@@ -1,0 +1,51 @@
+syntax = "proto3";
+
+option java_package = "com.rokkon.echo.grpc";
+option java_outer_classname = "EchoProto";
+option java_multiple_files = true;
+
+package echo;
+
+// The echo service - simple test service that echoes back input
+service EchoService {
+  // Echo back the input message
+  rpc Echo(EchoRequest) returns (EchoResponse);
+  
+  // Standard module service methods (as per requirements)
+  rpc ProcessData(ProcessRequest) returns (ProcessResponse);
+  rpc GetServiceRegistration(Empty) returns (ServiceRegistrationData);
+}
+
+message EchoRequest {
+  string message = 1;
+}
+
+message EchoResponse {
+  string message = 1;
+  int64 timestamp = 2;
+}
+
+// Standard module interface messages
+message ProcessRequest {
+  string id = 1;
+  bytes content = 2;
+  map<string, string> metadata = 3;
+}
+
+message ProcessResponse {
+  string id = 1;
+  bytes processed_content = 2;
+  map<string, string> metadata = 3;
+  string status = 4;
+  string error_message = 5;
+}
+
+message ServiceRegistrationData {
+  string module_name = 1;
+  string module_version = 2;
+  repeated string supported_input_types = 3;
+  repeated string supported_output_types = 4;
+}
+
+message Empty {
+}

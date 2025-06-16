@@ -1,0 +1,38 @@
+# Gradle
+.gradle/
+build/
+!build/quarkus-app/
+
+# IDE
+.idea/
+*.iml
+*.ipr
+*.iws
+.vscode/
+.settings/
+.project
+.classpath
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+
+# Test reports
+test-results/
+reports/
+
+# Git
+.git/
+.gitignore
+
+# Documentation
+*.md
+docs/
+
+# Docker
+.dockerignore
+Dockerfile*
+docker-compose*.yml
