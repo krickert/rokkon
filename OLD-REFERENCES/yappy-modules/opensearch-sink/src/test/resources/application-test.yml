@@ -1,0 +1,26 @@
+micronaut:
+  application:
+    name: opensearch-sink-test
+  server:
+    port: -1 # Random port for testing
+  test-resources:
+    enabled: true
+    modules:
+      opensearch:
+        enabled: true
+
+opesearch:
+  hostname: ${opensearch.host}
+# Kafka configuration
+kafka:
+  enabled: true
+
+
+# Logging configuration
+logger:
+  levels:
+    com.krickert.yappy.modules.opensearchsink: DEBUG
+    com.krickert.testcontainers.opensearch: TRACE
+    io.micronaut.context.condition: INFO
+    io.micronaut.testresources: TRACE
+    io.micronaut.testresources.testcontainers: TRACE

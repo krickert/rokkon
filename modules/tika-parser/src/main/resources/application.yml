@@ -1,0 +1,28 @@
+quarkus:
+  application:
+    name: tika-parser
+  
+  grpc:
+    server:
+      port: 9002
+      enable-health-service: true
+      enable-reflection-service: true
+  
+  # Disable auto-registration with Consul for modules
+  # The engine will register modules after validation
+  consul:
+    enabled: false
+  
+  log:
+    category:
+      "com.rokkon.modules.tika":
+        level: DEBUG
+    console:
+      format: "%d{HH:mm:ss} %-5p [%c{2.}] (%t) %s%e%n"
+      
+# Tika-specific configuration
+tika:
+  parser:
+    test-data-buffer:
+      enabled: false
+      precision: 3

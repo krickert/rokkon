@@ -1,0 +1,25 @@
+micronaut:
+  application:
+    name: module-registration-test
+  server:
+    port: ${random.port}
+
+# Test module configuration - hardcoded for testing
+test-module:
+  host: localhost
+  grpc:
+    port: 50051
+  http:
+    port: 8080
+
+# Consul configuration - will be provided by test resources
+consul:
+  client:
+    enabled: false  # Disable consul client creation for tests
+    host: ${consul.host}
+    port: ${consul.port}
+    registration:
+      enabled: false  # Don't register the test itself
+  # Host/port for backwards compatibility
+  host: ${consul.host}
+  port: ${consul.port}
