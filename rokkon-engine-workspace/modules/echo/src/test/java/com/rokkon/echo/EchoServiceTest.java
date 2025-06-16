@@ -1,6 +1,6 @@
 package com.rokkon.echo;
 
-import com.rokkon.echo.grpc.EchoService;
+import com.rokkon.search.sdk.PipeStepProcessor;
 import io.quarkus.grpc.GrpcClient;
 import io.quarkus.test.junit.QuarkusTest;
 
@@ -8,10 +8,10 @@ import io.quarkus.test.junit.QuarkusTest;
 class EchoServiceTest extends EchoServiceTestBase {
 
     @GrpcClient
-    EchoService echoService;
+    PipeStepProcessor pipeStepProcessor;
 
     @Override
-    protected EchoService getEchoService() {
-        return echoService;
+    protected PipeStepProcessor getEchoService() {
+        return pipeStepProcessor;
     }
 }

@@ -1,8 +1,7 @@
 plugins {
     java
-    `java-library`
-    `maven-publish`
     id("io.quarkus")
+    `maven-publish`
 }
 
 repositories {
@@ -16,10 +15,12 @@ val quarkusPlatformVersion: String by project
 
 dependencies {
     implementation(platform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}"))
-    api("io.quarkus:quarkus-grpc")
+    implementation("io.quarkus:quarkus-grpc")
+    implementation("io.quarkus:quarkus-arc")
+    testImplementation("io.quarkus:quarkus-junit5")
 }
 
-group = "com.rokkon"
+group = "com.rokkon.pipeline"
 version = "1.0.0-SNAPSHOT"
 
 java {
@@ -35,10 +36,10 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-// Configure Quarkus to use Mutiny for gRPC code generation
-quarkus {
-    buildForkOptions {
-        systemProperty("quarkus.grpc.codegen.type", "mutiny")
+// Include proto files in the JAR
+tasks.named<ProcessResources>("processResources") {
+    from("src/main/proto") {
+        include("**/*.proto")
     }
 }
 
@@ -46,6 +47,7 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
+            artifactId = "proto-definitions"
         }
     }
 }

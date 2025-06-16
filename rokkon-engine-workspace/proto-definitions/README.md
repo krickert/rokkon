@@ -9,7 +9,7 @@ If you want to learn more about Quarkus, please visit its website: <https://quar
 You can run your application in dev mode that enables live coding using:
 
 ```shell script
-gradle quarkusDev
+./gradlew quarkusDev
 ```
 
 > **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
@@ -19,7 +19,7 @@ gradle quarkusDev
 The application can be packaged using:
 
 ```shell script
-gradle build
+./gradlew build
 ```
 
 It produces the `quarkus-run.jar` file in the `build/quarkus-app/` directory.
@@ -30,7 +30,7 @@ The application is now runnable using `java -jar build/quarkus-app/quarkus-run.j
 If you want to build an _über-jar_, execute the following command:
 
 ```shell script
-gradle build -Dquarkus.package.jar.type=uber-jar
+./gradlew build -Dquarkus.package.jar.type=uber-jar
 ```
 
 The application, packaged as an _über-jar_, is now runnable using `java -jar build/*-runner.jar`.
@@ -40,13 +40,13 @@ The application, packaged as an _über-jar_, is now runnable using `java -jar bu
 You can create a native executable using:
 
 ```shell script
-gradle build -Dquarkus.native.enabled=true
+./gradlew build -Dquarkus.native.enabled=true
 ```
 
 Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
 
 ```shell script
-gradle build -Dquarkus.native.enabled=true -Dquarkus.native.container-build=true
+./gradlew build -Dquarkus.native.enabled=true -Dquarkus.native.container-build=true
 ```
 
 You can then execute your native executable with: `./build/proto-definitions-1.0.0-SNAPSHOT-runner`

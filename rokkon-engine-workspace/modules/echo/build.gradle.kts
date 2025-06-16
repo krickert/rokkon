@@ -1,6 +1,7 @@
 plugins {
     java
     alias(libs.plugins.quarkus)
+    `maven-publish`
 }
 
 repositories {
@@ -16,7 +17,7 @@ dependencies {
     implementation("io.quarkus:quarkus-arc")
     
     // Proto definitions from our proto project
-    implementation("com.rokkon:proto-definitions:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
     
     testImplementation(libs.quarkus.junit5)
     testImplementation(libs.assertj)
@@ -30,7 +31,7 @@ quarkus {
     }
 }
 
-group = "com.rokkon"
+group = "com.rokkon.pipeline"
 version = "1.0.0-SNAPSHOT"
 
 java {
@@ -49,4 +50,25 @@ tasks.test {
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
+}
+
+// Extract proto files from jar for local stub generation
+val extractProtos = tasks.register<Copy>("extractProtos") {
+    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("proto-definitions") }.singleFile))
+    include("**/*.proto")
+    into("src/main/proto")
+    includeEmptyDirs = false
+}
+
+tasks.named("quarkusGenerateCode") {
+    dependsOn(extractProtos)
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+            artifactId = "echo-module"
+        }
+    }
 }

@@ -1,7 +1,7 @@
 package com.rokkon.echo;
 
-import com.rokkon.echo.grpc.EchoService;
-import com.rokkon.echo.grpc.EchoServiceClient;
+import com.rokkon.search.sdk.PipeStepProcessor;
+import com.rokkon.search.sdk.PipeStepProcessorClient;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.quarkus.test.junit.QuarkusIntegrationTest;
@@ -12,12 +12,11 @@ import org.junit.jupiter.api.BeforeEach;
 public class EchoServiceIT extends EchoServiceTestBase {
 
     private ManagedChannel channel;
-    private EchoService echoService;
+    private PipeStepProcessor pipeStepProcessor;
 
     @BeforeEach
     void setup() {
         // For integration tests, the gRPC server runs on the configured port (9090 by default)
-        // The application.yml has it set to 9090
         int port = 9090;
         
         channel = ManagedChannelBuilder
@@ -25,7 +24,7 @@ public class EchoServiceIT extends EchoServiceTestBase {
                 .usePlaintext()
                 .build();
         
-        echoService = new EchoServiceClient("echoService", channel, (name, stub) -> stub);
+        pipeStepProcessor = new PipeStepProcessorClient("pipeStepProcessor", channel, (name, stub) -> stub);
     }
 
     @AfterEach
@@ -36,7 +35,7 @@ public class EchoServiceIT extends EchoServiceTestBase {
     }
 
     @Override
-    protected EchoService getEchoService() {
-        return echoService;
+    protected PipeStepProcessor getEchoService() {
+        return pipeStepProcessor;
     }
 }
