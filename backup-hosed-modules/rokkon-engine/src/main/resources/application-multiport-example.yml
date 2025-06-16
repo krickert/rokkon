@@ -1,0 +1,26 @@
+# Example configuration showing multiple gRPC clients 
+# pointing to the same service interface on different ports
+
+quarkus:
+  grpc:
+    clients:
+      # Multiple clients for PipeStepProcessor interface
+      chunker-module:
+        host: localhost
+        port: 50051
+        # Points to PipeStepProcessor service
+      
+      embedder-module:
+        host: localhost
+        port: 50052  
+        # Also points to PipeStepProcessor service
+        
+      echo-module:
+        host: localhost
+        port: 50053
+        # Also points to PipeStepProcessor service
+        
+      nlp-module:
+        host: localhost
+        port: 50054
+        # Also points to PipeStepProcessor service

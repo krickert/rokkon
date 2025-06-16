@@ -1,0 +1,26 @@
+# Test configuration for multiple gRPC clients to same interface
+quarkus:
+  grpc:
+    clients:
+      # Chunker module - same interface, port 50051
+      chunker-module:
+        host: localhost
+        port: 50051
+        # This points to PipeStepProcessor service
+      
+      # Embedder module - same interface, port 50052  
+      embedder-module:
+        host: localhost
+        port: 50052
+        # This also points to PipeStepProcessor service
+        
+      # Echo module - same interface, port 50053
+      echo-module:
+        host: localhost
+        port: 50053
+        # This also points to PipeStepProcessor service
+    
+  log:
+    level: DEBUG
+    category:
+      com.rokkon.search.engine: TRACE

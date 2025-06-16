@@ -1,0 +1,44 @@
+quarkus:
+  application:
+    name: echo-service
+  
+  # gRPC server configuration
+  grpc:
+    server:
+      port: 9001
+      enable-health-service: true  # Enable built-in gRPC health service
+      
+  # Health and monitoring
+  smallrye-health:
+    root-path: /health
+    
+  # Consul configuration - COMPLETELY DISABLED for modules
+  consul:
+    # Modules should NOT interact with Consul at all
+    # The engine will handle ALL Consul operations
+    enabled: false
+    
+  # Logging configuration
+  log:
+    level: INFO
+    category:
+      com.rokkon.modules.echo: DEBUG
+    console:
+      json: false  # Human readable for development
+      
+# Development profile
+"%dev":
+  quarkus:
+    log:
+      console:
+        json: false
+    grpc:
+      server:
+        reflection-service-enabled: true  # Enables gRPC reflection for testing tools
+        
+# Test profile  
+"%test":
+  quarkus:
+    grpc:
+      server:
+        port: 0  # Use random port for tests

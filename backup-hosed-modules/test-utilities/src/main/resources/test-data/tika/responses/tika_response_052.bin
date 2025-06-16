@@ -1,0 +1,32 @@
+
+tika-response-doc-052text/csv"Large CSV Dataset (Variant 2)*éLarge CSV Dataset (Variant 2)
+Document Index: 52
+
+ID Name Category Value Description
+1 Sample Item A Category 1 100.50 First test item
+2 Sample Item B Category 2 200.75 Second test item
+3 Sample Item C Category 1 150.25 Third test item
+4 Sample Item D Category 3 300.00 Fourth test item
+5 Sample Item E Category 2 75.50 Fifth test item
+6 Sample Item F Category 1 425.75 Sixth test item
+7 Sample Item G Category 3 50.00 Seventh test item
+8 Sample Item H Category 2 275.25 Eighth test item
+9 Sample Item I Category 1 325.50 Ninth test item
+10 Sample Item J Category 3 180.75 Tenth test item
+
+Summary Statistics
+Total Items: 10
+Categories: 3
+Document: 52
+
+Data Analysis Results
+The CSV file has been processed and converted to readable text format.
+Column headers and data relationships are preserved in the extracted content.
+Tabular structure is maintained through consistent spacing and organization.
+
+Content Verification
+All data values have been successfully extracted
+Column alignment is preserved where possible
+Special characters in data fields are handled correctly
+Row and column count matches source file specifications
+2csvZ©¡ÁÂüéÛR

@@ -1,0 +1,36 @@
+
+tika-response-doc-064
+text/plain"Large Text Document (Variant 3)*ª
+Large Text Document (Variant 3)
+
+This is extracted text from a plain text document (index 64).
+Since the original was already plain text, minimal processing was required.
+
+Plain text files are among the simplest document types to process.
+They contain no formatting information, only raw textual content.
+Tika processing preserves the original line breaks and paragraph structure.
+
+Key characteristics of plain text extraction:
+No formatting or styling information to remove
+Universal compatibility across systems
+Minimal processing overhead required
+Direct content preservation
+
+Content Structure Analysis
+This sample text includes multiple paragraphs and varied content
+to ensure proper testing of text extraction and chunking algorithms.
+The paragraph breaks and text flow are maintained exactly as in the source.
+
+Processing Benefits
+The document contains sufficient content for embedding generation
+and provides a good baseline for comparing extraction results
+across different document types and formats.
+
+Quality Assurance
+Plain text extraction serves as a control case for testing
+more complex document format processing capabilities.
+The simplicity allows for easy verification of extraction accuracy.
+
+End of extracted content from document 64.
+All original text content has been preserved without modification.
+2txtZ©¡ÁÂòîîR

@@ -1,0 +1,33 @@
+quarkus:
+  grpc:
+    server:
+      port: 9002
+      enable-reflection-service: true
+      use-separate-server: false
+      
+  http:
+    port: 8082
+    
+  log:
+    level: INFO
+    category:
+      "com.rokkon.modules.tika":
+        level: DEBUG
+      "io.quarkus.grpc":
+        level: DEBUG
+
+# Tika module configuration
+tika:
+  max-content-length: 10000000
+  enable-geo-topic-parser: false
+  extract-embedded-docs: true
+  parse-timeout-seconds: 60
+  max-recursion-depth: 10
+  enable-ocr: false
+  ocr-strategy: OCR_ONLY
+  ocr-language: eng
+  ocr-timeout-seconds: 120
+  enable-x-tika-content: false
+  flatten-compound: false
+  ignore-tika-exception: false
+  enable-password-extraction: false
