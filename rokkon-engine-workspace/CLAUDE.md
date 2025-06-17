@@ -1,5 +1,60 @@
 # Rokkon Engine Development Guide
 
+## Configuration Management - Critical Design Decisions
+
+### Consul Access Pattern (IMPORTANT)
+To prevent developers from bypassing validation and directly modifying the configuration graph:
+
+1. **config-orchestrator (WRITER)** - Uses Quarkus REST Client to access Consul HTTP API
+   - NO consul KV library dependencies
+   - Implements CAS (Compare-And-Set) operations for atomic updates
+   - All writes go through validation
+   
+2. **engine modules (READER ONLY)** - Uses quarkus-config-consul extension
+   - Read-only access via configuration properties
+   - Cannot write even if developer wants to bypass validation
+   - No KV client library available
+
+### CAS Implementation with Pure Quarkus
+```java
+@RegisterRestClient(configKey = "consul-api")
+@Path("/v1/kv")
+public interface ConsulKVClient {
+    @GET
+    @Path("/{key}")
+    Response getValueWithMetadata(@PathParam("key") String key);
+    
+    @PUT
+    @Path("/{key}")
+    Response putValueCAS(
+        @PathParam("key") String key,
+        @QueryParam("cas") Long modifyIndex,
+        String value
+    );
+}
+```
+
+### Retry Pattern with SmallRye Fault Tolerance
+```java
+@Retry(
+    maxRetries = 3,
+    delay = 100,
+    jitter = 50,
+    retryOn = CASConflictException.class
+)
+public void updateConfig(String key, Function<PipelineGraphConfig, PipelineGraphConfig> updater) {
+    // CAS logic with automatic retry
+}
+```
+
+**Required extension:** `quarkus ext add smallrye-fault-tolerance`
+
+This approach ensures:
+- No temptation to bypass validation
+- Clear separation of concerns
+- Audit trail for all modifications
+- Atomic updates with proper conflict resolution
+
 ## Module Development Procedure
 
 ### Overview
