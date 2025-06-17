@@ -76,6 +76,7 @@ public abstract class KafkaInputDefinitionTestBase {
     @Test
     public void testNullTopicInListValidation() {
         // List.of() throws NullPointerException for null elements
+        // This is expected Java behavior - List.of() does not accept null values
         assertThatThrownBy(() -> new KafkaInputDefinition(
                 List.of("topic1", null, "topic3"), 
                 "group", 
