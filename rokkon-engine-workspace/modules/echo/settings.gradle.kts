@@ -1,5 +1,3 @@
-rootProject.name = "echo"
-
 pluginManagement {
     repositories {
         mavenCentral()
@@ -8,10 +6,19 @@ pluginManagement {
     }
 }
 
+// Enable version catalogs from parent
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
 dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        mavenLocal()
+    }
     versionCatalogs {
         create("libs") {
             from(files("../../gradle/libs.versions.toml"))
         }
     }
 }
+
+rootProject.name = "echo"
