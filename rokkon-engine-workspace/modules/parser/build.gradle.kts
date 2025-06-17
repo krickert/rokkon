@@ -30,7 +30,13 @@ dependencies {
     testImplementation(libs.assertj)
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("com.rokkon.pipeline:test-utilities:1.0.0-SNAPSHOT")
+    testRuntimeOnly("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
     integrationTestImplementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+    
+    // Apache Commons IO for file operations
+    testImplementation("commons-io:commons-io:2.15.1")
+    // Apache Commons Compress for reading from JARs/ZIPs
+    testImplementation("org.apache.commons:commons-compress:1.25.0")
 
 }
 
@@ -63,7 +69,7 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-// Extract proto files from jar for local stub generation
+// CRITICAL: Extract proto files from jar for local stub generation
 val extractProtos = tasks.register<Copy>("extractProtos") {
     from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("proto-definitions") }.singleFile))
     include("**/*.proto")

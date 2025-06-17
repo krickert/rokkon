@@ -44,22 +44,14 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
+// Disable proto generation - we use classes from proto-definitions
 quarkus {
     buildForkOptions {
-        systemProperty("quarkus.grpc.codegen.type", "mutiny")
+        systemProperty("quarkus.grpc.codegen.skip", "true")
     }
 }
 
-val extractProtos = tasks.register<Copy>("extractProtos") {
-    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("proto-definitions") }.singleFile))
-    include("**/*.proto")
-    into("src/main/proto")
-    includeEmptyDirs = false
-}
-
-tasks.named("quarkusGenerateCode") {
-    dependsOn(extractProtos)
-}
+// No proto extraction needed - we depend on proto-definitions for message classes
 
 publishing {
     publications {

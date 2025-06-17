@@ -1,2 +1,0 @@
-# Ignore all proto files since they are extracted from jar
-*.proto

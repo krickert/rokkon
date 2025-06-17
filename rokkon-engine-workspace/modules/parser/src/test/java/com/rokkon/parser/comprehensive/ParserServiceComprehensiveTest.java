@@ -6,8 +6,7 @@ import com.rokkon.search.sdk.ProcessRequest;
 import com.rokkon.search.sdk.ProcessResponse;
 import com.rokkon.search.sdk.ProcessConfiguration;
 import com.rokkon.search.sdk.ServiceMetadata;
-import com.rokkon.test.data.TestDocumentFactory;
-import com.rokkon.test.data.TikaTestDataHelper;
+import com.rokkon.parser.util.ApacheCommonsDocumentLoader;
 import io.quarkus.grpc.GrpcClient;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
@@ -35,17 +34,15 @@ public class ParserServiceComprehensiveTest {
     @GrpcClient
     PipeStepProcessor parserService;
 
-    // Use direct instantiation pattern like chunker module (works better than CDI injection)
-    private final TikaTestDataHelper tikaTestDataHelper = new TikaTestDataHelper();
-    private final TestDocumentFactory documentFactory = new TestDocumentFactory();
+    // No longer need test-utilities classes - using Apache Commons loader instead
 
     @Test
     public void testProcessAllAvailableDocumentsQuality() {
         LOG.info("=== Testing All Available Documents with Quarkus ParserService ===");
 
-        // Load test documents from test-utilities
-        List<PipeDoc> testDocs = documentFactory.loadTikaProcessedDocuments();
-        LOG.info("Loaded " + testDocs.size() + " test documents for comprehensive testing");
+        // Load test documents using Apache Commons to bypass classloader issues
+        List<PipeDoc> testDocs = ApacheCommonsDocumentLoader.loadAllTestDocuments();
+        LOG.infof("Loaded %d test documents for comprehensive testing", testDocs.size());
 
         // Process configuration
         ProcessConfiguration config = ProcessConfiguration.newBuilder()
@@ -116,7 +113,8 @@ public class ParserServiceComprehensiveTest {
         double successRate = (double) successCount.get() / testDocs.size();
         LOG.infof("Success rate: %.2f%%", successRate * 100);
 
-        assertThat(successRate).isGreaterThanOrEqualTo(0.9)
-                .withFailMessage("Expected success rate of at least 90%, but got %.2f%%", successRate * 100);
+        assertThat(successRate)
+                .as("Expected success rate of at least 90%%, but got %.2f%%", successRate * 100)
+                .isGreaterThanOrEqualTo(0.9);
     }
 }
