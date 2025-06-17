@@ -14,6 +14,7 @@ val quarkusPlatformArtifactId: String by project
 val quarkusPlatformVersion: String by project
 
 dependencies {
+    implementation("io.quarkus:quarkus-jackson")
     implementation(enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}"))
     implementation("io.quarkus:quarkus-hibernate-validator")
     implementation("io.quarkus:quarkus-arc")
@@ -33,9 +34,15 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
+// Configure test tasks
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
     useJUnitPlatform()
+}
+
+// Exclude integration tests from regular test task (Quarkus handles this)
+tasks.test {
+    exclude("**/*IT.class")
 }
 
 tasks.withType<JavaCompile> {
