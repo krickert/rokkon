@@ -1,0 +1,32 @@
+quarkus:
+  application:
+    name: chunker-module
+  grpc:
+    server:
+      port: 9090
+      host: 0.0.0.0
+      enable-reflection-service: true
+    clients:
+      # Add gRPC client configurations here if needed
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+  container-image:
+    build: false  # Set to true when you want to build the image
+    push: false   # Set to true when you want to push to registry
+    registry: "registry.rokkon.com:8443"
+    image: "rokkon/chunker-module:${quarkus.application.version}"
+    dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
+    group: rokkon
+    # Credentials should be provided via environment variables:
+    # QUARKUS_CONTAINER_IMAGE_USERNAME
+    # QUARKUS_CONTAINER_IMAGE_PASSWORD
+
+# Test profile configuration
+"%test":
+  quarkus:
+    grpc:
+      server:
+        port: 0  # Use random port for tests

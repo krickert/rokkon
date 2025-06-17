@@ -4,3 +4,5 @@ rootProject.name = "rokkon-engine-workspace"
 includeBuild("proto-definitions")
 includeBuild("test-utilities")
 includeBuild("modules/echo")
+includeBuild("modules/chunker")
+includeBuild("modules/parser")
