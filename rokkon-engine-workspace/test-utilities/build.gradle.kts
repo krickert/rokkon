@@ -9,16 +9,21 @@ repositories {
     mavenLocal()
 }
 
+val quarkusPlatformGroupId: String by project
+val quarkusPlatformArtifactId: String by project
+val quarkusPlatformVersion: String by project
+
 dependencies {
+    implementation(enforcedPlatform(libs.quarkus.bom))
+    implementation("io.quarkus:quarkus-container-image-docker")
     implementation("io.quarkus:quarkus-grpc")
     implementation("io.quarkus:quarkus-config-yaml")
     implementation("io.quarkus:quarkus-arc")
-    implementation(enforcedPlatform(libs.quarkus.bom))
     implementation("org.junit.jupiter:junit-jupiter-api")
     implementation("org.apache.commons:commons-lang3:3.12.0")
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("org.junit.jupiter:junit-jupiter-engine")
-
+    
     implementation("org.assertj:assertj-core:3.24.2")
     implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
 }
@@ -31,12 +36,6 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-quarkus {
-    buildForkOptions {
-          systemProperty("quarkus.grpc.codegen.type", "mutiny")
-    }
- }
-
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
 }
@@ -45,11 +44,17 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
+quarkus {
+    buildForkOptions {
+        systemProperty("quarkus.grpc.codegen.type", "mutiny")
+    }
+}
+
 val extractProtos = tasks.register<Copy>("extractProtos") {
-      from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("proto-definitions") }.singleFile))
-      include("**/*.proto")
-      into("src/main/proto")
-      includeEmptyDirs = false
+    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("proto-definitions") }.singleFile))
+    include("**/*.proto")
+    into("src/main/proto")
+    includeEmptyDirs = false
 }
 
 tasks.named("quarkusGenerateCode") {

@@ -1,17 +1,19 @@
 pluginManagement {
-    val quarkusPluginVersion: String by settings
-    val quarkusPluginId: String by settings
     repositories {
         mavenCentral()
         gradlePluginPortal()
         mavenLocal()
     }
-    plugins {
-        id(quarkusPluginId) version quarkusPluginVersion
-    }
 }
 
+// Enable version catalogs from parent
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
+
 dependencyResolutionManagement {
+    repositories {
+        mavenCentral()
+        mavenLocal()
+    }
     versionCatalogs {
         create("libs") {
             from(files("../gradle/libs.versions.toml"))
@@ -19,4 +21,4 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name="test-utilities"
+rootProject.name = "test-utilities"
