@@ -3,7 +3,7 @@ quarkus:
     name: chunker-module
   grpc:
     server:
-      port: 9090
+      port: 49092
       host: 0.0.0.0
       enable-reflection-service: true
     clients:
