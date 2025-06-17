@@ -30,6 +30,8 @@ dependencies {
     testImplementation(libs.assertj)
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("com.rokkon.pipeline:test-utilities:1.0.0-SNAPSHOT")
+    integrationTestImplementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+
 }
 
 // Configure Quarkus to use Mutiny for gRPC code generation
@@ -54,7 +56,7 @@ tasks.withType<Test> {
 // Exclude integration tests from the regular test task
 tasks.test {
     exclude("**/*IT.class")
-    exclude("**/comprehensive/**")  // Exclude comprehensive tests for now
+    // Comprehensive tests are now enabled!
 }
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"

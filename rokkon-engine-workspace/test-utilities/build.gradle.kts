@@ -55,3 +55,16 @@ val extractProtos = tasks.register<Copy>("extractProtos") {
 tasks.named("quarkusGenerateCode") {
     dependsOn(extractProtos)
 }
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+            artifactId = "test-utilities"
+        }
+    }
+}
+
+tasks.withType<GenerateModuleMetadata> {
+    suppressedValidationErrors.add("enforced-platform")
+}
