@@ -81,6 +81,7 @@ public abstract class PipelineClusterConfigTestBase {
 
     @Test
     public void testAllowedTopicsValidation() {
+        // Set.of() throws NullPointerException for null elements
         assertThatThrownBy(() -> new PipelineClusterConfig(
                 "test-cluster",
                 null,
@@ -89,9 +90,26 @@ public abstract class PipelineClusterConfigTestBase {
                 Set.of("valid-topic", null, "another-topic"),
                 null
         ))
+            .isInstanceOf(NullPointerException.class);
+            
+        // Test with HashSet to properly test our validation
+        Set<String> topicsWithNull = new java.util.HashSet<>();
+        topicsWithNull.add("valid-topic");
+        topicsWithNull.add(null);
+        topicsWithNull.add("another-topic");
+        
+        assertThatThrownBy(() -> new PipelineClusterConfig(
+                "test-cluster",
+                null,
+                null,
+                null,
+                topicsWithNull,
+                null
+        ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("allowedKafkaTopics cannot contain null or blank strings.");
             
+        // Test blank string validation
         assertThatThrownBy(() -> new PipelineClusterConfig(
                 "test-cluster",
                 null,
@@ -106,6 +124,7 @@ public abstract class PipelineClusterConfigTestBase {
 
     @Test
     public void testAllowedServicesValidation() {
+        // Set.of() throws NullPointerException for null elements
         assertThatThrownBy(() -> new PipelineClusterConfig(
                 "test-cluster",
                 null,
@@ -113,6 +132,34 @@ public abstract class PipelineClusterConfigTestBase {
                 null,
                 null,
                 Set.of("valid-service", null, "another-service")
+        ))
+            .isInstanceOf(NullPointerException.class);
+            
+        // Test with HashSet to properly test our validation
+        Set<String> servicesWithNull = new java.util.HashSet<>();
+        servicesWithNull.add("valid-service");
+        servicesWithNull.add(null);
+        servicesWithNull.add("another-service");
+        
+        assertThatThrownBy(() -> new PipelineClusterConfig(
+                "test-cluster",
+                null,
+                null,
+                null,
+                null,
+                servicesWithNull
+        ))
+            .isInstanceOf(IllegalArgumentException.class)
+            .hasMessage("allowedGrpcServices cannot contain null or blank strings.");
+            
+        // Test blank string validation
+        assertThatThrownBy(() -> new PipelineClusterConfig(
+                "test-cluster",
+                null,
+                null,
+                null,
+                null,
+                Set.of("valid-service", "  ", "another-service")
         ))
             .isInstanceOf(IllegalArgumentException.class)
             .hasMessage("allowedGrpcServices cannot contain null or blank strings.");
