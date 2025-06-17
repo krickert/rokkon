@@ -33,7 +33,7 @@ PipelineClusterConfig (Root)
 Maintain existing Consul KV structure for operational continuity:
 
 ```
-/yappy-clusters/<cluster-name>/
+/rokkon-clusters/<cluster-name>/
 ├── config.json                    # PipelineClusterConfig
 ├── pipelines/                     # Individual pipeline configs
 │   ├── document-processing.json   # Example pipeline
@@ -63,10 +63,10 @@ Maintain existing Consul KV structure for operational continuity:
 ```java
 @ApplicationScoped
 public class DynamicConfigurationManager {
-    
+
     @ConfigProperty(name = "consul.kv.watch.interval")
     Duration watchInterval;
-    
+
     public void watchConfigurationChanges() {
         // Watch for changes in Consul KV
         // Trigger configuration reload
@@ -80,7 +80,7 @@ public class DynamicConfigurationManager {
 ```java
 @ApplicationScoped
 public class ConfigurationValidator {
-    
+
     public ValidationResult validatePipelineConfig(PipelineConfig config) {
         // Validate module references exist
         // Check routing logic consistency
@@ -95,7 +95,7 @@ public class ConfigurationValidator {
 ```java
 @ApplicationScoped
 public class ConsulConfigurationStore {
-    
+
     public boolean updateConfiguration(String key, Object newConfig, long expectedVersion) {
         // Implement CAS operations
         // Prevent concurrent modification conflicts
@@ -113,7 +113,7 @@ public class ConfigurationVersion {
     private Instant timestamp;
     private String author; // For audit trail
     private String changeDescription;
-    
+
     // Support for configuration rollback
     // Audit trail for operational compliance
 }
@@ -127,13 +127,13 @@ public class ConfigurationVersion {
 @RestController
 @Path("/api/v1/configuration")
 public class ConfigurationAPI {
-    
+
     @GET
     @Path("/pipelines")
     public List<PipelineConfig> getAllPipelines() {
         // Return pipeline configurations for UI
     }
-    
+
     @POST
     @Path("/pipelines")
     public Response createPipeline(PipelineConfig config) {
@@ -141,7 +141,7 @@ public class ConfigurationAPI {
         // Update Consul configuration
         // Trigger engine reconfiguration
     }
-    
+
     @PUT
     @Path("/pipelines/{id}")
     public Response updatePipeline(@PathParam("id") String id, PipelineConfig config) {
@@ -187,13 +187,13 @@ public class ConfigurationAPI {
 ```java
 @ApplicationScoped
 public class ConfigurationAssistant {
-    
+
     public List<ConfigurationHint> getConfigurationHints(PipelineConfig config) {
         // Suggest optimizations
         // Warn about potential issues
         // Recommend best practices
     }
-    
+
     public List<AvailableModule> getCompatibleModules(String currentStep) {
         // Return modules compatible with current pipeline step
         // Show module capabilities and requirements
@@ -235,16 +235,16 @@ message ConfigParameter {
 // Example module configuration implementation
 @ConfigurationProperties("module.chunker")
 public class ChunkerConfig {
-    
+
     @ConfigProperty(name = "chunk-size", defaultValue = "1000")
     @ConfigDescription("Size of text chunks in characters")
     @ConfigRange(min = 100, max = 10000)
     int chunkSize;
-    
+
     @ConfigProperty(name = "overlap", defaultValue = "100") 
     @ConfigDescription("Overlap between chunks in characters")
     int overlap;
-    
+
     @ConfigProperty(name = "split-on-sentences", defaultValue = "true")
     @ConfigDescription("Split chunks on sentence boundaries")
     boolean splitOnSentences;
@@ -256,17 +256,17 @@ public class ChunkerConfig {
 ```java
 @QuarkusTest
 public class ModuleConfigurationTest {
-    
+
     @Test
     void shouldHandleValidConfiguration() {
         // Test module with valid configuration
     }
-    
+
     @Test
     void shouldRejectInvalidConfiguration() {
         // Test module configuration validation
     }
-    
+
     @Test
     void shouldUseDefaultConfiguration() {
         // Test default configuration behavior
@@ -345,15 +345,15 @@ engine.circuit-breaker.reset-timeout=30s
 ```java
 @ApplicationScoped
 public class SecureConfigurationManager {
-    
+
     @ConfigProperty(name = "consul.token")
     @Secret
     String consulToken;
-    
+
     @ConfigProperty(name = "kafka.password")
     @Secret  
     String kafkaPassword;
-    
+
     // Never log or expose secret values
     // Integrate with external secret management systems
 }
@@ -364,7 +364,7 @@ public class SecureConfigurationManager {
 ```java
 @ApplicationScoped
 public class EncryptedConfigurationStore {
-    
+
     public void storeEncryptedConfig(String key, Object config) {
         // Encrypt sensitive configuration data
         // Store encrypted data in Consul
@@ -378,7 +378,7 @@ public class EncryptedConfigurationStore {
 ```java
 @ApplicationScoped
 public class ConfigurationAccessControl {
-    
+
     public boolean canModifyPipeline(String userId, String pipelineId) {
         // Implement role-based access control
         // Audit configuration changes
@@ -394,7 +394,7 @@ public class ConfigurationAccessControl {
 ```java
 @ApplicationScoped
 public class ConfigurationAuditLogger {
-    
+
     public void logConfigurationChange(ConfigurationChangeEvent event) {
         // Log who changed what when
         // Track configuration drift
@@ -408,12 +408,12 @@ public class ConfigurationAuditLogger {
 ```java
 @ApplicationScoped
 public class ConfigurationMetrics {
-    
+
     @Gauge(name = "active_pipelines_count")
     public int getActivePipelinesCount() {
         return configurationManager.getActivePipelines().size();
     }
-    
+
     @Counter(name = "configuration_changes_total")
     public void recordConfigurationChange() {
         // Track configuration change frequency
@@ -426,7 +426,7 @@ public class ConfigurationMetrics {
 ```java
 @ApplicationScoped
 public class ConfigurationHealthCheck {
-    
+
     @Readiness
     public HealthCheckResponse checkConfigurationHealth() {
         // Validate configuration consistency

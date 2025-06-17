@@ -46,6 +46,10 @@ public class PipelineStepConfigTest {
         
         KafkaTransportConfig kafkaTransport = new KafkaTransportConfig(
             "chunks-output", 
+            null, // use default partitionKeyField
+            null, // use default compressionType
+            null, // use default batchSize
+            null, // use default lingerMs
             Map.of("acks", "all")
         );
 
@@ -186,7 +190,7 @@ public class PipelineStepConfigTest {
     @Test
     public void testOutputTargetValidation() {
         GrpcTransportConfig grpcConfig = new GrpcTransportConfig("test-service", Map.of());
-        KafkaTransportConfig kafkaConfig = new KafkaTransportConfig("test-topic", Map.of());
+        KafkaTransportConfig kafkaConfig = new KafkaTransportConfig("test-topic", null, null, null, null, Map.of());
 
         // Valid GRPC output
         assertDoesNotThrow(() -> new PipelineStepConfig.OutputTarget(

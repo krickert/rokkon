@@ -8,6 +8,35 @@ import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Collections;
 import java.util.Map;
 
+/**
+ * gRPC transport configuration for pipeline step outputs.
+ * 
+ * <h3>Design Decisions:</h3>
+ * <ul>
+ *   <li><b>Service Discovery</b>: 100% through Consul - this is why we use Consul!</li>
+ *   <li><b>Host/Port Resolution</b>: Dynamically resolved via Consul service registry</li>
+ *   <li><b>TLS Settings</b>: Configured at global/instance level, not per-transport</li>
+ *   <li><b>Load Balancing</b>: Handled by Consul (round-robin or least-connections)</li>
+ * </ul>
+ * 
+ * <h3>Configuration Flow:</h3>
+ * <ol>
+ *   <li>Service name is looked up in Consul</li>
+ *   <li>Consul returns healthy instances with host:port</li>
+ *   <li>gRPC client connects using Consul's selection</li>
+ *   <li>Health checks maintain service registry accuracy</li>
+ * </ol>
+ * 
+ * <h3>Properties Map:</h3>
+ * Common properties include:
+ * <ul>
+ *   <li>{@code timeout} - Call timeout in milliseconds</li>
+ *   <li>{@code retry} - Number of retry attempts</li>
+ *   <li>{@code loadBalancingPolicy} - Override Consul's default</li>
+ * </ul>
+ * 
+ * @see PipelineStepConfig.OutputTarget
+ */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @Schema(description = "gRPC transport configuration")
 public record GrpcTransportConfig(

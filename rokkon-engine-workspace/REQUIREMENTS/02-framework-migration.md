@@ -104,7 +104,7 @@ quarkus.profile=dev
 # Consul configuration
 quarkus.consul-config.enabled=true
 quarkus.consul-config.agent.host-port=localhost:8500
-quarkus.consul-config.properties-value-keys=yappy-clusters/default/config
+quarkus.consul-config.properties-value-keys=rokkon-clusters/default/config
 
 # gRPC configuration
 quarkus.grpc.server.port=9090
@@ -138,7 +138,7 @@ public class ServiceDiscovery {
 public class ServiceDiscovery {
     @Inject
     private Vertx vertx; // For Consul client
-    
+
     // Custom Consul client integration
 }
 ```

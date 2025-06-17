@@ -1,7 +1,7 @@
 # Integration Requirements - Consul, Kafka, gRPC
 
 ## Overview
-Detailed requirements for integrating Consul, Kafka, and gRPC services in the Quarkus-based YAPPY Engine, focusing on reliability and ease of testing.
+Detailed requirements for integrating Consul, Kafka, and gRPC services in the Quarkus-based Rokkon Engine, focusing on reliability and ease of testing.
 
 ## Consul Integration Requirements
 
@@ -14,7 +14,7 @@ Detailed requirements for integrating Consul, Kafka, and gRPC services in the Qu
 ### Configuration Structure
 Maintain existing Consul KV structure:
 ```
-/yappy-clusters/<cluster-name>/
+/rokkon-clusters/<cluster-name>/
 ├── config.json              # PipelineClusterConfig
 ├── pipelines/               # Individual pipeline configs
 │   ├── pipeline-1.json
@@ -33,7 +33,7 @@ Maintain existing Consul KV structure:
 # Basic Consul configuration
 quarkus.consul-config.enabled=true
 quarkus.consul-config.agent.host-port=${CONSUL_HOST:localhost}:${CONSUL_PORT:8500}
-quarkus.consul-config.properties-value-keys=yappy-clusters/${CLUSTER_NAME:default}/config
+quarkus.consul-config.properties-value-keys=rokkon-clusters/${CLUSTER_NAME:default}/config
 
 # Service registration
 quarkus.consul-config.agent.service-name=rokkon-engine
@@ -45,10 +45,10 @@ quarkus.consul-config.agent.service-check-interval=10s
 ```java
 @ApplicationScoped
 public class ConsulConfigWatcher {
-    
+
     @ConfigProperty(name = "consul.kv.watch.paths")
     List<String> watchPaths;
-    
+
     // Custom implementation for watching Consul KV changes
     // Trigger configuration reload on changes
     // Implement Compare-And-Set operations
@@ -95,10 +95,10 @@ All modules must implement this interface:
 service ModuleService {
   // Core processing method
   rpc ProcessData(ProcessRequest) returns (ProcessResponse);
-  
+
   // Service registration
   rpc GetServiceRegistration() returns (ServiceRegistrationData);
-  
+
   // Health check (standard gRPC health)
   rpc Check(HealthCheckRequest) returns (HealthCheckResponse);
 }
@@ -108,7 +108,7 @@ service ModuleService {
 ```java
 @GrpcService
 public class EngineService implements EngineGrpc {
-    
+
     @Override
     public Uni<ProcessResponse> processData(ProcessRequest request) {
         return processDataAsync(request)
@@ -124,14 +124,14 @@ public class EngineService implements EngineGrpc {
 ```java
 @ApplicationScoped
 public class ModuleClientPool {
-    
+
     // Maintain connection pools per module type
     // Implement circuit breaker pattern
     // Handle connection failures gracefully
-    
+
     @GrpcClient("chunker-service")
     ChunkerService chunkerClient;
-    
+
     @GrpcClient("embedder-service") 
     EmbedderService embedderClient;
 }
@@ -154,10 +154,10 @@ public class ModuleClientPool {
 ```java
 @ApplicationScoped
 public class DynamicKafkaManager {
-    
+
     @Inject
     KafkaConsumer<String, byte[]> kafkaConsumer;
-    
+
     // Support for dynamic topic subscription based on pipeline config
     public void subscribeToTopics(List<String> topics) {
         // Dynamic subscription logic
@@ -186,7 +186,7 @@ mp.messaging.outgoing.pipeline-responses.topic=pipeline-responses
 ```java
 @ApplicationScoped
 public class KafkaMessageProcessor {
-    
+
     @Incoming("pipeline-requests")
     @Outgoing("pipeline-responses")
     public Uni<ProcessResponse> processMessage(ProcessRequest request) {
@@ -204,7 +204,7 @@ public class KafkaMessageProcessor {
 ```java
 @ApplicationScoped 
 public class KafkaSlotManager {
-    
+
     // Consul-based slot claiming
     // Prevent multiple consumers on same partition
     // Coordinate consumer group management
@@ -218,7 +218,7 @@ public class KafkaSlotManager {
 @QuarkusTest
 @TestProfile(IntegrationTestProfile.class)
 class FullIntegrationTest {
-    
+
     // Quarkus dev services should handle:
     // - Consul container with random port
     // - Kafka container with random port  
@@ -254,7 +254,7 @@ public class IntegrationTestProfile implements QuarkusTestProfile {
 ```java
 @ApplicationScoped
 public class ResilientModuleClient {
-    
+
     @CircuitBreaker(requestVolumeThreshold = 4, failureRatio = 0.5, delay = 1000)
     @Retry(maxRetries = 3, delay = 500)
     public Uni<ProcessResponse> callModule(ProcessRequest request) {

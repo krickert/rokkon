@@ -330,3 +330,52 @@ public class [Module]ServiceIT extends [Module]ServiceTestBase {
 6. Test both unit and integration modes
 
 This procedure ensures consistent, working modules that integrate properly with the Rokkon Engine architecture.
+
+## Critical Design Decisions
+
+### Kafka Transport Configuration
+
+#### Topic Naming Convention
+- **Pattern**: `{pipeline-name}.{step-name}.input`
+- **DLQ Pattern**: Always `{topic}.dlq` (not configurable)
+- **Consumer Groups**: `{pipeline-name}.consumer-group`
+- **Validation**: No dots in custom topic names (dots are delimiters)
+
+#### Partitioning Strategy
+- **Default Key**: Always `pipedocId` (NOT `streamId`)
+- **Rationale**: Ensures CRUD operations maintain order
+- **Compaction**: Enabled on topics to retain only most recent ID
+
+#### Producer Configuration
+- **Compression**: Default `snappy` (prefer `snappy` or `lz4`)
+- **Batch Size**: Default 16KB
+- **Linger MS**: Default 10ms
+- **Acks**: App-controlled at engine level
+
+#### Producer Instance ID
+- **Format**: `{hostname}-{consul-lease-id}-{uuid}`
+- **Tied to**: Consul lease for debugging/monitoring
+- **Dynamic**: Generated at runtime
+
+### gRPC Transport Configuration
+
+#### Service Discovery
+- **100% through Consul**: This is why we use Consul!
+- **Host/Port**: Resolved dynamically via service registry
+- **TLS**: Configured at global level, not per-transport
+- **Load Balancing**: Handled by Consul
+
+### Entity Operations
+- **Location**: PipeStream in protobuf (NOT Document or ProcessRequest)
+- **Operations**: CREATE, UPDATE, DELETE
+- **Rationale**: Operations are stream-level, not document-level
+
+### Schema Registry
+- **Current**: JSON Schema V7 validation
+- **Future**: Interface for Glue/Apicurio
+- **Per-Module**: Schema is global to the module
+
+### Consul Access Pattern
+- **Writer**: config-orchestrator uses REST client (with CAS operations)
+- **Reader**: Engine uses config-consul extension (read-only)
+- **Critical**: Engine should NEVER write to Consul configuration
