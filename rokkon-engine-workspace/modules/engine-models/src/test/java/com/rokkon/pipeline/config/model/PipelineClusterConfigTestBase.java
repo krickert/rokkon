@@ -82,6 +82,7 @@ public abstract class PipelineClusterConfigTestBase {
     @Test
     public void testAllowedTopicsValidation() {
         // Set.of() throws NullPointerException for null elements
+        // This is expected Java behavior - Set.of() does not accept null values
         assertThatThrownBy(() -> new PipelineClusterConfig(
                 "test-cluster",
                 null,
@@ -125,6 +126,7 @@ public abstract class PipelineClusterConfigTestBase {
     @Test
     public void testAllowedServicesValidation() {
         // Set.of() throws NullPointerException for null elements
+        // This is expected Java behavior - Set.of() does not accept null values
         assertThatThrownBy(() -> new PipelineClusterConfig(
                 "test-cluster",
                 null,
