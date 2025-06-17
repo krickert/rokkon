@@ -180,8 +180,9 @@ public abstract class RetryConfigValidatorTestBase {
         ValidationResult result = getValidator().validate(config);
         
         assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).containsExactly(
-            "Step 'test-step' retry config: retryBackoffMs exceeds maximum allowed value of 3600000 ms (was 4000000)"
+        assertThat(result.errors()).containsExactlyInAnyOrder(
+            "Step 'test-step' retry config: retryBackoffMs exceeds maximum allowed value of 3600000 ms (was 4000000)",
+            "Step 'test-step' retry config: initial retry backoff (4000000 ms) cannot exceed max retry backoff (60000 ms)"
         );
         assertThat(result.warnings()).isEmpty();
     }
@@ -249,8 +250,9 @@ public abstract class RetryConfigValidatorTestBase {
             Map.of("default", output),
             3,
             1000L,
-            4000000L,    // exceeds max timeout (over 1 hour)
-            null, null,
+            30000L,
+            null, 
+            4000000L,    // stepTimeoutMs - exceeds max timeout (over 1 hour)
             processorInfo
         );
 
@@ -288,10 +290,11 @@ public abstract class RetryConfigValidatorTestBase {
             "Test step",
             null, null, null,
             Map.of("default", output),
-            3,
-            1000L,
-            700000L,   // high timeout (11+ minutes)
-            null, null,
+            3,           // maxRetries
+            1000L,       // retryBackoffMs
+            30000L,      // maxRetryBackoffMs
+            null,        // retryBackoffMultiplier
+            700000L,     // stepTimeoutMs: high timeout (11+ minutes)
             processorInfo
         );
 
@@ -370,10 +373,11 @@ public abstract class RetryConfigValidatorTestBase {
             "Test step",
             null, null, null,
             Map.of("default", output),
-            10,       // 10 retries
-            7000L,    // 7s backoff * 10 = 70s total
-            60000L,   // 60s timeout
-            null, null,
+            10,       // maxRetries: 10 retries
+            7000L,    // retryBackoffMs: 7s backoff * 10 = 70s total
+            30000L,   // maxRetryBackoffMs
+            null,     // retryBackoffMultiplier
+            60000L,   // stepTimeoutMs: 60s timeout
             processorInfo
         );
 

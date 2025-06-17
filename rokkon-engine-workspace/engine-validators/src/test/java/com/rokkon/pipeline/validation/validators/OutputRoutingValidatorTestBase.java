@@ -11,6 +11,7 @@ import java.util.List;
 import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 public abstract class OutputRoutingValidatorTestBase {
 
@@ -145,8 +146,9 @@ public abstract class OutputRoutingValidatorTestBase {
         ValidationResult result = getValidator().validate(config);
         
         assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).containsExactly(
-            "Step 'sink-step': SINK steps should not have outputs"
+        assertThat(result.errors()).containsExactlyInAnyOrder(
+            "Step 'sink-step': SINK steps should not have outputs",
+            "Step 'sink-step' output 'default': Target step 'another-step' does not exist in pipeline"
         );
         assertThat(result.warnings()).isEmpty();
     }
@@ -183,77 +185,39 @@ public abstract class OutputRoutingValidatorTestBase {
 
     @Test
     void testKafkaTransportMissingConfig() {
-        PipelineStepConfig.ProcessorInfo processorInfo = new PipelineStepConfig.ProcessorInfo(
-            "test-service", null
-        );
+        // This test can't be done because OutputTarget constructor validates transport config
+        // The model prevents creation of invalid configs (KAFKA type without kafka config)
+        // OutputTarget constructor throws IllegalArgumentException:
+        // "KafkaTransportConfig must be provided when transportType is KAFKA"
         
-        PipelineStepConfig.OutputTarget output = new PipelineStepConfig.OutputTarget(
+        // Test that the model validation works as expected
+        assertThatThrownBy(() -> new PipelineStepConfig.OutputTarget(
             "target-step", TransportType.KAFKA, null, null  // Missing Kafka config
-        );
-        
-        PipelineStepConfig step = new PipelineStepConfig(
-            "test-step", 
-            StepType.PIPELINE, 
-            "Test step",
-            null, null, null,
-            Map.of("default", output),
-            null, null, null, null, null,
-            processorInfo
-        );
-
-        PipelineConfig config = new PipelineConfig(
-            "test-pipeline",
-            Map.of("test-step", step)
-        );
-
-        ValidationResult result = getValidator().validate(config);
-        
-        assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).containsExactly(
-            "Step 'test-step' output 'default': Kafka transport config required for KAFKA transport type"
-        );
-        assertThat(result.warnings()).isEmpty();
+        ))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("KafkaTransportConfig must be provided when transportType is KAFKA");
     }
 
     @Test
     void testGrpcTransportMissingConfig() {
-        PipelineStepConfig.ProcessorInfo processorInfo = new PipelineStepConfig.ProcessorInfo(
-            "test-service", null
-        );
+        // This test can't be done because OutputTarget constructor validates transport config
+        // The model prevents creation of invalid configs (GRPC type without grpc config)
+        // OutputTarget constructor throws IllegalArgumentException:
+        // "GrpcTransportConfig must be provided when transportType is GRPC"
         
-        PipelineStepConfig.OutputTarget output = new PipelineStepConfig.OutputTarget(
+        assertThatThrownBy(() -> new PipelineStepConfig.OutputTarget(
             "target-step", TransportType.GRPC, null, null  // Missing gRPC config
-        );
-        
-        PipelineStepConfig step = new PipelineStepConfig(
-            "test-step", 
-            StepType.PIPELINE, 
-            "Test step",
-            null, null, null,
-            Map.of("default", output),
-            null, null, null, null, null,
-            processorInfo
-        );
-
-        PipelineConfig config = new PipelineConfig(
-            "test-pipeline",
-            Map.of("test-step", step)
-        );
-
-        ValidationResult result = getValidator().validate(config);
-        
-        assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).containsExactly(
-            "Step 'test-step' output 'default': gRPC transport config required for GRPC transport type"
-        );
-        assertThat(result.warnings()).isEmpty();
+        ))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("GrpcTransportConfig must be provided when transportType is GRPC");
     }
 
     @Test
     void testMismatchedTransportConfig() {
-        PipelineStepConfig.ProcessorInfo processorInfo = new PipelineStepConfig.ProcessorInfo(
-            "test-service", null
-        );
+        // This test can't be done because OutputTarget constructor validates transport config
+        // The model prevents having both gRPC and Kafka configs when transport type is KAFKA
+        // OutputTarget constructor throws IllegalArgumentException:
+        // "GrpcTransportConfig should only be provided when transportType is GRPC"
         
         KafkaTransportConfig kafkaTransport = new KafkaTransportConfig(
             "test.topic", null, null, null, null, Map.of()
@@ -263,33 +227,11 @@ public abstract class OutputRoutingValidatorTestBase {
             "grpc-service", Map.of("timeout", "5000")
         );
         
-        // KAFKA type but has gRPC config
-        PipelineStepConfig.OutputTarget output = new PipelineStepConfig.OutputTarget(
+        assertThatThrownBy(() -> new PipelineStepConfig.OutputTarget(
             "target-step", TransportType.KAFKA, grpcTransport, kafkaTransport
-        );
-        
-        PipelineStepConfig step = new PipelineStepConfig(
-            "test-step", 
-            StepType.PIPELINE, 
-            "Test step",
-            null, null, null,
-            Map.of("default", output),
-            null, null, null, null, null,
-            processorInfo
-        );
-
-        PipelineConfig config = new PipelineConfig(
-            "test-pipeline",
-            Map.of("test-step", step)
-        );
-
-        ValidationResult result = getValidator().validate(config);
-        
-        assertThat(result.valid()).isTrue();
-        assertThat(result.errors()).isEmpty();
-        assertThat(result.warnings()).containsExactly(
-            "Step 'test-step' output 'default': gRPC config specified but transport type is KAFKA"
-        );
+        ))
+        .isInstanceOf(IllegalArgumentException.class)
+        .hasMessageContaining("GrpcTransportConfig should only be provided when transportType is GRPC");
     }
 
     @Test
@@ -316,9 +258,20 @@ public abstract class OutputRoutingValidatorTestBase {
             processorInfo
         );
 
+        // Add the target step to avoid "does not exist" errors
+        PipelineStepConfig targetStep = new PipelineStepConfig(
+            "target-step", 
+            StepType.SINK, 
+            "Target step",
+            null, null, null,
+            Map.of(),  // SINK has no outputs
+            null, null, null, null, null,
+            processorInfo
+        );
+
         PipelineConfig config = new PipelineConfig(
             "test-pipeline",
-            Map.of("test-step", step)
+            Map.of("test-step", step, "target-step", targetStep)
         );
 
         ValidationResult result = getValidator().validate(config);
@@ -362,9 +315,20 @@ public abstract class OutputRoutingValidatorTestBase {
             processorInfo
         );
 
+        // Add the target step to avoid "does not exist" errors
+        PipelineStepConfig targetStep = new PipelineStepConfig(
+            "target-step", 
+            StepType.SINK, 
+            "Target step",
+            null, null, null,
+            Map.of(),  // SINK has no outputs
+            null, null, null, null, null,
+            processorInfo
+        );
+
         PipelineConfig config = new PipelineConfig(
             "test-pipeline",
-            Map.of("test-step", step)
+            Map.of("test-step", step, "target-step", targetStep)
         );
 
         ValidationResult result = getValidator().validate(config);
