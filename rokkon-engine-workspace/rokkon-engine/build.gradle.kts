@@ -31,6 +31,7 @@ dependencies {
     // Engine modules
     implementation("com.rokkon.pipeline:engine-consul:1.0.0-SNAPSHOT")
     implementation("com.rokkon.pipeline:engine-validators:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:engine-models:1.0.0-SNAPSHOT")
     
     // Proto definitions
     implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
@@ -39,6 +40,8 @@ dependencies {
     testImplementation("io.quarkus:quarkus-junit5-mockito")
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("org.assertj:assertj-core:3.26.3")
+    testImplementation("org.testcontainers:testcontainers:1.19.8")
+    testImplementation("org.testcontainers:junit-jupiter:1.19.8")
     testImplementation("org.testcontainers:consul:1.19.8") {
         exclude(group = "org.apache.commons", module = "commons-compress")
     }

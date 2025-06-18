@@ -1,0 +1,48 @@
+quarkus:
+  application:
+    name: embedder-module
+  grpc:
+    server:
+      port: 49091  # Different port from echo module
+      host: 0.0.0.0
+      enable-reflection-service: true
+    clients:
+      # Add gRPC client configurations here if needed
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+  container-image:
+    build: false  # Set to true when you want to build the image
+    push: false   # Set to true when you want to push to registry
+    registry: "registry.rokkon.com:8443"
+    image: "rokkon/embedder-module:${quarkus.application.version}"
+    dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
+    group: rokkon
+    # Credentials should be provided via environment variables:
+    # QUARKUS_CONTAINER_IMAGE_USERNAME
+    # QUARKUS_CONTAINER_IMAGE_PASSWORD
+
+# DJL configuration for ML models
+djl:
+  engine:
+    default-engine: PyTorch
+  pytorch:
+    # Use GPU if available, otherwise fallback to CPU
+    use-gpu: true
+    # Number of threads for CPU inference
+    num-threads: 4
+    # Memory management
+    memory-management: ON_SYSTEM_MEMORY_PRESSURE
+
+# Test profile configuration
+"%test":
+  quarkus:
+    grpc:
+      server:
+        port: 0  # Use random port for tests
+    # Disable GPU for tests
+  djl:
+    pytorch:
+      use-gpu: false

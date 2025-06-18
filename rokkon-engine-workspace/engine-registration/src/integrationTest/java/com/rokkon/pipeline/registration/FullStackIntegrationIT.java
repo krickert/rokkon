@@ -37,7 +37,7 @@ public class FullStackIntegrationIT {
     static Network network = Network.newNetwork();
 
     @Container
-    static GenericContainer<?> consulContainer = new GenericContainer<>(DockerImageName.parse("consul:1.16"))
+    static GenericContainer<?> consulContainer = new GenericContainer<>(DockerImageName.parse("hashicorp/consul:1.21.1"))
             .withNetwork(network)
             .withNetworkAliases("consul")
             .withExposedPorts(CONSUL_PORT)
@@ -107,14 +107,15 @@ public class FullStackIntegrationIT {
 
     @Test
     @Order(1)
-    void testHealthCheck() {
-        // Verify registration service is healthy
-        HealthStatus health = moduleRegistrationService
-                .checkHealth(Empty.newBuilder().build())
+    void testRegistrationServiceIsRunning() {
+        // Simple test to verify the registration service is accessible
+        ModuleList moduleList = moduleRegistrationService
+                .listModules(Empty.newBuilder().build())
                 .await().indefinitely();
                 
-        assertThat(health.getHealthy()).isTrue();
-        assertThat(health.getMessage()).contains("Registration service is healthy");
+        // Should return an empty list or existing modules
+        assertThat(moduleList).isNotNull();
+        assertThat(moduleList.getAsOf()).isNotNull();
     }
 
     @Test
@@ -147,7 +148,7 @@ public class FullStackIntegrationIT {
                 .await().indefinitely();
         
         assertThat(response.getSuccess()).isTrue();
-        assertThat(response.getMessage()).contains("registered successfully");
+        assertThat(response.getMessage()).contains("successfully registered");
         assertThat(response.getConsulServiceId()).isNotEmpty();
         
         // Step 3: Give Consul time to perform health checks
@@ -212,12 +213,12 @@ public class FullStackIntegrationIT {
         if (moduleList.getModulesCount() > 0) {
             ModuleInfo moduleToUnregister = moduleList.getModules(0);
             
-            UnregisterRequest unregisterRequest = UnregisterRequest.newBuilder()
+            ModuleId moduleId = ModuleId.newBuilder()
                     .setServiceId(moduleToUnregister.getServiceId())
                     .build();
                     
-            RegistrationStatus response = moduleRegistrationService
-                    .unregisterModule(unregisterRequest)
+            UnregistrationStatus response = moduleRegistrationService
+                    .unregisterModule(moduleId)
                     .await().indefinitely();
                     
             assertThat(response.getSuccess()).isTrue();

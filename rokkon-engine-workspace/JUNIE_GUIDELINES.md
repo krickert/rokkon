@@ -1,5 +1,12 @@
 # Junie Guidelines for Rokkon Engine Development (Updated)
 
+## Best practices
+1. Mutiny reactive coding Quarkus style
+2. Integration tests over mocks
+3. Make sure for tests we make 3 - base, unit, and integration.  They all run on the same base tests.
+4. Ensure the development environment can still run
+5. 
+
 ## Rules to Prevent Project Damage
 
 ### 1. Configuration Management Rules
