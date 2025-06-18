@@ -1,14 +1,51 @@
 # Rokkon Engine Development Guide
 
+## Module Registration Architecture
+
+### Overview
+Modules in Rokkon Engine are "dumb" gRPC services that don't know about Consul or the engine. Registration is handled externally by a CLI tool that discovers modules and registers them with the engine.
+
+### Registration Flow
+1. **Module starts up** as a Docker container or K8s pod
+   - Exposes gRPC service implementing `PipeStepProcessor` interface
+   - Provides `getServiceRegistration()` method with module metadata
+   - Does NOT connect to Consul or engine directly
+
+2. **CLI tool discovers modules**
+   - Scans for running Docker containers/K8s pods
+   - Connects to each module's gRPC port
+   - Calls `getServiceRegistration()` to get module metadata
+
+3. **CLI registers module with engine**
+   - Looks up engine service in Consul
+   - Calls engine's registration endpoint with module info
+   - Engine validates and whitelists the module
+
+4. **Engine writes to Consul**
+   - Registers module as a gRPC service in Consul
+   - Sets up health check endpoint for the module
+   - Stores module metadata for pipeline configuration
+
+5. **Consul monitors health**
+   - Performs regular gRPC health checks
+   - Marks service as healthy/unhealthy
+   - Engine can query healthy services for pipeline execution
+
+### Key Design Principles
+- **Modules are stateless**: No Consul dependencies, just gRPC services
+- **External registration**: CLI tool handles discovery and registration
+- **Engine owns Consul writes**: Only engine-consul project writes to Consul
+- **Health monitoring**: Consul handles health checks independently
+
 ## Configuration Management - Critical Design Decisions
 
 ### Consul Access Pattern (IMPORTANT)
 To prevent developers from bypassing validation and directly modifying the configuration graph:
 
-1. **config-orchestrator (WRITER)** - Uses Quarkus REST Client to access Consul HTTP API
-   - NO consul KV library dependencies
-   - Implements CAS (Compare-And-Set) operations for atomic updates
-   - All writes go through validation
+1. **engine-consul (WRITER)** - Uses HTTP client to access Consul API
+   - Implements validation before writes
+   - Handles module registration from CLI tool
+   - All configuration changes go through validation
    
 2. **engine modules (READER ONLY)** - Uses quarkus-config-consul extension
    - Read-only access via configuration properties

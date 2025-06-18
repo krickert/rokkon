@@ -18,8 +18,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.CompletableFuture;
-import java.util.concurrent.CompletionStage;
 
 /**
  * Service for managing pipeline configurations in Consul KV store.
@@ -53,21 +51,21 @@ public class PipelineConfigService {
     /**
      * Creates a new pipeline configuration in Consul.
      */
-    public CompletionStage<ValidationResult> createPipeline(String clusterName, String pipelineId,
-                                                          PipelineConfig config) {
+    public Uni<ValidationResult> createPipeline(String clusterName, String pipelineId,
+                                               PipelineConfig config) {
         LOG.info("Creating pipeline '{}' in cluster '{}'", pipelineId, clusterName);
 
         // Validate the configuration
         ValidationResult validationResult = validator.validate(config);
         if (!validationResult.valid()) {
-            return CompletableFuture.completedFuture(validationResult);
+            return Uni.createFrom().item(validationResult);
         }
 
         // Check if pipeline already exists
         return getPipeline(clusterName, pipelineId)
-                .thenCompose(existing -> {
+                .flatMap(existing -> {
                     if (existing.isPresent()) {
-                        return CompletableFuture.completedFuture(
+                        return Uni.createFrom().item(
                                 new ValidationResult(false, 
                                         List.of("Pipeline '" + pipelineId + "' already exists"), 
                                         List.of()));
@@ -80,21 +78,21 @@ public class PipelineConfigService {
     /**
      * Updates an existing pipeline configuration.
      */
-    public CompletionStage<ValidationResult> updatePipeline(String clusterName, String pipelineId,
-                                                           PipelineConfig config) {
+    public Uni<ValidationResult> updatePipeline(String clusterName, String pipelineId,
+                                               PipelineConfig config) {
         LOG.info("Updating pipeline '{}' in cluster '{}'", pipelineId, clusterName);
 
         // Validate the configuration
         ValidationResult validationResult = validator.validate(config);
         if (!validationResult.valid()) {
-            return CompletableFuture.completedFuture(validationResult);
+            return Uni.createFrom().item(validationResult);
         }
 
         // Check if pipeline exists
         return getPipeline(clusterName, pipelineId)
-                .thenCompose(existing -> {
+                .flatMap(existing -> {
                     if (existing.isEmpty()) {
-                        return CompletableFuture.completedFuture(
+                        return Uni.createFrom().item(
                                 new ValidationResult(false, 
                                         List.of("Pipeline '" + pipelineId + "' not found"), 
                                         List.of()));
@@ -107,13 +105,13 @@ public class PipelineConfigService {
     /**
      * Deletes a pipeline configuration.
      */
-    public CompletionStage<ValidationResult> deletePipeline(String clusterName, String pipelineId) {
+    public Uni<ValidationResult> deletePipeline(String clusterName, String pipelineId) {
         LOG.info("Deleting pipeline '{}' from cluster '{}'", pipelineId, clusterName);
 
         return getPipeline(clusterName, pipelineId)
-                .thenCompose(existing -> {
+                .flatMap(existing -> {
                     if (existing.isEmpty()) {
-                        return CompletableFuture.completedFuture(
+                        return Uni.createFrom().item(
                                 new ValidationResult(false, 
                                         List.of("Pipeline '" + pipelineId + "' not found"), 
                                         List.of()));
@@ -126,8 +124,8 @@ public class PipelineConfigService {
     /**
      * Retrieves a pipeline configuration.
      */
-    public CompletionStage<Optional<PipelineConfig>> getPipeline(String clusterName, String pipelineId) {
-        Uni<Optional<PipelineConfig>> uni = Uni.createFrom().item(() -> {
+    public Uni<Optional<PipelineConfig>> getPipeline(String clusterName, String pipelineId) {
+        return Uni.createFrom().item(() -> {
             try {
                 String key = buildPipelineKey(clusterName, pipelineId);
                 String url = getConsulBaseUrl() + "/v1/kv/" + key + "?raw";
@@ -153,14 +151,13 @@ public class PipelineConfigService {
                 return Optional.empty();
             }
         });
-        return uni.subscribeAsCompletionStage();
     }
 
     /**
      * Lists all pipelines in a cluster.
      */
-    public CompletionStage<Map<String, PipelineConfig>> listPipelines(String clusterName) {
-        Uni<Map<String, PipelineConfig>> uni = Uni.createFrom().item(() -> {
+    public Uni<Map<String, PipelineConfig>> listPipelines(String clusterName) {
+        return Uni.createFrom().item(() -> {
             try {
                 String prefix = buildClusterPrefix(clusterName) + "pipelines/";
                 String url = getConsulBaseUrl() + "/v1/kv/" + prefix + "?keys";
@@ -180,7 +177,7 @@ public class PipelineConfigService {
                         String pipelineId = extractPipelineIdFromKey(key);
                         if (pipelineId != null && key.endsWith("/config")) {
                             Optional<PipelineConfig> config = getPipeline(clusterName, pipelineId)
-                                    .toCompletableFuture().join();
+                                    .await().indefinitely();
                             config.ifPresent(c -> pipelines.put(pipelineId, c));
                         }
                     }
@@ -197,12 +194,11 @@ public class PipelineConfigService {
                 return Collections.emptyMap();
             }
         });
-        return uni.subscribeAsCompletionStage();
     }
 
-    private CompletionStage<ValidationResult> storePipelineInConsul(String clusterName, String pipelineId, 
-                                                                    PipelineConfig config) {
-        Uni<ValidationResult> uni = Uni.createFrom().item(() -> {
+    private Uni<ValidationResult> storePipelineInConsul(String clusterName, String pipelineId, 
+                                                       PipelineConfig config) {
+        return Uni.createFrom().item(() -> {
             try {
                 String configJson = objectMapper.writeValueAsString(config);
                 String key = buildPipelineKey(clusterName, pipelineId);
@@ -231,11 +227,10 @@ public class PipelineConfigService {
                         List.of());
             }
         });
-        return uni.subscribeAsCompletionStage();
     }
 
-    private CompletionStage<ValidationResult> deletePipelineFromConsul(String clusterName, String pipelineId) {
-        Uni<ValidationResult> uni = Uni.createFrom().item(() -> {
+    private Uni<ValidationResult> deletePipelineFromConsul(String clusterName, String pipelineId) {
+        return Uni.createFrom().item(() -> {
             try {
                 String key = buildPipelineKey(clusterName, pipelineId);
                 String url = getConsulBaseUrl() + "/v1/kv/" + key;
@@ -263,7 +258,6 @@ public class PipelineConfigService {
                         List.of());
             }
         });
-        return uni.subscribeAsCompletionStage();
     }
 
     private String buildPipelineKey(String clusterName, String pipelineId) {

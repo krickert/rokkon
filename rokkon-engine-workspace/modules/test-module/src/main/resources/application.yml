@@ -16,8 +16,9 @@ quarkus:
     push: false
     registry: "registry.rokkon.com:8443"
     image: "rokkon/test-module:${quarkus.application.version}"
-    dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
     group: rokkon
+    # Use docker builder
+    builder: docker
 
 # Module specific configuration
 test:

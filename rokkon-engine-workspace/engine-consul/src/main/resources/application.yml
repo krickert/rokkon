@@ -1,32 +1,26 @@
 quarkus:
   application:
     name: engine-consul
-  
+
   # HTTP configuration
   http:
     port: 8090
     host: 0.0.0.0
-  
+
   # Swagger UI
   swagger-ui:
     always-include: true
     path: /swagger-ui
-  
+
   # OpenAPI
   smallrye-openapi:
     path: /openapi
     info-title: Rokkon Pipeline Configuration API
     info-version: 1.0.0
     info-description: REST API for managing pipeline configurations in Consul
-  
-  # Jackson configuration
-  jackson:
-    serialization:
-      indent-output: true
-      write-dates-as-timestamps: false
-    deserialization:
-      fail-on-unknown-properties: false
-  
+
+  # REST configuration
+
   # Stork service discovery for Consul
   stork:
     # Pipeline services discovery
@@ -35,14 +29,14 @@ quarkus:
         type: consul
         consul-host: ${CONSUL_HOST:localhost}
         consul-port: ${CONSUL_PORT:8500}
-    
+
     # Module services discovery
     module-service:
       service-discovery:
         type: consul
         consul-host: ${CONSUL_HOST:localhost}
         consul-port: ${CONSUL_PORT:8500}
-  
+
   # Logging
   log:
     level: INFO
@@ -52,6 +46,12 @@ quarkus:
     console:
       enable: true
       format: "%d{HH:mm:ss} %-5p [%c{2.}] (%t) %s%e%n"
+
+  # Index dependencies for reflection
+  index-dependency:
+    com-rokkon-pipeline-engine-models:
+      group-id: com.rokkon.pipeline
+      artifact-id: engine-models
 
 # Consul configuration
 consul:
@@ -66,9 +66,6 @@ consul:
 
 # Test profile
 "%test":
-  consul:
-    host: localhost
-    port: 8500
   quarkus:
     log:
       level: DEBUG
