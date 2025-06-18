@@ -12,7 +12,7 @@ public record ModuleRegistrationResponse(
      * Create a successful registration response.
      */
     public static ModuleRegistrationResponse success(String moduleId) {
-        return new ModuleRegistrationResponse(true, moduleId, "Module registered successfully");
+        return new ModuleRegistrationResponse(true, moduleId, null);
     }
     
     /**

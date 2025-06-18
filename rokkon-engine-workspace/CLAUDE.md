@@ -368,6 +368,59 @@ public class [Module]ServiceIT extends [Module]ServiceTestBase {
 
 This procedure ensures consistent, working modules that integrate properly with the Rokkon Engine architecture.
 
+## Container Health Check Testing Knowledge
+
+### Key Findings from Container Testing
+
+When testing Quarkus modules running in Docker containers:
+
+1. **Port Configuration**:
+   - Internal gRPC port: 9090 (what the container exposes internally)
+   - Internal HTTP port: 8080 (for health endpoints)
+   - External ports: Random mapped ports assigned by Docker
+
+2. **Consul Registration Pattern**:
+   ```json
+   {
+     "Name": "module-name",
+     "Address": "<container-hostname>",
+     "Port": 9090,
+     "Check": {
+       "GRPC": "<container-hostname>:9090",
+       "GRPCUseTLS": false,
+       "Interval": "10s"
+     }
+   }
+   ```
+   - Always use INTERNAL ports for Consul registration
+   - Consul will connect to the container using Docker networking
+
+3. **Testing from Outside Container**:
+   - Use mapped external ports (e.g., localhost:32933)
+   - These are different from internal ports
+   - Obtained via `container.getMappedPort(INTERNAL_PORT)`
+
+4. **Quarkus Container Testing Pattern**:
+   ```java
+   @QuarkusTestResource(TestModuleContainerResource.class)
+   class ContainerTest {
+       @ConfigProperty(name = "test.module.container.grpc.port")
+       int externalGrpcPort;
+   }
+   ```
+
+5. **Environment Variables for Consistent Ports**:
+   - `QUARKUS_HTTP_PORT=8080`
+   - `QUARKUS_GRPC_SERVER_PORT=9090`
+
+6. **Health Check Behavior**:
+   - Overall service health: Returns SERVING
+   - Specific service health: Returns UNKNOWN (acceptable for Consul)
+   - Both HTTP (`/q/health`) and gRPC health checks work
+
+### Critical Insight
+When registering a containerized module with Consul, the health check URL must use the container's internal port, not the external mapped port. This is because Consul will access the container from within the Docker network where internal ports are used.
+
 ## Critical Design Decisions
 
 ### Kafka Transport Configuration

@@ -23,6 +23,14 @@ quarkus:
     # Credentials should be provided via environment variables:
     # QUARKUS_CONTAINER_IMAGE_USERNAME
     # QUARKUS_CONTAINER_IMAGE_PASSWORD
+# Removed native image configuration as we're using standard JVM
+#  native:
+#    additional-build-args:
+#      - --initialize-at-run-time=ai.djl.pytorch.engine.PtEngine
+#      - --initialize-at-run-time=ai.djl.pytorch.engine.PtEngineProvider
+#      - --initialize-at-run-time=ai.djl.engine.Engine
+#      - --initialize-at-run-time=ai.djl.engine.EngineProvider
+#      - --initialize-at-run-time=com.rokkon.modules.embedder.ReactiveVectorizer
 
 # DJL configuration for ML models
 djl:

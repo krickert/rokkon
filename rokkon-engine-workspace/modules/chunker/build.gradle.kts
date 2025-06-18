@@ -34,13 +34,6 @@ dependencies {
     testImplementation("com.rokkon.pipeline:test-utilities:1.0.0-SNAPSHOT")
 }
 
-// Configure Quarkus to use Mutiny for gRPC code generation
-quarkus {
-    buildForkOptions {
-        systemProperty("quarkus.grpc.codegen.type", "mutiny")
-    }
-}
-
 group = "com.rokkon.pipeline"
 version = "1.0.0-SNAPSHOT"
 
@@ -60,18 +53,6 @@ tasks.test {
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
-}
-
-// Extract proto files from jar for local stub generation
-val extractProtos = tasks.register<Copy>("extractProtos") {
-    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("proto-definitions") }.singleFile))
-    include("**/*.proto")
-    into("src/main/proto")
-    includeEmptyDirs = false
-}
-
-tasks.named("quarkusGenerateCode") {
-    dependsOn(extractProtos)
 }
 
 publishing {

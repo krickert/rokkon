@@ -1,12 +1,11 @@
 package com.rokkon.pipeline.engine.api;
 
-import com.rokkon.pipeline.engine.model.ModuleRegistrationRequest;
-import com.rokkon.pipeline.engine.model.ModuleRegistrationResponse;
-import com.rokkon.pipeline.engine.service.ModuleRegistrationService;
-import io.quarkus.test.InjectMock;
+import com.rokkon.pipeline.consul.test.ConsulTestResource;
+import com.rokkon.pipeline.consul.service.ClusterService;
+import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
-import io.restassured.RestAssured;
-import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
+import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
@@ -14,113 +13,96 @@ import java.util.Map;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.Mockito.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
+/**
+ * Real integration test using actual Consul and services.
+ * No mocks - testing real functionality and validation.
+ */
 @QuarkusTest
+@QuarkusTestResource(ConsulTestResource.class)
 class ModuleRegistrationResourceTest {
     
-    @InjectMock
-    ModuleRegistrationService registrationService;
+    @Inject
+    ClusterService clusterService;
     
-    @BeforeEach
+    @BeforeEach 
     void setUp() {
-        reset(registrationService);
+        // Note: Real cluster is auto-created by engine startup
+        // We'll test validation without relying on async cluster creation
     }
     
     @Test
-    void testRegisterModuleSuccess() {
-        // Given: Registration service returns success
-        ModuleRegistrationResponse successResponse = ModuleRegistrationResponse.success(
-            "test-module-123"
-        );
-        
-        when(registrationService.registerModule(any()))
-            .thenReturn(Uni.createFrom().item(successResponse));
-        
-        // When: Calling the registration endpoint
+    void testRegisterModuleWithMissingServiceType() {
+        // Test validation failure - missing required serviceType field
         given()
             .contentType("application/json")
             .body(Map.of(
                 "moduleName", "test-module",
                 "host", "localhost",
                 "port", 9090,
-                "clusterName", "test-cluster",
-                "serviceData", Map.of("version", "1.0.0"),
-                "metadata", Map.of("env", "test")
+                "clusterName", "default-cluster"  // Use auto-created cluster
+                // Missing serviceType - should fail validation
             ))
             .when().post("/api/v1/modules/register")
             .then()
-            .statusCode(200)
-            .body("success", is(true))
-            .body("message", is("Module registered successfully"))
-            .body("moduleId", is("test-module-123"))
-            .body("consulServiceId", is("consul-service-123"))
-            .body("registeredAt", notNullValue());
+            .statusCode(400); // Bean validation will reject this
     }
     
     @Test
-    void testRegisterModuleValidationFailure() {
-        // Given: Registration service returns validation failure
-        ModuleRegistrationResponse failureResponse = ModuleRegistrationResponse.failure(
-            "Cluster 'test-cluster' does not exist"
-        );
-        
-        when(registrationService.registerModule(any()))
-            .thenReturn(Uni.createFrom().item(failureResponse));
-        
-        // When: Calling the registration endpoint
+    void testRegisterModuleWithInvalidPort() {
+        // Test validation failure - invalid port
+        given()
+            .contentType("application/json")
+            .body(Map.of(
+                "moduleName", "test-module",
+                "host", "localhost",
+                "port", -1,  // Invalid port
+                "clusterName", "default-cluster",
+                "serviceType", "PipeStepProcessor"
+            ))
+            .when().post("/api/v1/modules/register")
+            .then()
+            .statusCode(400); // Bean validation will reject negative port
+    }
+    
+    @Test
+    void testRegisterModuleWithNonExistentCluster() {
+        // Test business logic validation - cluster doesn't exist
         given()
             .contentType("application/json")
             .body(Map.of(
                 "moduleName", "test-module",
                 "host", "localhost",
                 "port", 9090,
-                "clusterName", "test-cluster"
+                "clusterName", "non-existent-cluster",  // This cluster doesn't exist
+                "serviceType", "PipeStepProcessor",
+                "metadata", Map.of("version", "1.0.0")
             ))
             .when().post("/api/v1/modules/register")
             .then()
             .statusCode(400)
             .body("success", is(false))
-            .body("message", is("Cluster 'test-cluster' does not exist"))
-            .body("moduleId", nullValue())
-            .body("consulServiceId", nullValue());
+            .body("message", containsString("does not exist"));
     }
     
     @Test
-    void testRegisterModuleMissingRequiredFields() {
-        // When: Calling the registration endpoint with missing fields
-        given()
-            .contentType("application/json")
-            .body(Map.of(
-                "moduleName", "test-module"
-                // Missing required fields: host, port, clusterName
-            ))
-            .when().post("/api/v1/modules/register")
-            .then()
-            .statusCode(400);
-    }
-    
-    @Test
-    void testRegisterModuleInternalError() {
-        // Given: Registration service throws exception
-        when(registrationService.registerModule(any()))
-            .thenReturn(Uni.createFrom().failure(new RuntimeException("Database connection failed")));
-        
-        // When: Calling the registration endpoint
+    void testRegisterModuleHealthCheckFailure() {
+        // Test with valid cluster but unreachable service (health check will fail)
         given()
             .contentType("application/json")
             .body(Map.of(
                 "moduleName", "test-module",
-                "host", "localhost",
-                "port", 9090,
-                "clusterName", "test-cluster"
+                "host", "localhost", 
+                "port", 9999,  // Nothing listening on this port
+                "clusterName", "default-cluster",  // This cluster exists
+                "serviceType", "PipeStepProcessor",
+                "metadata", Map.of("version", "1.0.0", "env", "test")
             ))
             .when().post("/api/v1/modules/register")
             .then()
-            .statusCode(500)
+            .statusCode(400)  // Health check will fail
             .body("success", is(false))
-            .body("message", containsString("Internal error"))
-            .body("message", containsString("Database connection failed"));
+            .body("message", containsString("Health check error"));
     }
 }

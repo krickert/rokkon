@@ -81,6 +81,7 @@ message PipeDoc {
   map<string, Embedding> named_embeddings = 14;
 
   optional Blob blob = 15;
+  map<string,string> metadata = 16;
 }
 
 // --- Binary Data Handling ---

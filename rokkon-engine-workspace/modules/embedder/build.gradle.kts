@@ -16,12 +16,20 @@ dependencies {
     implementation("io.quarkus:quarkus-config-yaml")
     implementation("io.quarkus:quarkus-arc")
     implementation("io.quarkus:quarkus-jackson")
+    implementation("io.quarkus:quarkus-smallrye-health")
+    implementation("io.quarkus:quarkus-logging-json")
+    implementation("io.grpc:grpc-services")
     implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
 
     // DJL (Deep Java Library) for ML inference
     implementation("ai.djl.huggingface:tokenizers:0.33.0")
     implementation("ai.djl.pytorch:pytorch-model-zoo:0.33.0")
     implementation("ai.djl.pytorch:pytorch-jni:2.5.1-0.33.0")
+
+    // CUDA support for GPU acceleration (if on amd64 architecture)
+    if (System.getProperty("os.arch") == "amd64") {
+        implementation("ai.djl.pytorch:pytorch-native-cu124:2.5.1")
+    }
 
     // Apache Commons for utilities
     implementation("org.apache.commons:commons-lang3:3.12.0")
@@ -32,6 +40,8 @@ dependencies {
     testImplementation(libs.quarkus.junit5)
     testImplementation(libs.assertj)
     testImplementation("io.rest-assured:rest-assured")
+    testImplementation("com.rokkon.pipeline:test-utilities:1.0.0-SNAPSHOT")
+
 }
 
 group = "com.rokkon.pipeline"
@@ -67,17 +77,6 @@ tasks.withType<Test> {
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
-}
-
-val extractProtos = tasks.register<Copy>("extractProtos") {
-    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("proto-definitions") }.singleFile))
-    include("**/*.proto")
-    into("src/main/proto")
-    includeEmptyDirs = false
-}
-
-tasks.named("quarkusGenerateCode") {
-    dependsOn(extractProtos)
 }
 
 tasks.test {

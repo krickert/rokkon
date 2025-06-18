@@ -3,9 +3,11 @@ quarkus:
     name: test-module
   grpc:
     server:
-      port: 49093
+      port: 9090
       host: 0.0.0.0
       enable-reflection-service: true
+      health:
+        enabled: true
   log:
     level: INFO
     category:

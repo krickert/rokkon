@@ -1,0 +1,14 @@
+quarkus:
+  application:
+    name: chunker-module-test
+  grpc:
+    server:
+      port: 0  # Use random port for tests
+
+# Processing buffer configuration for tests
+processing:
+  buffer:
+    enabled: true
+    capacity: 100
+    directory: target/test-data/chunker-output-1-set
+    prefix: chunker-output

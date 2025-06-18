@@ -30,11 +30,6 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-quarkus {
-    buildForkOptions {
-        systemProperty("quarkus.grpc.codegen.type", "mutiny")
-    }
-}
 
 publishing {
     publications {
@@ -54,17 +49,6 @@ tasks.withType<Test> {
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
-}
-
-val extractProtos = tasks.register<Copy>("extractProtos") {
-    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("proto-definitions") }.singleFile))
-    include("**/*.proto")
-    into("src/main/proto")
-    includeEmptyDirs = false
-}
-
-tasks.named("quarkusGenerateCode") {
-    dependsOn(extractProtos)
 }
 
 tasks.test {

@@ -13,6 +13,9 @@ val quarkusPlatformArtifactId: String by project
 val quarkusPlatformVersion: String by project
 
 dependencies {
+    implementation("io.quarkus:quarkus-smallrye-stork")
+    implementation("io.smallrye.stork:stork-service-discovery-consul")
+    implementation("io.quarkus:quarkus-jackson")
     implementation("io.quarkiverse.config:quarkus-config-consul")
     implementation("io.quarkus:quarkus-micrometer")
     implementation("io.quarkus:quarkus-config-yaml")
@@ -45,6 +48,9 @@ dependencies {
     testImplementation("org.testcontainers:consul:1.19.8") {
         exclude(group = "org.apache.commons", module = "commons-compress")
     }
+    
+    // Test utilities for container testing
+    testImplementation("com.rokkon.pipeline:test-utilities:1.0.0-SNAPSHOT")
 }
 
 group = "com.rokkon.pipeline"

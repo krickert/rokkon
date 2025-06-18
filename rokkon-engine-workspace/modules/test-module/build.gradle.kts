@@ -23,7 +23,8 @@ dependencies {
     implementation("io.quarkus:quarkus-config-yaml")
     implementation("io.quarkus:quarkus-micrometer")
     implementation("io.quarkus:quarkus-arc")
-    
+    implementation("io.grpc:grpc-services:1.58.0")
+
     // Proto definitions from shared project
     implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
     
@@ -37,6 +38,11 @@ dependencies {
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("org.assertj:assertj-core:3.26.3")
     testImplementation("io.rest-assured:rest-assured")
+    testImplementation("org.testcontainers:testcontainers:1.19.8")
+    testImplementation("org.testcontainers:junit-jupiter:1.19.8")
+
+    // Test utilities for container testing
+    testImplementation("com.rokkon.pipeline:test-utilities:1.0.0-SNAPSHOT")
 }
 
 group = "com.rokkon.pipeline"
@@ -45,25 +51,6 @@ version = "1.0.0-SNAPSHOT"
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
-}
-
-// Configure Quarkus to use Mutiny for gRPC code generation
-quarkus {
-    buildForkOptions {
-        systemProperty("quarkus.grpc.codegen.type", "mutiny")
-    }
-}
-
-// CRITICAL: Extract proto files from jar for local stub generation
-val extractProtos = tasks.register<Copy>("extractProtos") {
-    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("proto-definitions") }.singleFile))
-    include("**/*.proto")
-    into("src/main/proto")
-    includeEmptyDirs = false
-}
-
-tasks.named("quarkusGenerateCode") {
-    dependsOn(extractProtos)
 }
 
 // Exclude integration tests from regular test task (like reference implementation)

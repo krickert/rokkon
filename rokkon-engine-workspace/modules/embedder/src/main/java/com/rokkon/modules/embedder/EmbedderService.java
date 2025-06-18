@@ -277,26 +277,18 @@ public class EmbedderService implements PipeStepProcessor {
         return responseBuilder.build();
     }
 
-    @RunOnVirtualThread
     @Override
     public Uni<ServiceRegistrationData> getServiceRegistration(Empty request) {
-        return Uni.createFrom().item(() -> {
-            try {
-                ServiceRegistrationData registration = ServiceRegistrationData.newBuilder()
-                        .setModuleName("embedder")
-                        .setJsonConfigSchema(EmbedderOptions.getJsonV7Schema())
-                        .build();
+        log.info("Embedder service registration requested");
 
-                log.info("Returned service registration for embedder module (GPU: {})", vectorizer.isUsingGpu());
-                return registration;
+        ServiceRegistrationData response = ServiceRegistrationData.newBuilder()
+                .setModuleName("embedder")
+                .setJsonConfigSchema(EmbedderOptions.getJsonV7Schema())
+                .build();
 
-            } catch (Exception e) {
-                log.error("Error getting service registration", e);
-                return ServiceRegistrationData.newBuilder()
-                    .setModuleName("embedder")
-                    .build();
-            }
-        });
+        log.info("Returned service registration for embedder module (GPU: {})", vectorizer.isUsingGpu());
+
+        return Uni.createFrom().item(response);
     }
 
     private ProcessResponse createErrorResponse(String errorMessage, Throwable e) {

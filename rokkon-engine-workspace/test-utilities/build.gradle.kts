@@ -26,6 +26,10 @@ dependencies {
     
     implementation("org.assertj:assertj-core:3.24.2")
     implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+    
+    // Add dependencies for container testing
+    implementation("io.quarkus:quarkus-test-common")
+    implementation("org.testcontainers:testcontainers:1.19.8")
 }
 
 group = "com.rokkon.pipeline"

@@ -5,6 +5,7 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.Struct;
 import com.google.protobuf.util.JsonFormat;
 import com.rokkon.search.model.*;
+import com.rokkon.search.protobuf.utils.ProcessingBuffer;
 import com.rokkon.search.sdk.*;
 import io.quarkus.grpc.GrpcService;
 import io.smallrye.mutiny.Uni;
@@ -35,6 +36,9 @@ public class ChunkerServiceImpl implements PipeStepProcessor {
 
     @Inject
     ChunkMetadataExtractor metadataExtractor;
+
+    @Inject
+    ProcessingBuffer<PipeDoc> outputBuffer;
 
     @Override
     public Uni<ProcessResponse> processData(ProcessRequest request) {
@@ -141,7 +145,12 @@ public class ChunkerServiceImpl implements PipeStepProcessor {
                 }
 
                 responseBuilder.setSuccess(true);
-                responseBuilder.setOutputDoc(outputDocBuilder.build());
+                PipeDoc outputDoc = outputDocBuilder.build();
+                responseBuilder.setOutputDoc(outputDoc);
+
+                // Add the document to the buffer - no need to check if enabled
+                // If buffer is disabled, the NoOpProcessingBuffer will do nothing
+                outputBuffer.add(outputDoc);
 
                 ProcessResponse response = responseBuilder.build();
                 LOG.debugf("Chunker service returning success: %s with %d chunks", 

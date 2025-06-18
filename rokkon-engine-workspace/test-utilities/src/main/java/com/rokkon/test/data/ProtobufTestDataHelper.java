@@ -29,15 +29,16 @@ public class ProtobufTestDataHelper {
     private static final String SAMPLE_PIPE_DOC_DIRECTORY = "/test-data/sample-documents/pipe-docs";
     private static final String SAMPLE_PIPE_STREAM_DIRECTORY = "/test-data/sample-documents/pipe-streams";
     private static final String PIPELINE_GENERATED_DIRECTORY = "/test-data/pipeline-generated";
-    
+
     // New generated test data directories
     private static final String TIKA_REQUESTS_DIRECTORY = "/test-data/tika/requests";
     private static final String TIKA_RESPONSES_DIRECTORY = "/test-data/tika/responses";
     private static final String CHUNKER_INPUT_DIRECTORY = "/test-data/chunker/input";
     private static final String CHUNKER_OUTPUT_DIRECTORY = "/test-data/chunker/output";
+    private static final String CHUNKER_OUTPUT_SMALL_DIRECTORY = "/test-data/chunker/output/small";
     private static final String EMBEDDER_INPUT_DIRECTORY = "/test-data/embedder/input";
     private static final String EMBEDDER_OUTPUT_DIRECTORY = "/test-data/embedder/output";
-    
+
     private static final String FILE_EXTENSION = ".bin";
 
     // Lazy-loaded collections and maps
@@ -49,7 +50,7 @@ public class ProtobufTestDataHelper {
     private static volatile Collection<PipeStream> chunkerPipeStreams;
     private static volatile Collection<PipeDoc> samplePipeDocuments;
     private static volatile Collection<PipeStream> samplePipeStreams;
-    
+
     private static volatile Map<String, PipeDoc> pipeDocumentsMap;
     private static volatile Map<String, PipeStream> pipeStreamsMap;
     private static volatile Map<String, PipeDoc> tikaPipeDocumentsMap;
@@ -58,11 +59,11 @@ public class ProtobufTestDataHelper {
     private static volatile Map<String, PipeStream> chunkerPipeStreamsMap;
     private static volatile Map<String, PipeDoc> samplePipeDocumentsMap;
     private static volatile Map<String, PipeStream> samplePipeStreamsMap;
-    
+
     // Lazy-loaded ordered lists for sample documents
     private static volatile List<PipeDoc> orderedSamplePipeDocs;
     private static volatile List<PipeStream> orderedSamplePipeStreams;
-    
+
     // Pipeline generated data
     private static volatile Map<String, Collection<PipeDoc>> pipelineGeneratedDocs;
 
@@ -400,7 +401,7 @@ public class ProtobufTestDataHelper {
         }
         return pipelineGeneratedDocs.getOrDefault(stage, Collections.emptyList());
     }
-    
+
     /**
      * Retrieves Tika request streams (input data with document blobs).
      *
@@ -413,7 +414,7 @@ public class ProtobufTestDataHelper {
             return Collections.emptyList();
         }
     }
-    
+
     /**
      * Retrieves Tika response documents (output data with extracted text).
      *
@@ -426,7 +427,7 @@ public class ProtobufTestDataHelper {
             return Collections.emptyList();
         }
     }
-    
+
     /**
      * Retrieves Tika request documents (input PipeDocs with blobs extracted from PipeStreams).
      * This is a convenience method that extracts PipeDoc objects from the Tika request PipeStreams.
@@ -438,7 +439,7 @@ public class ProtobufTestDataHelper {
             .map(PipeStream::getDocument)
             .collect(Collectors.toList());
     }
-    
+
     /**
      * Retrieves chunker input documents (Tika-processed documents ready for chunking).
      *
@@ -451,7 +452,7 @@ public class ProtobufTestDataHelper {
             return Collections.emptyList();
         }
     }
-    
+
     /**
      * Retrieves chunker output streams (documents with semantic chunks).
      *
@@ -464,7 +465,34 @@ public class ProtobufTestDataHelper {
             return Collections.emptyList();
         }
     }
-    
+
+    /**
+     * Retrieves chunker output streams with small chunks (documents with smaller semantic chunks).
+     * These are generated with a different chunker configuration (smaller chunk sizes).
+     *
+     * @return A collection of PipeStream objects for chunker output testing with small chunks
+     */
+    public static Collection<PipeStream> getChunkerOutputStreamsSmall() {
+        try {
+            return loadPipeStreamsFromDirectory(CHUNKER_OUTPUT_SMALL_DIRECTORY);
+        } catch (Exception e) {
+            return Collections.emptyList();
+        }
+    }
+
+    /**
+     * Retrieves all chunker output streams (both default and small chunks).
+     * This combines the results of getChunkerOutputStreams() and getChunkerOutputStreamsSmall().
+     *
+     * @return A collection of PipeStream objects for all chunker output testing
+     */
+    public static Collection<PipeStream> getAllChunkerOutputStreams() {
+        Collection<PipeStream> result = new ArrayList<>();
+        result.addAll(getChunkerOutputStreams());
+        result.addAll(getChunkerOutputStreamsSmall());
+        return result;
+    }
+
     /**
      * Retrieves embedder input documents (chunked documents ready for embedding).
      *
@@ -477,7 +505,7 @@ public class ProtobufTestDataHelper {
             return Collections.emptyList();
         }
     }
-    
+
     /**
      * Retrieves embedder output documents (documents with vector embeddings).
      *
@@ -490,7 +518,7 @@ public class ProtobufTestDataHelper {
             return Collections.emptyList();
         }
     }
-    
+
     /**
      * Retrieves all pipeline stages available.
      *
@@ -506,7 +534,7 @@ public class ProtobufTestDataHelper {
         }
         return pipelineGeneratedDocs.keySet();
     }
-    
+
     /**
      * Retrieves a specific PipeStream object from the Sample Documents by index.
      *
@@ -730,7 +758,7 @@ public class ProtobufTestDataHelper {
      * @throws IOException If an I/O error occurs.
      */
     private static Collection<PipeDoc> loadPipeDocsFromDirectory(String directory) throws IOException {
-        return ProtobufUtils.loadPipeDocsFromDirectory(directory, FILE_EXTENSION);
+        return UnifiedDocumentLoader.loadPipeDocsFromDirectory(directory, FILE_EXTENSION);
     }
 
     /**
@@ -741,7 +769,7 @@ public class ProtobufTestDataHelper {
      * @throws IOException If an I/O error occurs.
      */
     private static Collection<PipeStream> loadPipeStreamsFromDirectory(String directory) throws IOException {
-        return ProtobufUtils.loadPipeStreamsFromDirectory(directory, FILE_EXTENSION);
+        return UnifiedDocumentLoader.loadPipeStreamsFromDirectory(directory, FILE_EXTENSION);
     }
 
     /**
@@ -751,7 +779,7 @@ public class ProtobufTestDataHelper {
      */
     private static Map<String, Collection<PipeDoc>> loadPipelineGeneratedDocuments() {
         Map<String, Collection<PipeDoc>> result = new HashMap<>();
-        
+
         try {
             ClassPathUtils.consumeAsPaths(PIPELINE_GENERATED_DIRECTORY, pipelineDir -> {
                 try (Stream<Path> stages = Files.list(pipelineDir)) {
@@ -774,7 +802,7 @@ public class ProtobufTestDataHelper {
             // Return empty map on any error
             return Collections.emptyMap();
         }
-        
+
         return result;
     }
 }

@@ -24,9 +24,21 @@ quarkus:
     # QUARKUS_CONTAINER_IMAGE_USERNAME
     # QUARKUS_CONTAINER_IMAGE_PASSWORD
 
+# Processing buffer configuration
+processing:
+  buffer:
+    enabled: ${PROCESSING_BUFFER_ENABLED:false}
+    capacity: ${PROCESSING_BUFFER_CAPACITY:100}
+    directory: ${PROCESSING_BUFFER_DIRECTORY:}
+    prefix: ${PROCESSING_BUFFER_PREFIX:chunker_output}
+
 # Test profile configuration
 "%test":
   quarkus:
     grpc:
       server:
         port: 0  # Use random port for tests
+  processing:
+    buffer:
+      enabled: true
+      directory: ${java.io.tmpdir}/chunker-test-output
