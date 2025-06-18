@@ -34,6 +34,11 @@ dependencies {
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("org.assertj:assertj-core:3.26.3")
+    testImplementation("org.testcontainers:testcontainers:1.19.8")
+    testImplementation("org.testcontainers:consul:1.19.8")
+    testImplementation("org.testcontainers:junit-jupiter:1.19.8")
+    testImplementation("org.awaitility:awaitility:4.2.0")
+    testImplementation("com.rokkon.pipeline:test-utilities:1.0.0-SNAPSHOT")
 }
 
 group = "com.rokkon.pipeline"
@@ -66,4 +71,9 @@ publishing {
             from(components["java"])
         }
     }
+}
+
+// Suppress the enforced platform validation
+tasks.withType<GenerateModuleMetadata> {
+    suppressedValidationErrors.add("enforced-platform")
 }

@@ -1,0 +1,42 @@
+quarkus:
+  application:
+    name: rokkon-engine
+  
+  http:
+    port: 8081
+  
+  grpc:
+    server:
+      port: 9000
+      enable-reflection-service: true
+      health:
+        enabled: true
+  
+  # Consul configuration
+  consul-config:
+    enabled: true
+    agent:
+      host-port: ${consul.host:localhost}:${consul.port:8500}
+      
+  # Index external dependencies for CDI discovery
+  index-dependency:
+    engine-consul:
+      group-id: com.rokkon.pipeline
+      artifact-id: engine-consul
+    
+# Dev profile
+"%dev":
+  quarkus:
+    log:
+      level: INFO
+      console:
+        enable: true
+      category:
+        "com.rokkon.pipeline":
+          level: DEBUG
+
+# Test profile  
+"%test":
+  quarkus:
+    log:
+      level: INFO

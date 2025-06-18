@@ -5,6 +5,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.validation.CompositeValidator;
 import com.rokkon.pipeline.validation.ValidationResult;
+import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -35,7 +36,10 @@ public class PipelineConfigService {
     ObjectMapper objectMapper;
     
     @Inject
-    CompositeValidator validator;
+    CompositeValidator<PipelineConfig> validator;
+    
+    @Inject
+    ClusterService clusterService;
     
     @ConfigProperty(name = "consul.host", defaultValue = "localhost")
     String consulHost;

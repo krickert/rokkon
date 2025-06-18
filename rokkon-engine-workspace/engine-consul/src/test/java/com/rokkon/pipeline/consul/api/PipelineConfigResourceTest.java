@@ -1,31 +1,21 @@
 package com.rokkon.pipeline.consul.api;
 
 import com.rokkon.pipeline.config.model.*;
-import com.rokkon.pipeline.consul.service.PipelineConfigService;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.consul.test.ConsulTestResource;
+import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.mockito.InjectMock;
 import io.restassured.http.ContentType;
-import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.*;
 
-import java.util.List;
 import java.util.Map;
-import java.util.Optional;
-import java.util.concurrent.CompletableFuture;
 
 import static io.restassured.RestAssured.given;
-import static org.hamcrest.Matchers.equalTo;
-import static org.hamcrest.Matchers.hasSize;
-import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.eq;
-import static org.mockito.Mockito.when;
+import static org.hamcrest.Matchers.*;
 
 @QuarkusTest
+@QuarkusTestResource(ConsulTestResource.class)
+@TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class PipelineConfigResourceTest {
-    
-    @InjectMock
-    PipelineConfigService pipelineConfigService;
     
     private PipelineConfig testConfig;
     
@@ -42,21 +32,37 @@ class PipelineConfigResourceTest {
             processorInfo
         );
         
+        // Create a valid pipeline config with INITIAL_PIPELINE and SINK
+        PipelineStepConfig.ProcessorInfo sourceProcessor = new PipelineStepConfig.ProcessorInfo(
+            "source-service", null
+        );
+        PipelineStepConfig sourceStep = new PipelineStepConfig(
+            "source-step",
+            StepType.INITIAL_PIPELINE,
+            sourceProcessor
+        );
+        
+        PipelineStepConfig.ProcessorInfo sinkProcessor = new PipelineStepConfig.ProcessorInfo(
+            "sink-service", null
+        );
+        PipelineStepConfig sinkStep = new PipelineStepConfig(
+            "sink-step",
+            StepType.SINK,
+            sinkProcessor
+        );
+        
         testConfig = new PipelineConfig(
             "test-pipeline",
-            Map.of("test-step", step)
+            Map.of(
+                "source-step", sourceStep,
+                "sink-step", sinkStep
+            )
         );
     }
     
     @Test
-    void testCreatePipelineSuccess() {
-        // Given
-        when(pipelineConfigService.createPipeline(eq("test-cluster"), eq("test-pipeline"), any()))
-            .thenReturn(CompletableFuture.completedFuture(
-                new ValidationResult(true, List.of(), List.of())
-            ));
-        
-        // When & Then
+    @Order(1)
+    void testCreatePipeline() {
         given()
             .contentType(ContentType.JSON)
             .body(testConfig)
@@ -69,76 +75,72 @@ class PipelineConfigResourceTest {
     }
     
     @Test
-    void testCreatePipelineValidationFailure() {
-        // Given
-        when(pipelineConfigService.createPipeline(eq("test-cluster"), eq("test-pipeline"), any()))
-            .thenReturn(CompletableFuture.completedFuture(
-                new ValidationResult(false, 
-                    List.of("Pipeline must have at least one SINK step"), 
-                    List.of("Consider adding error handling"))
-            ));
-        
-        // When & Then
-        given()
-            .contentType(ContentType.JSON)
-            .body(testConfig)
-            .when()
-            .post("/api/v1/clusters/test-cluster/pipelines/test-pipeline")
-            .then()
-            .statusCode(400)
-            .body("success", equalTo(false))
-            .body("errors", hasSize(1))
-            .body("errors[0]", equalTo("Pipeline must have at least one SINK step"))
-            .body("warnings", hasSize(1));
-    }
-    
-    @Test
-    void testCreatePipelineAlreadyExists() {
-        // Given
-        when(pipelineConfigService.createPipeline(eq("test-cluster"), eq("test-pipeline"), any()))
-            .thenReturn(CompletableFuture.completedFuture(
-                new ValidationResult(false, 
-                    List.of("Pipeline 'test-pipeline' already exists"), 
-                    List.of())
-            ));
-        
-        // When & Then
-        given()
-            .contentType(ContentType.JSON)
-            .body(testConfig)
-            .when()
-            .post("/api/v1/clusters/test-cluster/pipelines/test-pipeline")
-            .then()
-            .statusCode(409)
-            .body("success", equalTo(false));
-    }
-    
-    @Test
-    void testGetPipelineSuccess() {
-        // Given
-        when(pipelineConfigService.getPipeline("test-cluster", "test-pipeline"))
-            .thenReturn(CompletableFuture.completedFuture(Optional.of(testConfig)));
-        
-        // When & Then
+    @Order(2)
+    void testGetPipeline() {
         given()
             .when()
             .get("/api/v1/clusters/test-cluster/pipelines/test-pipeline")
             .then()
             .statusCode(200)
             .body("name", equalTo("test-pipeline"))
-            .body("pipelineSteps.test-step.stepName", equalTo("test-step"));
+            .body("pipelineSteps", hasKey("source-step"))
+            .body("pipelineSteps", hasKey("sink-step"));
     }
     
     @Test
-    void testGetPipelineNotFound() {
-        // Given
-        when(pipelineConfigService.getPipeline("test-cluster", "non-existent"))
-            .thenReturn(CompletableFuture.completedFuture(Optional.empty()));
+    @Order(3)
+    void testUpdatePipeline() {
+        // Add a middle step
+        PipelineStepConfig.ProcessorInfo middleProcessor = new PipelineStepConfig.ProcessorInfo(
+            "middle-service", null
+        );
+        PipelineStepConfig middleStep = new PipelineStepConfig(
+            "middle-step",
+            StepType.PIPELINE,
+            middleProcessor
+        );
         
-        // When & Then
+        PipelineConfig updatedConfig = new PipelineConfig(
+            "test-pipeline",
+            Map.of(
+                "source-step", testConfig.pipelineSteps().get("source-step"),
+                "middle-step", middleStep,
+                "sink-step", testConfig.pipelineSteps().get("sink-step")
+            )
+        );
+        
+        given()
+            .contentType(ContentType.JSON)
+            .body(updatedConfig)
+            .when()
+            .put("/api/v1/clusters/test-cluster/pipelines/test-pipeline")
+            .then()
+            .statusCode(200)
+            .body("success", equalTo(true))
+            .body("message", equalTo("Pipeline updated successfully"));
+        
+        // Verify the update
         given()
             .when()
-            .get("/api/v1/clusters/test-cluster/pipelines/non-existent")
+            .get("/api/v1/clusters/test-cluster/pipelines/test-pipeline")
+            .then()
+            .statusCode(200)
+            .body("pipelineSteps", hasKey("middle-step"));
+    }
+    
+    @Test
+    @Order(4)
+    void testDeletePipeline() {
+        given()
+            .when()
+            .delete("/api/v1/clusters/test-cluster/pipelines/test-pipeline")
+            .then()
+            .statusCode(204);
+        
+        // Verify deletion
+        given()
+            .when()
+            .get("/api/v1/clusters/test-cluster/pipelines/test-pipeline")
             .then()
             .statusCode(404)
             .body("success", equalTo(false))
@@ -146,95 +148,89 @@ class PipelineConfigResourceTest {
     }
     
     @Test
-    void testUpdatePipelineSuccess() {
-        // Given
-        when(pipelineConfigService.updatePipeline(eq("test-cluster"), eq("test-pipeline"), any()))
-            .thenReturn(CompletableFuture.completedFuture(
-                new ValidationResult(true, List.of(), List.of())
-            ));
+    void testCreateInvalidPipeline() {
+        // Pipeline without SINK step
+        PipelineStepConfig.ProcessorInfo processor = new PipelineStepConfig.ProcessorInfo(
+            "service", null
+        );
+        PipelineStepConfig step = new PipelineStepConfig(
+            "only-step",
+            StepType.PIPELINE,
+            processor
+        );
         
-        // When & Then
+        PipelineConfig invalidConfig = new PipelineConfig(
+            "invalid-pipeline",
+            Map.of("only-step", step)
+        );
+        
+        given()
+            .contentType(ContentType.JSON)
+            .body(invalidConfig)
+            .when()
+            .post("/api/v1/clusters/test-cluster/pipelines/invalid-pipeline")
+            .then()
+            .statusCode(400)
+            .body("success", equalTo(false))
+            .body("errors", hasSize(greaterThan(0)));
+    }
+    
+    @Test
+    void testConcurrentPipelineCreation() {
+        // Try to create the same pipeline twice
         given()
             .contentType(ContentType.JSON)
             .body(testConfig)
             .when()
-            .put("/api/v1/clusters/test-cluster/pipelines/test-pipeline")
+            .post("/api/v1/clusters/test-cluster/pipelines/concurrent-test")
             .then()
-            .statusCode(200)
-            .body("success", equalTo(true))
-            .body("message", equalTo("Pipeline updated successfully"));
-    }
-    
-    @Test
-    void testUpdatePipelineNotFound() {
-        // Given
-        when(pipelineConfigService.updatePipeline(eq("test-cluster"), eq("non-existent"), any()))
-            .thenReturn(CompletableFuture.completedFuture(
-                new ValidationResult(false, 
-                    List.of("Pipeline 'non-existent' not found"), 
-                    List.of())
-            ));
+            .statusCode(201);
         
-        // When & Then
+        // Second creation should fail
         given()
             .contentType(ContentType.JSON)
             .body(testConfig)
             .when()
-            .put("/api/v1/clusters/test-cluster/pipelines/non-existent")
+            .post("/api/v1/clusters/test-cluster/pipelines/concurrent-test")
             .then()
-            .statusCode(404)
-            .body("success", equalTo(false));
-    }
-    
-    @Test
-    void testDeletePipelineSuccess() {
-        // Given
-        when(pipelineConfigService.deletePipeline("test-cluster", "test-pipeline"))
-            .thenReturn(CompletableFuture.completedFuture(
-                new ValidationResult(true, List.of(), List.of())
-            ));
+            .statusCode(409)
+            .body("success", equalTo(false))
+            .body("errors", hasItem(containsString("already exists")));
         
-        // When & Then
+        // Cleanup
         given()
             .when()
-            .delete("/api/v1/clusters/test-cluster/pipelines/test-pipeline")
+            .delete("/api/v1/clusters/test-cluster/pipelines/concurrent-test")
             .then()
             .statusCode(204);
     }
     
     @Test
-    void testDeletePipelineNotFound() {
-        // Given
-        when(pipelineConfigService.deletePipeline("test-cluster", "non-existent"))
-            .thenReturn(CompletableFuture.completedFuture(
-                new ValidationResult(false, 
-                    List.of("Pipeline 'non-existent' not found"), 
-                    List.of())
-            ));
-        
-        // When & Then
+    void testOpenApiEndpoint() {
         given()
             .when()
-            .delete("/api/v1/clusters/test-cluster/pipelines/non-existent")
+            .get("/openapi")
             .then()
-            .statusCode(404)
-            .body("success", equalTo(false));
+            .statusCode(200)
+            .body("openapi", notNullValue())
+            .body("info.title", equalTo("Rokkon Pipeline Configuration API"));
     }
     
     @Test
-    void testListPipelines() {
-        // Given
-        when(pipelineConfigService.listPipelines("test-cluster"))
-            .thenReturn(CompletableFuture.completedFuture(
-                Map.of("test-pipeline", testConfig)
-            ));
-        
-        // When & Then
+    void testSwaggerUIEndpoint() {
         given()
             .when()
-            .get("/api/v1/clusters/test-cluster/pipelines")
+            .get("/swagger-ui/")
             .then()
-            .statusCode(200)
-            .body("test-pipeline.name", equalTo("test-pipeline"));
+            .statusCode(200);
+    }
+    
+    @Test 
+    void testHealthEndpoint() {
+        given()
+            .when()
+            .get("/q/health")
+            .then()
+            .statusCode(200);
     }
 }

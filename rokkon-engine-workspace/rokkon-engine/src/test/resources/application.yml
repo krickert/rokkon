@@ -1,0 +1,7 @@
+quarkus:
+  http:
+    test-port: 0  # Use random port for tests
+  grpc:
+    server:
+      port: 0  # Use random port for tests
+      test-port: 0

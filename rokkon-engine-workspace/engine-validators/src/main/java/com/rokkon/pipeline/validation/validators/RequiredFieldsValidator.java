@@ -40,10 +40,9 @@ public class RequiredFieldsValidator implements PipelineConfigValidator {
             return ValidationResult.failure(List.of("Pipeline configuration cannot be null"));
         }
         
-        // Business rule: Pipeline must have at least one step
-        if (config.pipelineSteps() == null || config.pipelineSteps().isEmpty()) {
-            errors.add("Pipeline must have at least one step");
-        } else {
+        // Pipelines can start empty - no steps required initially
+        // Steps will be added after services are whitelisted
+        if (config.pipelineSteps() != null && !config.pipelineSteps().isEmpty()) {
             for (var entry : config.pipelineSteps().entrySet()) {
                 String stepId = entry.getKey();
                 PipelineStepConfig step = entry.getValue();

@@ -50,17 +50,20 @@ public class StepTypeValidator implements PipelineConfigValidator {
             validateStepTypeConstraints(stepId, step, errors, warnings);
         }
         
-        // Validate pipeline structure constraints
-        if (initialPipelineCount == 0) {
-            errors.add("Pipeline must have at least one INITIAL_PIPELINE step");
-        }
-        
-        if (initialPipelineCount > 1) {
-            errors.add("Pipeline can have at most one INITIAL_PIPELINE step, found " + initialPipelineCount);
-        }
-        
-        if (sinkCount == 0) {
-            errors.add("Pipeline must have at least one SINK step");
+        // Only validate pipeline structure constraints if there are steps
+        // Empty pipelines are valid initial states
+        if (config.pipelineSteps() != null && !config.pipelineSteps().isEmpty()) {
+            if (initialPipelineCount == 0) {
+                errors.add("Pipeline must have at least one INITIAL_PIPELINE step");
+            }
+            
+            if (initialPipelineCount > 1) {
+                errors.add("Pipeline can have at most one INITIAL_PIPELINE step, found " + initialPipelineCount);
+            }
+            
+            if (sinkCount == 0) {
+                errors.add("Pipeline must have at least one SINK step");
+            }
         }
         
         return new ValidationResult(errors.isEmpty(), errors, warnings);

@@ -67,3 +67,8 @@ publishing {
         }
     }
 }
+
+// Suppress the enforced platform validation
+tasks.withType<GenerateModuleMetadata> {
+    suppressedValidationErrors.add("enforced-platform")
+}
