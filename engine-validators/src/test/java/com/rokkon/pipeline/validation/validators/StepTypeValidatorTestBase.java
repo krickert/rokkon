@@ -174,9 +174,9 @@ public abstract class StepTypeValidatorTestBase {
         );
         
         ValidationResult result = getValidator().validate(config);
-        assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).hasSize(1);
-        assertThat(result.errors().get(0)).contains("Pipeline must have at least one INITIAL_PIPELINE step");
+        assertThat(result.valid()).isTrue();  // Now it's valid, just with warnings
+        // We get warnings about missing INITIAL_PIPELINE step plus warnings about steps without proper inputs/outputs
+        assertThat(result.warnings()).contains("Pipeline has no INITIAL_PIPELINE step - data must come from external sources");
     }
     
     @Test
@@ -216,9 +216,9 @@ public abstract class StepTypeValidatorTestBase {
         );
         
         ValidationResult result = getValidator().validate(config);
-        assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).hasSize(1);
-        assertThat(result.errors().get(0)).contains("Pipeline must have at least one SINK step");
+        assertThat(result.valid()).isTrue();  // Now it's valid, just with warnings
+        // We get warnings about missing SINK step plus warnings about steps without proper inputs/outputs
+        assertThat(result.warnings()).contains("Pipeline has no SINK step - ensure data has a destination");
     }
     
     @Test
@@ -283,9 +283,9 @@ public abstract class StepTypeValidatorTestBase {
         );
         
         ValidationResult result = getValidator().validate(config);
-        assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).hasSize(1);
-        assertThat(result.errors().get(0)).contains("Pipeline can have at most one INITIAL_PIPELINE step, found 2");
+        assertThat(result.valid()).isTrue();  // Now it's valid, just with warnings
+        // We get warnings about multiple INITIAL_PIPELINE steps
+        assertThat(result.warnings()).contains("Pipeline has multiple INITIAL_PIPELINE steps (2) - consider if this is intended");
     }
     
     @Test

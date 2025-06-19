@@ -1,15 +1,25 @@
 package com.rokkon.pipeline.consul.test;
 
+import com.rokkon.pipeline.config.model.*;
+import com.rokkon.pipeline.consul.model.ModuleWhitelistRequest;
 import com.rokkon.pipeline.consul.service.ClusterService;
 import com.rokkon.pipeline.consul.service.ModuleWhitelistService;
 import com.rokkon.pipeline.consul.service.PipelineConfigService;
 import com.rokkon.pipeline.validation.ValidationResult;
 import io.smallrye.mutiny.Uni;
+import io.vertx.ext.consul.ConsulClientOptions;
+import io.vertx.ext.consul.ServiceOptions;
+import io.vertx.mutiny.core.Vertx;
+import io.vertx.mutiny.ext.consul.ConsulClient;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.time.Duration;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Implementation of TestSeedingService for unit tests.
@@ -32,6 +42,15 @@ public class TestSeedingServiceImpl implements TestSeedingService {
     
     @Inject
     PipelineConfigService pipelineConfigService;
+    
+    @Inject
+    Vertx vertx;
+    
+    @ConfigProperty(name = "consul.host", defaultValue = "localhost")
+    String consulHost;
+    
+    @ConfigProperty(name = "consul.port", defaultValue = "8500")
+    int consulPort;
     
     private int currentStep = -1;
     
@@ -130,7 +149,7 @@ public class TestSeedingServiceImpl implements TestSeedingService {
     
     @Override
     public Uni<Boolean> seedStep3_ContainerRegistered() {
-        LOG.info("Seeding Step 3: Registering test-module");
+        LOG.info("Seeding Step 3: Registering test-module with engine");
         
         // Ensure step 2 is complete
         if (currentStep < 2) {
@@ -138,9 +157,63 @@ public class TestSeedingServiceImpl implements TestSeedingService {
                 .flatMap(success -> success ? seedStep3_ContainerRegistered() : Uni.createFrom().item(false));
         }
         
-        // TODO: Implement actual registration
-        LOG.warn("⚠ Step 3 not yet implemented: Container registration pending");
-        return Uni.createFrom().item(false);
+        // Use Vertx Consul client to register the service properly
+        ConsulClient consulClient = ConsulClient.create(vertx, 
+            new ConsulClientOptions()
+                .setHost(consulHost)
+                .setPort(consulPort));
+        
+        // Create service options for the test-module
+        ServiceOptions serviceOptions = new ServiceOptions()
+            .setId("grpc-test-module")
+            .setName(TEST_MODULE)
+            .setAddress("test-module")  // Docker network name
+            .setPort(9090)
+            .setTags(java.util.List.of("rokkon-module", "grpc", "test"))
+            .setMeta(Map.of(
+                "module-type", "test",
+                "version", "1.0.0"
+            ))
+            .setCheckOptions(new io.vertx.ext.consul.CheckOptions()
+                .setGrpc("test-module:9090")
+                .setGrpcTls(false)
+                .setInterval("10s")
+                .setDeregisterAfter("1m"));
+        
+        // Register the service
+        return consulClient.registerService(serviceOptions)
+            .map(__ -> {
+                currentStep = Math.max(currentStep, 3);
+                LOG.info("✓ Step 3 complete: Test-module registered in Consul");
+                return true;
+            })
+            .onFailure().recoverWithItem(error -> {
+                LOG.errorf("Failed to register test-module in Consul: %s", error.getMessage());
+                return false;
+            })
+            // Give Consul time to propagate the registration
+            .onItem().delayIt().by(Duration.ofSeconds(1))
+            // Verify the service is visible in the catalog
+            .flatMap(success -> {
+                if (!success) {
+                    return Uni.createFrom().item(false);
+                }
+                
+                return consulClient.catalogServiceNodes(TEST_MODULE)
+                    .map(serviceList -> {
+                        boolean hasService = serviceList != null && !serviceList.getList().isEmpty();
+                        if (hasService) {
+                            LOG.info("✓ Service confirmed in Consul catalog");
+                        } else {
+                            LOG.warn("Service registered but not yet visible in catalog");
+                        }
+                        return hasService;
+                    })
+                    .onFailure().recoverWithItem(error -> {
+                        LOG.errorf("Failed to verify service in catalog: %s", error.getMessage());
+                        return false;
+                    });
+            });
     }
     
     @Override
@@ -153,9 +226,34 @@ public class TestSeedingServiceImpl implements TestSeedingService {
                 .flatMap(success -> success ? seedStep4_EmptyPipelineCreated() : Uni.createFrom().item(false));
         }
         
-        // TODO: Implement empty pipeline creation
-        LOG.warn("⚠ Step 4 not yet implemented: Empty pipeline creation pending");
-        return Uni.createFrom().item(false);
+        // Create an empty pipeline configuration
+        PipelineConfig emptyPipeline = new PipelineConfig(
+            TEST_PIPELINE,
+            Collections.emptyMap() // No steps yet
+        );
+        
+        // Create the pipeline in the test cluster
+        return pipelineConfigService.createPipeline(TEST_CLUSTER, TEST_PIPELINE, emptyPipeline)
+            .map(result -> {
+                if (result.valid()) {
+                    currentStep = Math.max(currentStep, 4);
+                    LOG.info("✓ Step 4 complete: Empty pipeline created");
+                    return true;
+                } else {
+                    // Check if it already exists
+                    if (result.errors().stream().anyMatch(e -> e.contains("already exists"))) {
+                        currentStep = Math.max(currentStep, 4);
+                        LOG.debug("Empty pipeline already exists");
+                        return true;
+                    }
+                    LOG.errorf("Failed to create empty pipeline: %s", result.errors());
+                    return false;
+                }
+            })
+            .onFailure().recoverWithItem(error -> {
+                LOG.errorf("Exception creating empty pipeline: %s", error.getMessage());
+                return false;
+            });
     }
     
     @Override
@@ -168,9 +266,68 @@ public class TestSeedingServiceImpl implements TestSeedingService {
                 .flatMap(success -> success ? seedStep5_FirstPipelineStepAdded() : Uni.createFrom().item(false));
         }
         
-        // TODO: Implement pipeline step addition
-        LOG.warn("⚠ Step 5 not yet implemented: Pipeline step addition pending");
-        return Uni.createFrom().item(false);
+        // First, whitelist the test-module
+        ModuleWhitelistRequest whitelistRequest = new ModuleWhitelistRequest(
+            TEST_MODULE,              // grpcServiceName
+            TEST_MODULE,              // implementationName (same as service name for test)
+            null,                     // customConfigSchemaReference
+            null                      // customConfig
+        );
+        
+        return moduleWhitelistService.whitelistModule(TEST_CLUSTER, whitelistRequest)
+            .flatMap(whitelistResponse -> {
+                if (!whitelistResponse.success()) {
+                    LOG.errorf("Failed to whitelist module: %s", whitelistResponse.message());
+                    return Uni.createFrom().item(false);
+                }
+                
+                LOG.info("Module whitelisted successfully, now adding pipeline step");
+                
+                // Create a pipeline step configuration
+                PipelineStepConfig.ProcessorInfo processorInfo = new PipelineStepConfig.ProcessorInfo(TEST_MODULE, null);
+                PipelineStepConfig stepConfig = new PipelineStepConfig(
+                    "test-step-1",            // stepName
+                    StepType.PIPELINE,       // stepType - standard PIPELINE type
+                    processorInfo             // processorInfo
+                );
+                
+                // Get the current pipeline configuration
+                return pipelineConfigService.getPipeline(TEST_CLUSTER, TEST_PIPELINE)
+                    .flatMap(pipelineOpt -> {
+                        if (pipelineOpt.isEmpty()) {
+                            LOG.error("Pipeline not found");
+                            return Uni.createFrom().item(false);
+                        }
+                        
+                        PipelineConfig pipeline = pipelineOpt.get();
+                        
+                        // Add the step to the pipeline
+                        Map<String, PipelineStepConfig> updatedSteps = new HashMap<>(pipeline.pipelineSteps());
+                        updatedSteps.put("test-step-1", stepConfig);
+                        
+                        PipelineConfig updatedPipeline = new PipelineConfig(
+                            pipeline.name(),
+                            updatedSteps
+                        );
+                        
+                        // Update the pipeline
+                        return pipelineConfigService.updatePipeline(TEST_CLUSTER, TEST_PIPELINE, updatedPipeline)
+                            .map(result -> {
+                                if (result.valid()) {
+                                    currentStep = Math.max(currentStep, 5);
+                                    LOG.info("✓ Step 5 complete: First pipeline step added");
+                                    return true;
+                                } else {
+                                    LOG.errorf("Failed to update pipeline with step: %s", result.errors());
+                                    return false;
+                                }
+                            });
+                    });
+            })
+            .onFailure().recoverWithItem(error -> {
+                LOG.errorf("Exception adding first pipeline step: %s", error.getMessage());
+                return false;
+            });
     }
     
     @Override
@@ -244,7 +401,11 @@ public class TestSeedingServiceImpl implements TestSeedingService {
         
         // Step 4: Remove empty pipeline
         if (fromStep >= 4) {
-            // TODO: Remove pipeline when implemented
+            result = result.flatMap(success ->
+                pipelineConfigService.deletePipeline(TEST_CLUSTER, TEST_PIPELINE)
+                    .map(r -> r.valid())
+                    .onFailure().recoverWithItem(false)
+            );
         }
         
         // Step 3: Unregister container

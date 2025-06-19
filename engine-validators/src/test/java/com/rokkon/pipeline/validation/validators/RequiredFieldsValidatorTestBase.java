@@ -66,8 +66,9 @@ public abstract class RequiredFieldsValidatorTestBase {
         
         ValidationResult result = getValidator().validate(config);
         
-        assertFalse(result.valid());
-        assertTrue(result.errors().stream().anyMatch(e -> e.contains("Pipeline must have at least one step")));
+        // Empty pipelines are valid - steps will be added after services are whitelisted
+        assertTrue(result.valid());
+        assertTrue(result.errors().isEmpty());
     }
     
     @Test

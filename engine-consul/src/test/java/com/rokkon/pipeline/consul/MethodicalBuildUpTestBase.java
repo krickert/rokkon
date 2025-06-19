@@ -1,5 +1,6 @@
 package com.rokkon.pipeline.consul;
 
+import com.rokkon.pipeline.config.model.StepType;
 import com.rokkon.pipeline.consul.model.Cluster;
 import com.rokkon.pipeline.consul.service.ClusterService;
 import com.rokkon.pipeline.consul.service.ModuleWhitelistService;
@@ -157,16 +158,36 @@ public abstract class MethodicalBuildUpTestBase {
     void testRegisterContainer() {
         LOG.info("TEST 3: Registering test-module with the engine");
         
-        // TODO: This is where we'll implement the actual registration flow:
-        // 1. CLI tool connects to test-module on localhost
-        // 2. CLI calls GetServiceRegistration to get module info
-        // 3. CLI connects to engine's ModuleRegistrationService
-        // 4. Engine validates and registers module in Consul
+        // First ensure clusters exist (dependency on test 1)
+        Boolean clusterSuccess = getTestSeedingService().seedStep1_ClustersCreated()
+            .subscribe().withSubscriber(UniAssertSubscriber.create())
+            .awaitItem()
+            .assertCompleted()
+            .getItem();
         
-        // For now, this is a placeholder
-        LOG.info("⚠ Container registration not yet implemented");
-        LOG.info("  This will be implemented when we create the CLI tool");
-        LOG.info("  and ModuleRegistrationService");
+        assertThat(clusterSuccess)
+            .as("Clusters should be created before registration")
+            .isTrue();
+        
+        // Now register the container
+        Boolean success = getTestSeedingService().seedStep3_ContainerRegistered()
+            .subscribe().withSubscriber(UniAssertSubscriber.create())
+            .awaitItem()
+            .assertCompleted()
+            .getItem();
+        
+        assertThat(success)
+            .as("Container registration should succeed")
+            .isTrue();
+        
+        // TODO: Verify module is registered in Consul
+        // For now, we just check that registration succeeded
+        // In full implementation:
+        // 1. Query Consul for service health
+        // 2. Verify gRPC health check is passing
+        // 3. Confirm service metadata is correct
+        
+        LOG.info("✓ Test-module registered in Consul (whitelisting comes in step 5)");
     }
     
     @Test
@@ -175,11 +196,30 @@ public abstract class MethodicalBuildUpTestBase {
     void testCreateEmptyPipeline() {
         LOG.info("TEST 4: Creating an empty pipeline (no steps)");
         
-        // TODO: Create an empty pipeline configuration
-        // This should be allowed by the validators
+        // Use TestSeedingService to create an empty pipeline
+        Boolean success = getTestSeedingService().seedStep4_EmptyPipelineCreated()
+            .subscribe().withSubscriber(UniAssertSubscriber.create())
+            .awaitItem()
+            .assertCompleted()
+            .getItem();
         
-        LOG.info("⚠ Empty pipeline creation not yet implemented");
-        LOG.info("  Need to verify if validators allow empty pipelines");
+        assertThat(success)
+            .as("Empty pipeline creation should succeed")
+            .isTrue();
+        
+        // Verify the pipeline exists but has no steps
+        var pipeline = getPipelineConfigService().getPipeline(TEST_CLUSTER, "test-pipeline")
+            .await().indefinitely();
+        
+        assertThat(pipeline)
+            .as("Pipeline should exist")
+            .isPresent();
+        
+        assertThat(pipeline.get().pipelineSteps())
+            .as("Pipeline should have no steps")
+            .isEmpty();
+        
+        LOG.info("✓ Empty pipeline created successfully with no steps");
     }
     
     @Test
@@ -188,11 +228,37 @@ public abstract class MethodicalBuildUpTestBase {
     void testAddFirstPipelineStep() {
         LOG.info("TEST 5: Adding first test-module step to pipeline");
         
-        // TODO: Add a single test-module step to the pipeline
-        // This requires the module to be registered and whitelisted first
+        // Use TestSeedingService to whitelist module and add first step
+        Boolean success = getTestSeedingService().seedStep5_FirstPipelineStepAdded()
+            .subscribe().withSubscriber(UniAssertSubscriber.create())
+            .awaitItem()
+            .assertCompleted()
+            .getItem();
         
-        LOG.info("⚠ Pipeline step addition not yet implemented");
-        LOG.info("  Depends on container registration being completed");
+        assertThat(success)
+            .as("First pipeline step addition should succeed")
+            .isTrue();
+        
+        // Verify the pipeline now has one step
+        var pipeline = getPipelineConfigService().getPipeline(TEST_CLUSTER, "test-pipeline")
+            .await().indefinitely();
+        
+        assertThat(pipeline)
+            .as("Pipeline should exist")
+            .isPresent();
+        
+        assertThat(pipeline.get().pipelineSteps())
+            .as("Pipeline should have one step")
+            .hasSize(1)
+            .containsKey("test-step-1");
+        
+        // Verify the step configuration
+        var step = pipeline.get().pipelineSteps().get("test-step-1");
+        assertThat(step.stepName()).isEqualTo("test-step-1");
+        assertThat(step.stepType()).isEqualTo(StepType.PIPELINE);
+        assertThat(step.processorInfo().grpcServiceName()).isEqualTo(TEST_MODULE);
+        
+        LOG.info("✓ First pipeline step added successfully");
     }
     
     @Test

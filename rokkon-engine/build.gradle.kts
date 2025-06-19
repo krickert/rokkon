@@ -30,6 +30,8 @@ dependencies {
     implementation("io.quarkus:quarkus-smallrye-openapi")
     implementation(enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}"))
     implementation("io.quarkus:quarkus-arc")
+    implementation("io.quarkus:quarkus-vertx")
+    implementation("io.vertx:vertx-consul-client")
     
     // Engine modules
     implementation("com.rokkon.pipeline:engine-consul:1.0.0-SNAPSHOT")

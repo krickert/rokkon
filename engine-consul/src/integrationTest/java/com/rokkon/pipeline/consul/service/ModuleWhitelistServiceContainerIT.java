@@ -29,10 +29,17 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Tests the complete flow with network connectivity.
  */
 @QuarkusIntegrationTest
-@QuarkusTestResource(value = ModuleContainerResource.class, initArgs = {
-    @QuarkusTestResource.ResourceArg(name = "imageName", value = "rokkon/test-module:1.0.0-SNAPSHOT")
-})
+@QuarkusTestResource(ModuleWhitelistServiceContainerIT.TestModuleContainerResource.class)
 class ModuleWhitelistServiceContainerIT extends ModuleWhitelistServiceTestBase {
+    
+    /**
+     * Custom test resource that provides the test module container.
+     */
+    public static class TestModuleContainerResource extends ModuleContainerResource {
+        public TestModuleContainerResource() {
+            super("rokkon/test-module:1.0.0-SNAPSHOT");
+        }
+    }
     
     @ConfigProperty(name = "test.module.container.name")
     String testModuleContainerName;
@@ -41,7 +48,7 @@ class ModuleWhitelistServiceContainerIT extends ModuleWhitelistServiceTestBase {
     int testModuleInternalPort;
     
     private ConsulContainer consulContainer;
-    private ModuleWhitelistService whitelistService;
+    private ModuleWhitelistServiceImpl whitelistService;
     private final HttpClient httpClient = HttpClient.newHttpClient();
     private Network sharedNetwork;
     
@@ -61,8 +68,8 @@ class ModuleWhitelistServiceContainerIT extends ModuleWhitelistServiceTestBase {
         
         // Create service instances
         ObjectMapper objectMapper = new ObjectMapper();
-        ClusterService clusterService = new ClusterService();
-        PipelineConfigService pipelineConfigService = new PipelineConfigService();
+        ClusterServiceImpl clusterService = new ClusterServiceImpl();
+        PipelineConfigServiceImpl pipelineConfigService = new PipelineConfigServiceImpl();
         
         String consulHost = consulContainer.getHost();
         String consulPort = String.valueOf(consulContainer.getMappedPort(8500));
@@ -81,7 +88,7 @@ class ModuleWhitelistServiceContainerIT extends ModuleWhitelistServiceTestBase {
         setField(pipelineConfigService, "validator", validator);
         
         // Create whitelist service
-        whitelistService = new ModuleWhitelistService();
+        whitelistService = new ModuleWhitelistServiceImpl();
         setField(whitelistService, "consulHost", consulHost);
         setField(whitelistService, "consulPort", consulPort);
         setField(whitelistService, "objectMapper", objectMapper);

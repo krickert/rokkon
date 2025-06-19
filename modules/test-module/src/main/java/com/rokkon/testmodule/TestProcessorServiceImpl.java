@@ -10,6 +10,7 @@ import io.micrometer.core.instrument.MeterRegistry;
 import io.micrometer.core.instrument.Timer;
 import io.quarkus.grpc.GrpcService;
 import io.smallrye.mutiny.Uni;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
@@ -30,11 +31,15 @@ public class TestProcessorServiceImpl implements PipeStepProcessor {
     @ConfigProperty(name = "test.processor.delay.ms", defaultValue = "0")
     Long processingDelayMs;
     
-    private final Counter processedDocuments;
-    private final Counter failedDocuments;
-    private final Timer processingTimer;
+    @Inject
+    MeterRegistry registry;
     
-    public TestProcessorServiceImpl(MeterRegistry registry) {
+    Counter processedDocuments;
+    Counter failedDocuments;
+    Timer processingTimer;
+    
+    @jakarta.annotation.PostConstruct
+    void init() {
         this.processedDocuments = Counter.builder("test.processor.documents.processed")
                 .description("Number of documents processed")
                 .register(registry);

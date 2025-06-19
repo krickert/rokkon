@@ -46,7 +46,7 @@ public abstract class ClusterServiceTestBase {
         assertThat(createResult.valid()).isTrue();
         
         // Now get the cluster
-        Optional<ClusterService.ClusterMetadata> cluster = getClusterService().getCluster(clusterName)
+        Optional<ClusterMetadata> cluster = getClusterService().getCluster(clusterName)
             .subscribe().withSubscriber(UniAssertSubscriber.create())
             .awaitItem(Duration.ofSeconds(5))
             .getItem();

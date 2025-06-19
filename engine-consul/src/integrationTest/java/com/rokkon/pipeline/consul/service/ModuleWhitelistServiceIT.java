@@ -43,8 +43,8 @@ class ModuleWhitelistServiceIT extends ModuleWhitelistServiceTestBase {
         // Create service instance manually for integration test
         // In prod mode, we need to instantiate services ourselves
         ObjectMapper objectMapper = new ObjectMapper();
-        ClusterService clusterService = new ClusterService();
-        PipelineConfigService pipelineConfigService = new PipelineConfigService();
+        ClusterServiceImpl clusterService = new ClusterServiceImpl();
+        PipelineConfigServiceImpl pipelineConfigService = new PipelineConfigServiceImpl();
         
         // Use reflection to set fields since we're in IT mode
         setField(clusterService, "consulHost", consulHost);
@@ -61,7 +61,7 @@ class ModuleWhitelistServiceIT extends ModuleWhitelistServiceTestBase {
         setField(pipelineConfigService, "validator", validator);
         
         // Create whitelist service
-        whitelistService = new ModuleWhitelistService();
+        whitelistService = new ModuleWhitelistServiceImpl();
         setField(whitelistService, "consulHost", consulHost);
         setField(whitelistService, "consulPort", consulPort);
         setField(whitelistService, "objectMapper", objectMapper);

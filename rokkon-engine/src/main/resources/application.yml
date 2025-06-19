@@ -4,25 +4,66 @@ quarkus:
   
   http:
     port: 8081
+    host: 0.0.0.0
   
   grpc:
     server:
       port: 9000
+      host: 0.0.0.0
       enable-reflection-service: true
+      max-inbound-message-size: 4MB
       health:
         enabled: true
+    
+    # gRPC client defaults
+    clients:
+      default:
+        max-inbound-message-size: 4MB
+        keepalive-time: 30s
+        keepalive-timeout: 10s
   
   # Consul configuration
   consul-config:
     enabled: true
     agent:
       host-port: ${consul.host:localhost}:${consul.port:8500}
+    properties-value-keys: rokkon-clusters/${CLUSTER_NAME:default}/config
+    fail-fast: false
       
   # Index external dependencies for CDI discovery
   index-dependency:
     engine-consul:
       group-id: com.rokkon.pipeline
       artifact-id: engine-consul
+      
+  # Health check configuration
+  health:
+    extensions:
+      enabled: true
+    readiness:
+      enabled: true
+    liveness:
+      enabled: true
+      
+  # Logging
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+      "io.grpc":
+        level: INFO
+
+# Engine-specific configuration
+consul:
+  host: ${CONSUL_HOST:localhost}
+  port: ${CONSUL_PORT:8500}
+
+grpc:
+  client:
+    max-inbound-message-size: ${GRPC_MAX_MESSAGE_SIZE:4194304}
+    keepalive-time-seconds: ${GRPC_KEEPALIVE_TIME:30}
+    keepalive-timeout-seconds: ${GRPC_KEEPALIVE_TIMEOUT:10}
     
 # Dev profile
 "%dev":
@@ -38,5 +79,10 @@ quarkus:
 # Test profile  
 "%test":
   quarkus:
+    grpc:
+      server:
+        port: 0  # Random port for tests
+    consul-config:
+      enabled: false  # Disable in tests unless explicitly needed
     log:
       level: INFO

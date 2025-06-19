@@ -26,6 +26,9 @@ dependencies {
     // Stork for Consul service discovery
     implementation("io.smallrye.stork:stork-service-discovery-consul:2.6.3")
     
+    // Vertx Consul client for service registration
+    implementation("io.smallrye.reactive:smallrye-mutiny-vertx-consul-client")
+    
     // Our models and validators
     implementation("com.rokkon.pipeline:engine-models:1.0.0-SNAPSHOT")
     implementation("com.rokkon.pipeline:engine-validators:1.0.0-SNAPSHOT")
