@@ -1,0 +1,3546 @@
+
+tika-input-doc-080*��source-code/SecurityIntegrationTests_v3.java source-code/SecurityIntegrationTests_v3.java// VARIATION 80 of Security Test Source (Variant 3) // Generated on: 2025-06-18T14:38:08.483792132Z // Base file: source-code/SecurityIntegrationTests.java package com.rokkon.integration.security; import com.google.protobuf.ByteString; import com.google.protobuf.Empty; import com.google.protobuf.Struct; import com.google.protobuf.Value; import com.rokkon.search.model.*; import com.rokkon.search.sdk.*; import io.grpc.ManagedChannel; import io.grpc.ManagedChannelBuilder; import io.grpc.Status; import io.grpc.StatusRuntimeException; import io.quarkus.test.junit.QuarkusIntegrationTest; import org.junit.jupiter.api.*; import org.slf4j.Logger; import org.slf4j.LoggerFactory; import java.nio.charset.StandardCharsets; import java.security.MessageDigest; import java.util.*; import java.util.concurrent.TimeUnit; import java.util.regex.Pattern; import static org.junit.jupiter.api.Assertions.*; /**  * Comprehensive security integration tests to validate input validation, malicious content handling,  * data integrity verification, and security boundaries across all services.  *   * These tests verify:  * - Input validation and sanitization  * - Malicious content detection and handling  * - Data integrity verification and checksums  * - Security boundary enforcement  * - Buffer overflow and injection attack prevention  * - Content filtering and blacklist enforcement  * - Secure error handling without information leakage  * - Authentication and authorization patterns  * - Secure data transmission and storage  * - Privacy and data protection compliance  */ @QuarkusIntegrationTest @TestMethodOrder(MethodOrderer.OrderAnnotation.class) @Disabled("Requires full gRPC service infrastructure for comprehensive security testing against malicious inputs and attacks") class SecurityIntegrationTests {     private static final Logger LOG = LoggerFactory.getLogger(SecurityIntegrationTests.class);          // Security test patterns     private static final List<String> SQL_INJECTION_PATTERNS = Arrays.asList(         "'; DROP TABLE users; --",         "' OR '1'='1",         "' UNION SELECT * FROM sensitive_data --",         "admin'--",         "' OR 1=1#"     );          private static final List<String> XSS_PATTERNS = Arrays.asList(         "<script>alert('XSS')</script>",         "javascript:alert('XSS')",         "<img src=x onerror=alert('XSS')>",         "<svg onload=alert('XSS')>",         "';alert('XSS');//"     );          private static final List<String> COMMAND_INJECTION_PATTERNS = Arrays.asList(         "; rm -rf /",         "| cat /etc/passwd",         "&& whoami",         "`rm -rf /`",         "$(cat /etc/passwd)"     );          private static final List<String> PATH_TRAVERSAL_PATTERNS = Arrays.asList(         "../../../etc/passwd",         "..\\..\\..\\windows\\system32\\config\\sam",         "....//....//....//etc/passwd",         "%2e%2e%2f%2e%2e%2f%2e%2e%2fetc%2fpasswd",         "..%252f..%252f..%252fetc%252fpasswd"     );          // Content security patterns     private static final Pattern SUSPICIOUS_PATTERN = Pattern.compile(         "(?i)(password|secret|key|token|auth|admin|root|exploit|hack|inject|malware|virus)",         Pattern.CASE_INSENSITIVE | Pattern.MULTILINE     );          private static final long MAX_CONTENT_SIZE = 100 * 1024 * 1024; // 100MB     private static final int MAX_FIELD_LENGTH = 10000;          private ManagedChannel tikaChannel;     private ManagedChannel chunkerChannel;     private ManagedChannel embedderChannel;     private ManagedChannel echoChannel;          private PipeStepProcessorGrpc.PipeStepProcessorBlockingStub tikaClient;     private PipeStepProcessorGrpc.PipeStepProcessorBlockingStub chunkerClient;     private PipeStepProcessorGrpc.PipeStepProcessorBlockingStub embedderClient;     private PipeStepProcessorGrpc.PipeStepProcessorBlockingStub echoClient;     @BeforeEach     void setUp() {         // Set up gRPC channels for security testing         tikaChannel = ManagedChannelBuilder.forAddress("localhost", 9000).usePlaintext().build();         chunkerChannel = ManagedChannelBuilder.forAddress("localhost", 9001).usePlaintext().build();         embedderChannel = ManagedChannelBuilder.forAddress("localhost", 9002).usePlaintext().build();         echoChannel = ManagedChannelBuilder.forAddress("localhost", 9003).usePlaintext().build();                  tikaClient = PipeStepProcessorGrpc.newBlockingStub(tikaChannel);         chunkerClient = PipeStepProcessorGrpc.newBlockingStub(chunkerChannel);         embedderClient = PipeStepProcessorGrpc.newBlockingStub(embedderChannel);         echoClient = PipeStepProcessorGrpc.newBlockingStub(echoChannel);                  LOG.info("Security integration test environment initialized");     }     @AfterEach      void tearDown() throws InterruptedException {         if (tikaChannel != null) {             tikaChannel.shutdown();             tikaChannel.awaitTermination(5, TimeUnit.SECONDS);         }         if (chunkerChannel != null) {             chunkerChannel.shutdown();             chunkerChannel.awaitTermination(5, TimeUnit.SECONDS);         }         if (embedderChannel != null) {             embedderChannel.shutdown();             embedderChannel.awaitTermination(5, TimeUnit.SECONDS);         }         if (echoChannel != null) {             echoChannel.shutdown();             echoChannel.awaitTermination(5, TimeUnit.SECONDS);         }     }     @Test     @Order(1)     @DisplayName("SQL Injection Attack Prevention")     void testSqlInjectionPrevention() {         LOG.info("Testing SQL injection attack prevention");                  Map<String, Integer> serviceVulnerabilities = new HashMap<>();         int totalInjectionAttempts = 0;         int blockedAttempts = 0;                  for (String injectionPattern : SQL_INJECTION_PATTERNS) {             totalInjectionAttempts++;                          // Test each service with SQL injection patterns             if (testServiceWithMaliciousInput(tikaClient, "tika", injectionPattern, "SQL Injection")) {                 blockedAttempts++;             } else {                 serviceVulnerabilities.merge("tika", 1, Integer::sum);             }                          if (testServiceWithMaliciousInput(chunkerClient, "chunker", injectionPattern, "SQL Injection")) {                 blockedAttempts++;             } else {                 serviceVulnerabilities.merge("chunker", 1, Integer::sum);             }                          if (testServiceWithMaliciousInput(embedderClient, "embedder", injectionPattern, "SQL Injection")) {                 blockedAttempts++;             } else {                 serviceVulnerabilities.merge("embedder", 1, Integer::sum);             }                          if (testServiceWithMaliciousInput(echoClient, "echo", injectionPattern, "SQL Injection")) {                 blockedAttempts++;             } else {                 serviceVulnerabilities.merge("echo", 1, Integer::sum);             }                          totalInjectionAttempts += 3; // Added 3 more services         }                  double blockingRate = (double) blockedAttempts / totalInjectionAttempts;                  // Verify SQL injection protection         assertTrue(blockingRate >= 0.90,              String.format("SQL injection blocking rate %.2f%% below minimum 90%%", blockingRate * 100));                  // Check for service-specific vulnerabilities         for (Map.Entry<String, Integer> entry : serviceVulnerabilities.entrySet()) {             String serviceName = entry.getKey();             Integer vulnerabilityCount = entry.getValue();                          assertTrue(vulnerabilityCount <= 1,                  String.format("%s service has %d SQL injection vulnerabilities", serviceName, vulnerabilityCount));         }                  LOG.info("✅ SQL injection prevention test completed - Blocking rate: {:.2f}%, Vulnerabilities: {}",                  blockingRate * 100, serviceVulnerabilities);     }     @Test     @Order(2)     @DisplayName("Cross-Site Scripting (XSS) Prevention")     void testXssPreventionAndSanitization() {         LOG.info("Testing XSS prevention and content sanitization");                  int totalXssAttempts = 0;         int sanitizedResponses = 0;         List<String> unsanitizedResponses = new ArrayList<>();                  for (String xssPattern : XSS_PATTERNS) {             totalXssAttempts++;                          // Test XSS pattern handling in document content             PipeDoc maliciousDoc = PipeDoc.newBuilder()                     .setId("xss-test-" + System.currentTimeMillis())                     .setTitle("XSS Test: " + xssPattern)                     .setBody("Content with XSS attempt: " + xssPattern)                     .build();                          ProcessRequest request = createProcessRequest("xss-security-test", "echo-step", maliciousDoc);                          try {                 ProcessResponse response = echoClient.processData(request);                                  if (response.getSuccess()) {                     String responseTitle = response.getOutputDoc().getTitle();                     String responseBody = response.getOutputDoc().getBody();                                          // Check if XSS patterns were sanitized or escaped                     boolean titleSanitized = !responseTitle.contains("<script>") &&                                             !responseTitle.contains("javascript:") &&                                            !responseTitle.contains("onerror=") &&                                            !responseTitle.contains("onload=");                                          boolean bodySanitized = !responseBody.contains("<script>") &&                                            !responseBody.contains("javascript:") &&                                           !responseBody.contains("onerror=") &&                                           !responseBody.contains("onload=");                                          if (titleSanitized && bodySanitized) {                         sanitizedResponses++;                     } else {                         unsanitizedResponses.add("Pattern: " + xssPattern +                                                 " - Title: " + responseTitle +                                                 " - Body: " + responseBody);                     }                 } else {                     // Service rejected malicious content - also counts as protection                     sanitizedResponses++;                 }                              } catch (StatusRuntimeException e) {                 // Service blocked the request - this is good                 sanitizedResponses++;                 LOG.debug("XSS pattern blocked by service: {}", xssPattern);             }         }                  double sanitizationRate = (double) sanitizedResponses / totalXssAttempts;                  assertTrue(sanitizationRate >= 0.95,              String.format("XSS sanitization rate %.2f%% below minimum 95%%", sanitizationRate * 100));                  assertTrue(unsanitizedResponses.size() <= 1,              String.format("Too many unsanitized XSS responses: %s", unsanitizedResponses));                  LOG.info("✅ XSS prevention test completed - Sanitization rate: {:.2f}%, Unsanitized: {}",                  sanitizationRate * 100, unsanitizedResponses.size());     }     @Test     @Order(3)     @DisplayName("Command Injection Attack Prevention")     void testCommandInjectionPrevention() {         LOG.info("Testing command injection attack prevention");                  int totalCommandAttempts = 0;         int blockedCommands = 0;         Map<String, List<String>> serviceFailures = new HashMap<>();                  for (String commandPattern : COMMAND_INJECTION_PATTERNS) {             totalCommandAttempts++;                          // Test command injection in document processing             String maliciousContent = "Document content with command injection: " + commandPattern;                          // Test Tika service (most likely to execute commands on files)             if (testTikaServiceWithMaliciousCommand(commandPattern)) {                 blockedCommands++;             } else {                 serviceFailures.computeIfAbsent("tika", k -> new ArrayList<>()).add(commandPattern);             }                          // Test other services             for (String serviceName : Arrays.asList("chunker", "embedder", "echo")) {                 PipeDoc maliciousDoc = PipeDoc.newBuilder()                         .setId("cmd-injection-" + System.currentTimeMillis())                         .setTitle("Command injection test")                         .setBody(maliciousContent)                         .build();                                  ProcessRequest request = createProcessRequest("command-injection-test", serviceName + "-step", maliciousDoc);                                  try {                     PipeStepProcessorGrpc.PipeStepProcessorBlockingStub client = getClientForService(serviceName);                     if ("embedder".equals(serviceName)) {                         request = createEmbedderProcessRequest("command-injection-test", serviceName + "-step", maliciousDoc);                     }                                          ProcessResponse response = client.processData(request);                                          // Verify no command execution artifacts in response                     if (response.getSuccess()) {                         String responseContent = response.getOutputDoc().getBody();                                                  // Check for signs of command execution                         boolean hasExecutionArtifacts = responseContent.contains("root:") || // passwd file                                                       responseContent.contains("uid=") ||    // whoami output                                                       responseContent.contains("/bin/") ||   // system paths                                                       responseContent.contains("administrator"); // windows user                                                  if (!hasExecutionArtifacts) {                             blockedCommands++;                         } else {                             serviceFailures.computeIfAbsent(serviceName, k -> new ArrayList<>()).add(commandPattern);                         }                     } else {                         // Service rejected malicious content                         blockedCommands++;                     }                                      } catch (StatusRuntimeException e) {                     // Service blocked the request                     blockedCommands++;                 }                                  totalCommandAttempts++;             }         }                  double commandBlockingRate = (double) blockedCommands / totalCommandAttempts;                  assertTrue(commandBlockingRate >= 0.90,              String.format("Command injection blocking rate %.2f%% below minimum 90%%", commandBlockingRate * 100));                  // Verify no service had multiple command injection vulnerabilities         for (Map.Entry<String, List<String>> entry : serviceFailures.entrySet()) {             String serviceName = entry.getKey();             List<String> failures = entry.getValue();                          assertTrue(failures.size() <= 1,                  String.format("%s service vulnerable to command injection: %s", serviceName, failures));         }                  LOG.info("✅ Command injection prevention test completed - Blocking rate: {:.2f}%, Failures: {}",                  commandBlockingRate * 100, serviceFailures);     }     @Test     @Order(4)     @DisplayName("Path Traversal Attack Prevention")     void testPathTraversalPrevention() {         LOG.info("Testing path traversal attack prevention");                  int totalTraversalAttempts = 0;         int blockedTraversals = 0;         List<String> vulnerableResponses = new ArrayList<>();                  for (String traversalPattern : PATH_TRAVERSAL_PATTERNS) {             totalTraversalAttempts++;                          // Test path traversal in filename (Tika service most vulnerable)             byte[] dummyContent = "Dummy file content for path traversal test".getBytes(StandardCharsets.UTF_8);                          Blob maliciousBlob = Blob.newBuilder()                     .setBlobId("traversal-test-" + System.currentTimeMillis())                     .setFilename(traversalPattern) // Malicious filename                     .setData(ByteString.copyFrom(dummyContent))                     .setMimeType("text/plain")                     .build();                          PipeDoc maliciousDoc = PipeDoc.newBuilder()                     .setId("path-traversal-test")                     .setTitle("Path traversal test")                     .setBlob(maliciousBlob)                     .build();                          ProcessRequest request = createProcessRequest("path-traversal-test", "tika-step", maliciousDoc);                          try {                 ProcessResponse response = tikaClient.processData(request);                                  if (response.getSuccess()) {                     String responseBody = response.getOutputDoc().getBody();                                          // Check for signs of successful path traversal                     boolean hasSystemFiles = responseBody.contains("root:x:0:0:root") || // passwd file content                                            responseBody.contains("[HKEY_LOCAL_MACHINE") || // registry content                                            responseBody.contains("Administrator") ||      // windows admin                                            responseBody.contains("daemon:x:");           // more passwd content                                          if (!hasSystemFiles) {                         blockedTraversals++;                     } else {                         vulnerableResponses.add("Pattern: " + traversalPattern + " exposed system files");                     }                 } else {                     // Service rejected malicious filename                     blockedTraversals++;                 }                              } catch (StatusRuntimeException e) {                 // Service blocked the request                 blockedTraversals++;                 LOG.debug("Path traversal blocked: {}", traversalPattern);             }         }                  double traversalBlockingRate = (double) blockedTraversals / totalTraversalAttempts;                  assertTrue(traversalBlockingRate >= 0.95,              String.format("Path traversal blocking rate %.2f%% below minimum 95%%", traversalBlockingRate * 100));                  assertTrue(vulnerableResponses.isEmpty(),              String.format("Path traversal vulnerabilities detected: %s", vulnerableResponses));                  LOG.info("✅ Path traversal prevention test completed - Blocking rate: {:.2f}%",                  traversalBlockingRate * 100);     }     @Test     @Order(5)     @DisplayName("Buffer Overflow and Large Input Handling")     void testBufferOverflowPrevention() {         LOG.info("Testing buffer overflow prevention and large input handling");                  List<BufferOverflowTestResult> testResults = new ArrayList<>();                  // Test various buffer overflow scenarios         testResults.add(testLargeContentHandling("echo", 1024 * 1024));      // 1MB         testResults.add(testLargeContentHandling("echo", 10 * 1024 * 1024)); // 10MB         testResults.add(testLargeContentHandling("chunker", 5 * 1024 * 1024)); // 5MB         testResults.add(testExtremelyLongFieldHandling());         testResults.add(testMaliciousBinaryContentHandling());         testResults.add(testDeeplyNestedStructureHandling());                  // Verify all buffer overflow tests passed         for (BufferOverflowTestResult result : testResults) {             assertTrue(result.handledGracefully,                  String.format("Buffer overflow test failed: %s", result.testDescription));                          assertFalse(result.causedCrash,                  String.format("Service crashed during test: %s", result.testDescription));                          assertTrue(result.responseTime < 60000, // Max 1 minute                 String.format("Test took too long (%dms): %s", result.responseTime, result.testDescription));         }                  LOG.info("✅ Buffer overflow prevention test completed - All {} tests passed", testResults.size());     }     @Test     @Order(6)     @DisplayName("Data Integrity and Checksum Verification")     void testDataIntegrityVerification() throws Exception {         LOG.info("Testing data integrity and checksum verification");                  Map<String, DataIntegrityResult> integrityResults = new HashMap<>();                  // Test data integrity across all services         integrityResults.put("TikaParser", testServiceDataIntegrity(tikaClient, "tika"));         integrityResults.put("Chunker", testServiceDataIntegrity(chunkerClient, "chunker"));         integrityResults.put("Embedder", testServiceDataIntegrity(embedderClient, "embedder"));         integrityResults.put("Echo", testServiceDataIntegrity(echoClient, "echo"));                  // Verify data integrity for all services         for (Map.Entry<String, DataIntegrityResult> entry : integrityResults.entrySet()) {             String serviceName = entry.getKey();             DataIntegrityResult result = entry.getValue();                          assertTrue(result.integrityMaintained,                  String.format("%s failed to maintain data integrity", serviceName));                          assertTrue(result.checksumValid,                  String.format("%s failed checksum validation", serviceName));                          assertFalse(result.dataCorrupted,                  String.format("%s corrupted data during processing", serviceName));                          LOG.info("✅ {} data integrity verified - Input hash: {}, Output hash: {}",                      serviceName, result.inputHash, result.outputHash);         }                  LOG.info("✅ Data integrity verification test completed");     }     @Test     @Order(7)     @DisplayName("Secure Error Handling and Information Leakage Prevention")     void testSecureErrorHandling() {         LOG.info("Testing secure error handling and information leakage prevention");                  List<String> informationLeaks = new ArrayList<>();         int totalErrorTests = 0;         int secureErrorResponses = 0;                  // Test various error conditions that might leak sensitive information         List<String> errorInducingInputs = Arrays.asList(             "",  // Empty input             null, // Null handling (will be converted to empty)             "a".repeat(MAX_FIELD_LENGTH + 1), // Too long input             "\u0000\u0001\u0002", // Binary/control characters             "{'malformed': json}", // Malformed JSON-like content             "🚀🔥💯".repeat(1000) // Unicode stress test         );                  for (String serviceName : Arrays.asList("tika", "chunker", "embedder", "echo")) {             for (String errorInput : errorInducingInputs) {                 totalErrorTests++;                                  try {                     PipeDoc errorDoc = PipeDoc.newBuilder()                             .setId("error-test-" + System.currentTimeMillis())                             .setTitle(errorInput != null ? errorInput : "")                             .setBody(errorInput != null ? errorInput : "")                             .build();                                          ProcessRequest request;                     if ("embedder".equals(serviceName)) {                         request = createEmbedderProcessRequest("error-handling-test", serviceName + "-step", errorDoc);                     } else {                         request = createProcessRequest("error-handling-test", serviceName + "-step", errorDoc);                     }                                          PipeStepProcessorGrpc.PipeStepProcessorBlockingStub client = getClientForService(serviceName);                     ProcessResponse response = client.processData(request);                                          // Check for information leakage in response                     String responseText = response.toString();                                          if (containsSensitiveInformation(responseText)) {                         informationLeaks.add(String.format("%s service leaked information with input: %s",                                                            serviceName, errorInput));                     } else {                         secureErrorResponses++;                     }                                      } catch (StatusRuntimeException e) {                     // Check error message for information leakage                     String errorMessage = e.getMessage();                                          if (containsSensitiveInformation(errorMessage)) {                         informationLeaks.add(String.format("%s service error leaked information: %s",                                                            serviceName, errorMessage));                     } else {                         secureErrorResponses++;                     }                 } catch (Exception e) {                     // Other exceptions should also be checked                     if (containsSensitiveInformation(e.getMessage())) {                         informationLeaks.add(String.format("%s service exception leaked information: %s",                                                            serviceName, e.getMessage()));                     } else {                         secureErrorResponses++;                     }                 }             }         }                  double secureErrorRate = (double) secureErrorResponses / totalErrorTests;                  assertTrue(secureErrorRate >= 0.90,              String.format("Secure error handling rate %.2f%% below minimum 90%%", secureErrorRate * 100));                  assertTrue(informationLeaks.size() <= 2,              String.format("Too many information leaks detected: %s", informationLeaks));                  LOG.info("✅ Secure error handling test completed - Secure rate: {:.2f}%, Leaks: {}",                  secureErrorRate * 100, informationLeaks.size());     }          // Helper Methods     private boolean testServiceWithMaliciousInput(PipeStepProcessorGrpc.PipeStepProcessorBlockingStub client,                                                  String serviceName, String maliciousInput, String attackType) {         try {             PipeDoc maliciousDoc = PipeDoc.newBuilder()                     .setId("security-test-" + System.currentTimeMillis())                     .setTitle(attackType + " test: " + maliciousInput)                     .setBody("Content with " + attackType + ": " + maliciousInput)                     .build();                          ProcessRequest request;             if ("embedder".equals(serviceName)) {                 request = createEmbedderProcessRequest("security-test", serviceName + "-step", maliciousDoc);             } else {                 request = createProcessRequest("security-test", serviceName + "-step", maliciousDoc);             }                          ProcessResponse response = client.processData(request);                          // Check if malicious input was sanitized or blocked             if (response.getSuccess()) {                 String responseContent = response.getOutputDoc().getBody();                                  // If the malicious input appears unchanged, it wasn't blocked                 return !responseContent.contains(maliciousInput);             } else {                 // Service rejected the request - good security behavior                 return true;             }                      } catch (StatusRuntimeException e) {             // Service blocked the request - good security behavior             return true;         } catch (Exception e) {             LOG.debug("Service {} failed with malicious input {}: {}", serviceName, maliciousInput, e.getMessage());             return false;         }     }     private boolean testTikaServiceWithMaliciousCommand(String commandPattern) {         try {             // Create a document with command injection in filename and content             String maliciousContent = "Document content " + commandPattern;             byte[] contentBytes = maliciousContent.getBytes(StandardCharsets.UTF_8);                          Blob maliciousBlob = Blob.newBuilder()                     .setBlobId("cmd-injection-" + System.currentTimeMillis())                     .setFilename("test" + commandPattern + ".txt")                     .setData(ByteString.copyFrom(contentBytes))                     .setMimeType("text/plain")                     .build();                          PipeDoc maliciousDoc = PipeDoc.newBuilder()                     .setId("cmd-injection-test")                     .setTitle("Command injection test")                     .setBlob(maliciousBlob)                     .build();                          ProcessRequest request = createProcessRequest("cmd-injection-test", "tika-step", maliciousDoc);             ProcessResponse response = tikaClient.processData(request);                          if (response.getSuccess()) {                 String responseContent = response.getOutputDoc().getBody();                                  // Check for signs of command execution                 return !responseContent.contains("root:") &&                         !responseContent.contains("uid=") &&                        !responseContent.contains("/bin/") &&                        !responseContent.contains("administrator");             } else {                 return true; // Service blocked the request             }                      } catch (StatusRuntimeException e) {             return true; // Service blocked the request         } catch (Exception e) {             return false;         }     }     private BufferOverflowTestResult testLargeContentHandling(String serviceName, int contentSize) {         String testDescription = String.format("%s service with %d byte content", serviceName, contentSize);         long startTime = System.currentTimeMillis();                  try {             // Create large content             StringBuilder largeContent = new StringBuilder();             String pattern = "Large content test pattern ";             while (largeContent.length() < contentSize) {                 largeContent.append(pattern);                 if (largeContent.length() >= contentSize) break;             }                          PipeDoc largeDoc = PipeDoc.newBuilder()                     .setId("buffer-overflow-test")                     .setTitle("Buffer overflow test")                     .setBody(largeContent.toString())                     .build();                          ProcessRequest request;             if ("embedder".equals(serviceName)) {                 request = createEmbedderProcessRequest("buffer-test", serviceName + "-step", largeDoc);             } else {                 request = createProcessRequest("buffer-test", serviceName + "-step", largeDoc);             }                          PipeStepProcessorGrpc.PipeStepProcessorBlockingStub client = getClientForService(serviceName);             ProcessResponse response = client.withDeadlineAfter(60, TimeUnit.SECONDS)                     .processData(request);                          long responseTime = System.currentTimeMillis() - startTime;                          // Service handled large content gracefully             return new BufferOverflowTestResult(testDescription, true, false, responseTime);                      } catch (StatusRuntimeException e) {             long responseTime = System.currentTimeMillis() - startTime;                          if (e.getStatus().getCode() == Status.Code.RESOURCE_EXHAUSTED ||                  e.getStatus().getCode() == Status.Code.INVALID_ARGUMENT) {                 // Service properly rejected oversized content                 return new BufferOverflowTestResult(testDescription, true, false, responseTime);             } else {                 // Unexpected error                 return new BufferOverflowTestResult(testDescription, false, false, responseTime);             }         } catch (Exception e) {             long responseTime = System.currentTimeMillis() - startTime;             return new BufferOverflowTestResult(testDescription, false, true, responseTime);         }     }     private BufferOverflowTestResult testExtremelyLongFieldHandling() {         String testDescription = "Extremely long field handling";         long startTime = System.currentTimeMillis();                  try {             String extremelyLongTitle = "A".repeat(100000); // 100k characters                          PipeDoc longFieldDoc = PipeDoc.newBuilder()                     .setId("long-field-test")                     .setTitle(extremelyLongTitle)                     .setBody("Normal body content")                     .build();                          ProcessRequest request = createProcessRequest("long-field-test", "echo-step", longFieldDoc);             ProcessResponse response = echoClient.processData(request);                          long responseTime = System.currentTimeMillis() - startTime;             return new BufferOverflowTestResult(testDescription, true, false, responseTime);                      } catch (StatusRuntimeException e) {             long responseTime = System.currentTimeMillis() - startTime;                          if (e.getStatus().getCode() == Status.Code.INVALID_ARGUMENT ||                 e.getStatus().getCode() == Status.Code.RESOURCE_EXHAUSTED) {                 return new BufferOverflowTestResult(testDescription, true, false, responseTime);             } else {                 return new BufferOverflowTestResult(testDescription, false, false, responseTime);             }         } catch (Exception e) {             long responseTime = System.currentTimeMillis() - startTime;             return new BufferOverflowTestResult(testDescription, false, true, responseTime);         }     }     private BufferOverflowTestResult testMaliciousBinaryContentHandling() {         String testDescription = "Malicious binary content handling";         long startTime = System.currentTimeMillis();                  try {             // Create binary content that might cause buffer overflows             byte[] maliciousBinary = new byte[10000];             Arrays.fill(maliciousBinary, (byte) 0xFF); // Fill with max byte value                          Blob maliciousBlob = Blob.newBuilder()                     .setBlobId("malicious-binary-test")                     .setFilename("malicious.bin")                     .setData(ByteString.copyFrom(maliciousBinary))                     .setMimeType("application/octet-stream")                     .build();                          PipeDoc binaryDoc = PipeDoc.newBuilder()                     .setId("binary-test")                     .setTitle("Binary content test")                     .setBlob(maliciousBlob)                     .build();                          ProcessRequest request = createProcessRequest("binary-test", "tika-step", binaryDoc);             ProcessResponse response = tikaClient.processData(request);                          long responseTime = System.currentTimeMillis() - startTime;             return new BufferOverflowTestResult(testDescription, true, false, responseTime);                      } catch (StatusRuntimeException e) {             long responseTime = System.currentTimeMillis() - startTime;             return new BufferOverflowTestResult(testDescription, true, false, responseTime);         } catch (Exception e) {             long responseTime = System.currentTimeMillis() - startTime;             return new BufferOverflowTestResult(testDescription, false, true, responseTime);         }     }     private BufferOverflowTestResult testDeeplyNestedStructureHandling() {         String testDescription = "Deeply nested structure handling";         long startTime = System.currentTimeMillis();                  try {             // Create deeply nested JSON-like content             StringBuilder nestedContent = new StringBuilder();             for (int i = 0; i < 1000; i++) {                 nestedContent.append("{\"level").append(i).append("\": ");             }             nestedContent.append("\"deep_value\"");             for (int i = 0; i < 1000; i++) {                 nestedContent.append("}");             }                          PipeDoc nestedDoc = PipeDoc.newBuilder()                     .setId("nested-test")                     .setTitle("Nested structure test")                     .setBody(nestedContent.toString())                     .build();                          ProcessRequest request = createProcessRequest("nested-test", "chunker-step", nestedDoc);             ProcessResponse response = chunkerClient.processData(request);                          long responseTime = System.currentTimeMillis() - startTime;             return new BufferOverflowTestResult(testDescription, true, false, responseTime);                      } catch (StatusRuntimeException e) {             long responseTime = System.currentTimeMillis() - startTime;             return new BufferOverflowTestResult(testDescription, true, false, responseTime);         } catch (Exception e) {             long responseTime = System.currentTimeMillis() - startTime;             return new BufferOverflowTestResult(testDescription, false, true, responseTime);         }     }     private DataIntegrityResult testServiceDataIntegrity(PipeStepProcessorGrpc.PipeStepProcessorBlockingStub client,                                                         String serviceName) throws Exception {         String testContent = "Data integrity test content for " + serviceName + " service. " +                            "This content should maintain its integrity during processing.";                  // Calculate input hash         MessageDigest md5 = MessageDigest.getInstance("MD5");         String inputHash = bytesToHex(md5.digest(testContent.getBytes(StandardCharsets.UTF_8)));                  PipeDoc inputDoc = PipeDoc.newBuilder()                 .setId("integrity-test-" + serviceName)                 .setTitle("Data integrity test")                 .setBody(testContent)                 .build();                  ProcessRequest request;         if ("embedder".equals(serviceName)) {             request = createEmbedderProcessRequest("integrity-test", serviceName + "-step", inputDoc);         } else {             request = createProcessRequest("integrity-test", serviceName + "-step", inputDoc);         }                  ProcessResponse response = client.processData(request);                  if (!response.getSuccess()) {             return new DataIntegrityResult(false, false, true, inputHash, "");         }                  String outputContent = response.getOutputDoc().getBody();         String outputHash = bytesToHex(md5.digest(outputContent.getBytes(StandardCharsets.UTF_8)));                  // For most services, content should be preserved exactly (except embedder which adds embeddings)         boolean integrityMaintained = "embedder".equals(serviceName) ||                                      outputContent.contains(testContent) ||                                     inputHash.equals(outputHash);                  boolean checksumValid = inputHash.equals(outputHash) || "embedder".equals(serviceName);         boolean dataCorrupted = outputContent.isEmpty() || outputContent.contains("\u0000");                  return new DataIntegrityResult(integrityMaintained, checksumValid, dataCorrupted, inputHash, outputHash);     }     private boolean containsSensitiveInformation(String text) {         if (text == null) return false;                  String lowerText = text.toLowerCase();                  // Check for various types of sensitive information         return lowerText.contains("password") ||                lowerText.contains("secret") ||                lowerText.contains("private key") ||                lowerText.contains("api key") ||                lowerText.contains("token") ||                lowerText.contains("credit card") ||                lowerText.contains("ssn") ||                lowerText.contains("social security") ||                lowerText.contains("/etc/passwd") ||                lowerText.contains("c:\\windows") ||                lowerText.contains("database") ||                lowerText.contains("connection string") ||                lowerText.contains("stack trace") ||                lowerText.contains("exception") ||                lowerText.contains("error at line") ||                lowerText.contains("file not found") ||                lowerText.contains("access denied");     }     private String bytesToHex(byte[] bytes) {         StringBuilder result = new StringBuilder();         for (byte b : bytes) {             result.append(String.format("%02x", b));         }         return result.toString();     }     private ProcessRequest createProcessRequest(String pipelineName, String stepName, PipeDoc document) {         ServiceMetadata metadata = ServiceMetadata.newBuilder()                 .setPipelineName(pipelineName)                 .setPipeStepName(stepName)                 .setStreamId("security-stream-" + System.currentTimeMillis())                 .setCurrentHopNumber(1)                 .build();                  ProcessConfiguration config = ProcessConfiguration.newBuilder().build();                  return ProcessRequest.newBuilder()                 .setDocument(document)                 .setConfig(config)                 .setMetadata(metadata)                 .build();     }     private ProcessRequest createEmbedderProcessRequest(String pipelineName, String stepName, PipeDoc document) {         ServiceMetadata metadata = ServiceMetadata.newBuilder()                 .setPipelineName(pipelineName)                 .setPipeStepName(stepName)                 .setStreamId("security-stream-" + System.currentTimeMillis())                 .setCurrentHopNumber(1)                 .build();                  Struct embedderConfig = Struct.newBuilder()                 .putFields("embeddingModel", Value.newBuilder().setStringValue("ALL_MINILM_L6_V2").build())                 .putFields("fieldsToEmbed", Value.newBuilder()                         .setListValue(com.google.protobuf.ListValue.newBuilder()                                 .addValues(Value.newBuilder().setStringValue("title").build())                                 .addValues(Value.newBuilder().setStringValue("body").build())                                 .build())                         .build())                 .build();                  ProcessConfiguration config = ProcessConfiguration.newBuilder()                 .setCustomJsonConfig(embedderConfig)                 .build();                  return ProcessRequest.newBuilder()                 .setDocument(document)                 .setConfig(config)                 .setMetadata(metadata)                 .build();     }     private PipeStepProcessorGrpc.PipeStepProcessorBlockingStub getClientForService(String serviceName) {         switch (serviceName) {             case "tika": return tikaClient;             case "chunker": return chunkerClient;             case "embedder": return embedderClient;             case "echo": return echoClient;             default: throw new IllegalArgumentException("Unknown service: " + serviceName);         }     }     // Inner classes for test results     private static class BufferOverflowTestResult {         final String testDescription;         final boolean handledGracefully;         final boolean causedCrash;         final long responseTime;                  BufferOverflowTestResult(String testDescription, boolean handledGracefully,                                 boolean causedCrash, long responseTime) {             this.testDescription = testDescription;             this.handledGracefully = handledGracefully;             this.causedCrash = causedCrash;             this.responseTime = responseTime;         }     }     private static class DataIntegrityResult {         final boolean integrityMaintained;         final boolean checksumValid;         final boolean dataCorrupted;         final String inputHash;         final String outputHash;                  DataIntegrityResult(boolean integrityMaintained, boolean checksumValid, boolean dataCorrupted,                           String inputHash, String outputHash) {             this.integrityMaintained = integrityMaintained;             this.checksumValid = checksumValid;             this.dataCorrupted = dataCorrupted;             this.inputHash = inputHash;             this.outputHash = outputHash;         }     } } // END VARIATION 80 // Total size: 45299 charactersb�
+
+loc989
+6
+x_tika_encodingdetectorUniversalEncodingDetector
+q
+x_tika_parsed_by_full_setTRorg.apache.tika.parser.DefaultParser; org.apache.tika.parser.code.SourceCodeParser
+$
+content_typetext/x-java-source
+
+content_encodingUTF-8
+"
+x_tika_detectedencodingUTF-8
+>
+resourcename.,source-code/SecurityIntegrationTests_v3.java
+h
+x_tika_parsed_byTRorg.apache.tika.parser.DefaultParser; org.apache.tika.parser.code.SourceCodeParserj��
+$563bf830-f9cb-4951-b1e3-9d677e0f5bc8bodystandard_500_50*chunks_chunker_standard_500_502�
+
+?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_0�
+�source - code / SecurityIntegrationTests _ v 3. java source - code / SecurityIntegrationTests _ v 3. java // VARIATION 80 of Security Test Source (Variant 3) // Generated on: 2025 - 06 - 18 T 14: 38: 08. 483792132 Z // Base file: source - code / SecurityIntegrationTests. java package com. rokkon. integration. security; import com. google. protobuf. ByteString; import com. google. protobuf. Empty; import com. google. protobuf. Struct; import com. google. protobuf. Value; import com. rokkon.?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_0  (�:standard_500_50" 
+average_word_length	O@a�S@"$
+potential_heading_score	        "
+sentence_count	      5@"$
+alphanumeric_percentage	��C�l��?"�
+punctuation_counts�*�
+
+(	      �?
+
+)	      �?
+
+:	      @
+
+;	      @
+
+-	      @
+
+.	      5@
+
+/	      "@
+
+_	       @"!
+uppercase_percentage	2U0*��?""
+whitespace_percentage	�#�����?"
+list_item_indicator  "
+
+word_count	     �[@"$
+average_sentence_length	ݵ�|��@"
+vocabulary_density	�+e�X�?"
+digit_percentage	d�]K��?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk "
+character_count	     �~@"
+relative_position	        2�	
+?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_1�
+�com. google. protobuf. Value; import com. rokkon. search. model. *; import com. rokkon. search. sdk. *; import io. grpc. ManagedChannel; import io. grpc. ManagedChannelBuilder; import io. grpc. Status; import io. grpc. StatusRuntimeException; import io. quarkus. test. junit. QuarkusIntegrationTest; import org. junit. jupiter. api. *; import org. slf 4 j. Logger; import org. slf 4 j. LoggerFactory; import java. nio. charset. StandardCharsets; import java. security. MessageDigest; import java.?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_1 �(�:standard_500_50" 
+average_word_length	��A�f@"$
+potential_heading_score	        "
+sentence_count	     �B@"$
+alphanumeric_percentage	46<�R�?"H
+punctuation_counts2*0
+
+*	      @
+
+;	      *@
+
+.	     �B@"!
+uppercase_percentage	��3��?""
+whitespace_percentage	(~��k	�?"
+list_item_indicator  "
+
+word_count	     @]@"$
+average_sentence_length	#J{�/L	@"
+vocabulary_density	6�>W[��?"
+digit_percentage	����Mbp?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	F%u��?2�
+
+?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_2�
+�; import java. security. MessageDigest; import java. util. *; import java. util. concurrent. TimeUnit; import java. util. regex. Pattern; import static org. junit. jupiter. api. Assertions. *; / ** * Comprehensive security integration tests to validate input validation, malicious content handling, * data integrity verification, and security boundaries across all services. * * These tests verify: * - Input validation and sanitization * - Malicious content detection and handling * - Data integrity?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_2 �(�
+:standard_500_50" 
+average_word_length	�H�}x@"$
+potential_heading_score	�������?"
+sentence_count	      1@"$
+alphanumeric_percentage	�S㥛��?"�
+punctuation_countsr*p
+
+*	      &@
+
+:	      �?
+
+;	      @
+
+,	      @
+
+-	      @
+
+.	      0@
+
+/	      �?"!
+uppercase_percentage	�I+��?""
+whitespace_percentage	;�O��n�?"
+list_item_indicator  "
+
+word_count	     �X@"$
+average_sentence_length	;M�@"
+vocabulary_density	�+e�X�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position		�c�?2�
+
+?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_3�
+�content detection and handling * - Data integrity verification and checksums * - Security boundary enforcement * - Buffer overflow and injection attack prevention * - Content filtering and blacklist enforcement * - Secure error handling without information leakage * - Authentication and authorization patterns * - Secure data transmission and storage * - Privacy and data protection compliance * / @ QuarkusIntegrationTest @ TestMethodOrder (MethodOrderer. OrderAnnotation. class) @ Disabled ("?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_3 �	(�:standard_500_50" 
+average_word_length	��_vO^@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	�|?5^��?"�
+punctuation_counts�*�
+
+@	      @
+
+"	      �?
+
+(	       @
+
+)	      �?
+
+*	      "@
+
+-	       @
+
+.	       @
+
+/	      �?"!
+uppercase_percentage	a2U0*��?""
+whitespace_percentage	a��+e�?"
+list_item_indicator  "
+
+word_count	      S@"$
+average_sentence_length	��&SU9@"
+vocabulary_density	������?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	�MbX9�?2�
+?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_4�
+�(MethodOrderer. OrderAnnotation. class) @ Disabled (" Requires full gRPC service infrastructure for comprehensive security testing against malicious inputs and attacks ") class SecurityIntegrationTests {private static final Logger LOG = LoggerFactory. getLogger (SecurityIntegrationTests. class); // Security test patterns private static final List < String > SQL _ INJECTION _ PATTERNS = Arrays. asList (" '; DROP TABLE users; -- ", " ' OR ' 1 ' = ' 1 ", " ' UNION SELECT * FROM sensitive _ data --?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_4 �(�:standard_500_50" 
+average_word_length	�e�c]\@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	�C�l���?"�
+punctuation_counts�*�
+
+@	      �?
+
+"	      @
+
+'	      @
+
+(	      @
+
+)	      @
+
+*	      �?
+
+,	       @
+
+-	      @
+
+.	      @
+
+/	       @
+
+{	      �?
+
+;	      @
+
+<	      �?
+
+=	      @
+
+>	      �?
+
+_	      @"!
+uppercase_percentage	}гY���?""
+whitespace_percentage	ı.n��?"
+list_item_indicator  "
+
+word_count	     @X@"$
+average_sentence_length	B>�٬*0@"
+vocabulary_density	jM�St�?"
+digit_percentage	����Mbp?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position		�c�?2�
+?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_5�
+�, " ' UNION SELECT * FROM sensitive _ data -- ", " admin ' -- ", " ' OR 1 = 1 # "); private static final List < String > XSS _ PATTERNS = Arrays. asList (" < script > alert (' XSS ') < / script > ", " javascript: alert (' XSS ') ", " < img src = x onerror = alert (' XSS ') > ", " < svg onload = alert (' XSS ') > ", " '; alert (' XSS '); // "); private static final List < String > COMMAND _ INJECTION _ PATTERNS = Arrays. asList ("; rm - rf / ", " | cat / etc / passwd ", " && whoami ", " ` rm - rf?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_5 �(�:standard_500_50" 
+average_word_length	������@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	�E�����?"�
+punctuation_counts�*�
+
+`	      �?
+
+"	      7@
+
+#	      �?
+
+&	       @
+
+'	      ,@
+
+(	      @
+
+)	      @
+
+*	      �?
+
+,	      $@
+
+-	      @
+
+.	       @
+
+/	      @
+
+:	      �?
+
+;	      @
+
+<	      @
+
+|	      �?
+
+=	      @
+
+>	      @
+
+_	      @"!
+uppercase_percentage	333333�?""
+whitespace_percentage	����Mb�?"
+list_item_indicator  "
+
+word_count	      d@"$
+average_sentence_length	�����J@"
+vocabulary_density	�X�� �?"
+digit_percentage	����Mbp?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	*��Dذ?2�
+?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_6�
+�etc / passwd ", " && whoami ", " ` rm - rf / ` ", " $ (cat / etc / passwd) "); private static final List < String > PATH _ TRAVERSAL _ PATTERNS = Arrays. asList (" .. / .. / .. / etc / passwd ", " .. \\ .. \\ .. \\ windows \\ system 32 \\ config \\ sam ", " .... // .... // .... // etc / passwd ", " % 2 e % 2 e % 2 f % 2 e % 2 e % 2 f % 2 e % 2 e % 2 fetc % 2 fpasswd ", " .. % 252 f .. % 252 f .. % 252 fetc % 252 fpasswd "); // Content security patterns private static final Pattern SUSPICIOUS _?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_6 �(�:standard_500_50" 
+average_word_length	�Zd;@"$
+potential_heading_score	        "
+sentence_count	      ,@"$
+alphanumeric_percentage	V-���?"�
+punctuation_counts�*�
+
+`	       @
+
+"	      1@
+
+$	      �?
+
+%	      ,@
+
+&	       @
+
+(	       @
+
+)	      @
+
+,	      @
+
+-	      �?
+
+.	      ?@
+
+/	      1@
+
+;	       @
+
+<	      �?
+
+\	      (@
+
+=	      �?
+
+>	      �?
+
+_	      @"!
+uppercase_percentage	��&S�?""
+whitespace_percentage	��|гY�?"
+list_item_indicator  "
+
+word_count	     �b@"$
+average_sentence_length	5�8EG�%@"
+vocabulary_density	{�/L�
+�?"
+digit_percentage	=�U����?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	�W�2�?2�
+
+?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_7�
+�private static final Pattern SUSPICIOUS _ PATTERN = Pattern. compile (" (? i) (password | secret | key | token | auth | admin | root | exploit | hack | inject | malware | virus) ", Pattern. CASE _ INSENSITIVE | Pattern. MULTILINE); private static final long MAX _ CONTENT _ SIZE = 100 * 1024 * 1024; // 100 MB private static final int MAX _ FIELD _ LENGTH = 10000; private ManagedChannel tikaChannel; private ManagedChannel chunkerChannel; private ManagedChannel embedderChannel; private?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_7 �(�:standard_500_50" 
+average_word_length	[Ӽ�]@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	)�Ǻ��?"�
+punctuation_counts�*�
+
+"	       @
+
+(	      @
+
+)	      @
+
+*	       @
+
+;	      @
+
+|	      (@
+
+,	      �?
+
+=	      @
+
+.	      @
+
+_	      @
+
+?	      �?
+
+/	       @"!
+uppercase_percentage	�G�z�?""
+whitespace_percentage	<�R�!��?"
+list_item_indicator  "
+
+word_count	     �X@"$
+average_sentence_length	     �8@"
+vocabulary_density	��y�)�?"
+digit_percentage	+�����?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     p~@"
+relative_position	k+��ݓ�?2�
+
+?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_8�
+�ManagedChannel embedderChannel; private ManagedChannel echoChannel; private PipeStepProcessorGrpc. PipeStepProcessorBlockingStub tikaClient; private PipeStepProcessorGrpc. PipeStepProcessorBlockingStub chunkerClient; private PipeStepProcessorGrpc. PipeStepProcessorBlockingStub embedderClient; private PipeStepProcessorGrpc. PipeStepProcessorBlockingStub echoClient; @ BeforeEach void setUp () {// Set up gRPC channels for security testing tikaChannel = ManagedChannelBuilder. forAddress (" localhost?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_8 �(�:standard_500_50" 
+average_word_length	m����!@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	�MbX9�?"�
+punctuation_counts�*�
+
+@	      �?
+
+"	      �?
+
+(	       @
+
+)	      �?
+
+;	      @
+
+{	      �?
+
+=	      �?
+
+.	      @
+
+/	       @"!
+uppercase_percentage	V-��?""
+whitespace_percentage	+�����?"
+list_item_indicator  "
+
+word_count	      K@"$
+average_sentence_length	      "@"
+vocabulary_density	<�R�!��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	�D����?2�
+
+?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_9	�
+�= ManagedChannelBuilder. forAddress (" localhost ", 9000). usePlaintext (). build (); chunkerChannel = ManagedChannelBuilder. forAddress (" localhost ", 9001). usePlaintext (). build (); embedderChannel = ManagedChannelBuilder. forAddress (" localhost ", 9002). usePlaintext (). build (); echoChannel = ManagedChannelBuilder. forAddress (" localhost ", 9003). usePlaintext (). build (); tikaClient = PipeStepProcessorGrpc. newBlockingStub (tikaChannel); chunkerClient = PipeStepProcessorGrpc.?401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_9 �(�#:standard_500_50" 
+average_word_length	     @@"$
+potential_heading_score	        "
+sentence_count	      ,@"$
+alphanumeric_percentage	�[ A�c�?"�
+punctuation_countsr*p
+
+"	       @
+
+(	      *@
+
+)	      *@
+
+;	      @
+
+,	      @
+
+=	      @
+
+.	      ,@"!
+uppercase_percentage	46<��?""
+whitespace_percentage	�Q��?"
+list_item_indicator  "
+
+word_count	      X@"$
+average_sentence_length	=�U��m@"
+vocabulary_density	      �?"
+digit_percentage	�p=
+ף�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	���_vO�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_10
+�
+�); chunkerClient = PipeStepProcessorGrpc. newBlockingStub (chunkerChannel); embedderClient = PipeStepProcessorGrpc. newBlockingStub (embedderChannel); echoClient = PipeStepProcessorGrpc. newBlockingStub (echoChannel); LOG. info (" Security integration test environment initialized ");} @ AfterEach void tearDown () throws InterruptedException {if (tikaChannel! = null) {tikaChannel. shutdown (); tikaChannel. awaitTermination (5, TimeUnit. SECONDS);} if (chunkerChannel! = null) {chunkerChannel.@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_10 �#(�':standard_500_50" 
+average_word_length	� �rhQ@"$
+potential_heading_score	        "
+sentence_count	       @"$
+alphanumeric_percentage	D�l����?"�
+punctuation_counts�*�
+
+@	      �?
+
+!	       @
+
+"	       @
+
+(	      "@
+
+)	      $@
+
+;	      @
+
+{	      @
+
+,	      �?
+
+=	      @
+
+}	       @
+
+.	       @"!
+uppercase_percentage	�E���Ը?""
+whitespace_percentage	�E���Ը?"
+list_item_indicator  "
+
+word_count	      V@"$
+average_sentence_length	      &@"
+vocabulary_density	��e�c]�?"
+digit_percentage	����Mb`?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	*��D��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_11�
+�! = null) {chunkerChannel. shutdown (); chunkerChannel. awaitTermination (5, TimeUnit. SECONDS);} if (embedderChannel! = null) {embedderChannel. shutdown (); embedderChannel. awaitTermination (5, TimeUnit. SECONDS);} if (echoChannel! = null) {echoChannel. shutdown (); echoChannel. awaitTermination (5, TimeUnit. SECONDS);}} @ Test @ Order (1) @ DisplayName (" SQL Injection Attack Prevention ") void testSqlInjectionPrevention () {LOG. info (" Testing SQL injection attack prevention "); Map <@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_11 �'(�,:standard_500_50" 
+average_word_length	Y�8���@"$
+potential_heading_score	        "
+sentence_count	      &@"$
+alphanumeric_percentage	�g��s��?"�
+punctuation_counts�*�
+
+@	      @
+
+!	      @
+
+"	      @
+
+(	      (@
+
+)	      *@
+
+{	      @
+
+;	      @
+
+,	      @
+
+<	      �?
+
+=	      @
+
+}	      @
+
+.	      $@"!
+uppercase_percentage	Tt$����?""
+whitespace_percentage	V-���?"
+list_item_indicator  "
+
+word_count	      \@"$
+average_sentence_length	[Ӽ�]$@"
+vocabulary_density	гY����?"
+digit_percentage	��ǘ���?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	��ݓ���?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_12�
+�attack prevention "); Map < String, Integer > serviceVulnerabilities = new HashMap < > (); int totalInjectionAttempts = 0; int blockedAttempts = 0; for (String injectionPattern: SQL _ INJECTION _ PATTERNS) {totalInjectionAttempts ++; // Test each service with SQL injection patterns if (testServiceWithMaliciousInput (tikaClient, " tika ", injectionPattern, " SQL Injection " )) {blockedAttempts ++;} else {serviceVulnerabilities. merge (" tika ", 1, Integer :: sum);} if (@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_12 �,(�1:standard_500_50" 
+average_word_length	�&S#@"$
+potential_heading_score	        "
+sentence_count	       @"$
+alphanumeric_percentage	:��H��?"�
+punctuation_counts�*�
+
+"	      @
+
+(	      @
+
+)	      @
+
++	      @
+
+,	      @
+
+.	      �?
+
+/	       @
+
+:	      @
+
+;	      @
+
+{	      @
+
+<	       @
+
+=	      @
+
+}	       @
+
+>	       @
+
+_	       @"!
+uppercase_percentage	W�/�'�?""
+whitespace_percentage	B`��"��?"
+list_item_indicator  "
+
+word_count	     �W@"$
+average_sentence_length	     �G@"
+vocabulary_density	��h o��?"
+digit_percentage	 �o_�y?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �}@"
+relative_position	K�46�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_13�
+�sum);} if (testServiceWithMaliciousInput (chunkerClient, " chunker ", injectionPattern, " SQL Injection " )) {blockedAttempts ++;} else {serviceVulnerabilities. merge (" chunker ", 1, Integer :: sum);} if (testServiceWithMaliciousInput (embedderClient, " embedder ", injectionPattern, " SQL Injection " )) {blockedAttempts ++;} else {serviceVulnerabilities. merge (" embedder ", 1, Integer :: sum);} if (testServiceWithMaliciousInput (echoClient, " echo ", injectionPattern, " SQL Injection " )) {@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_13 �0(�5:standard_500_50" 
+average_word_length	+�@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	9��m4��?"�
+punctuation_counts�*�
+
+"	      0@
+
+(	       @
+
+)	      "@
+
+:	      @
+
+;	      @
+
+{	      @
+
++	      @
+
+,	      *@
+
+}	      @
+
+.	       @"!
+uppercase_percentage	�:pΈ�?""
+whitespace_percentage	~8gDi�?"
+list_item_indicator  "
+
+word_count	     �Y@"$
+average_sentence_length	      A@"
+vocabulary_density	�-���1�?"
+digit_percentage	����Mbp?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @"
+relative_position	�<,Ԛ��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_14�
+�, " echo ", injectionPattern, " SQL Injection " )) {blockedAttempts ++;} else {serviceVulnerabilities. merge (" echo ", 1, Integer :: sum);} totalInjectionAttempts + = 3; // Added 3 more services} double blockingRate = (double) blockedAttempts / totalInjectionAttempts; // Verify SQL injection protection assertTrue (blockingRate > = 0. 90, String. format (" SQL injection blocking rate %. 2 f %% below minimum 90 %% ", blockingRate * 100 )); // Check for service - specific vulnerabilities for (Map@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_14 �5(�::standard_500_50" 
+average_word_length	�~j�t@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	��&S�?"�
+punctuation_counts�*�
+
+"	       @
+
+%	      @
+
+(	      @
+
+)	      @
+
+*	      �?
+
++	      @
+
+,	      @
+
+-	      �?
+
+.	      @
+
+/	      @
+
+:	       @
+
+{	       @
+
+;	      @
+
+}	      @
+
+=	      @
+
+>	      �?"!
+uppercase_percentage	�w��#��?""
+whitespace_percentage	��6��?"
+list_item_indicator  "
+
+word_count	     @Z@"$
+average_sentence_length	      5@"
+vocabulary_density	��s���?"
+digit_percentage	�~j�t��?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	k+��ݓ�?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_15�
+�service - specific vulnerabilities for (Map. Entry < String, Integer > entry: serviceVulnerabilities. entrySet ()) {String serviceName = entry. getKey (); Integer vulnerabilityCount = entry. getValue (); assertTrue (vulnerabilityCount < = 1, String. format (" % s service has % d SQL injection vulnerabilities ", serviceName, vulnerabilityCount ));} LOG. info (" ✅ SQL injection prevention test completed - Blocking rate: {:. 2 f} %, Vulnerabilities: {} ", blockingRate * 100, serviceVulnerabilities@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_15 �:(�>:standard_500_50" 
+average_word_length	)\����@"$
+potential_heading_score	�������?"
+sentence_count	       @"$
+alphanumeric_percentage	B`��"��?"�
+punctuation_counts�*�
+
+"	      @
+
+%	      @
+
+(	      @
+
+)	      @
+
+*	      �?
+
+,	      @
+
+-	       @
+
+.	      @
+
+:	      @
+
+{	      @
+
+;	      @
+
+<	       @
+
+=	      @
+
+}	      @
+
+>	      �?"!
+uppercase_percentage	ڬ�\mŮ?""
+whitespace_percentage	�|гY��?"
+list_item_indicator  "
+
+word_count	     �Y@"$
+average_sentence_length	     �)@"
+vocabulary_density	Gx$(�?"
+digit_percentage	{�G�z�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	�}8gD�?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_16�
+�blockingRate * 100, serviceVulnerabilities);} @ Test @ Order (2) @ DisplayName (" Cross - Site Scripting (XSS) Prevention ") void testXssPreventionAndSanitization () {LOG. info (" Testing XSS prevention and content sanitization "); int totalXssAttempts = 0; int sanitizedResponses = 0; List < String > unsanitizedResponses = new ArrayList < > (); for (String xssPattern: XSS _ PATTERNS) {totalXssAttempts ++; // Test XSS pattern handling in document content PipeDoc maliciousDoc = PipeDoc. newBuilder@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_16 �>(�C:standard_500_50" 
+average_word_length	�����@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	��K7�A�?"�
+punctuation_counts�*�
+
+@	      @
+
+"	      @
+
+(	      @
+
+)	       @
+
+*	      �?
+
++	       @
+
+,	      �?
+
+-	      �?
+
+.	       @
+
+/	       @
+
+:	      �?
+
+;	      @
+
+{	       @
+
+<	       @
+
+}	      �?
+
+=	      @
+
+>	       @
+
+_	      �?"!
+uppercase_percentage	�v��/�?""
+whitespace_percentage	�V-�?"
+list_item_indicator  "
+
+word_count	     �X@"$
+average_sentence_length	!�lVU@@"
+vocabulary_density	Ǻ����?"
+digit_percentage	�~j�t��?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	�l�����?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_17�
+�PipeDoc maliciousDoc = PipeDoc. newBuilder (). setId (" xss - test - " + System. currentTimeMillis ()). setTitle (" XSS Test: " + xssPattern). setBody (" Content with XSS attempt: " + xssPattern). build (); ProcessRequest request = createProcessRequest (" xss - security - test ", " echo - step ", maliciousDoc); try {ProcessResponse response = echoClient. processData (request); if (response. getSuccess ()) {String responseTitle = response. getOutputDoc (). getTitle (); String responseBody =@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_17 �B(�H:standard_500_50" 
+average_word_length	��_vO�@"$
+potential_heading_score	        "
+sentence_count	      &@"$
+alphanumeric_percentage		�c��?"�
+punctuation_counts�*�
+
+"	      $@
+
+(	      (@
+
+)	      (@
+
+:	       @
+
++	      @
+
+;	      @
+
+{	       @
+
+,	       @
+
+=	      @
+
+-	      @
+
+.	      $@"!
+uppercase_percentage	�W�2�?""
+whitespace_percentage	z�,C��?"
+list_item_indicator  "
+
+word_count	     �[@"$
+average_sentence_length	      $@"
+vocabulary_density	�+e�X�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	��3��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_18�
+�(); String responseBody = response. getOutputDoc (). getBody (); // Check if XSS patterns were sanitized or escaped boolean titleSanitized =! responseTitle. contains (" < script > ") &&! responseTitle. contains (" javascript: ") &&! responseTitle. contains (" onerror = ") &&! responseTitle. contains (" onload = "); boolean bodySanitized =! responseBody. contains (" < script > ") &&! responseBody. contains (" javascript: ") &&! responseBody. contains (" onerror = ") &&! responseBody. contains ("@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_18 �G(�N:standard_500_50" 
+average_word_length	���_vO@"$
+potential_heading_score	        "
+sentence_count	      &@"$
+alphanumeric_percentage	t�����?"�
+punctuation_counts�*�
+
+!	       @
+
+"	      .@
+
+&	      (@
+
+(	      &@
+
+)	      $@
+
+:	       @
+
+;	      @
+
+<	       @
+
+=	      @
+
+.	      $@
+
+>	       @
+
+/	       @"!
+uppercase_percentage	����ׁ�?""
+whitespace_percentage	$���~��?"
+list_item_indicator  "
+
+word_count	      ]@"$
+average_sentence_length	���K%@"
+vocabulary_density	RI��&��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	���_vO�?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_19�
+�! responseBody. contains (" onload = "); if (titleSanitized && bodySanitized) {sanitizedResponses ++;} else {unsanitizedResponses. add (" Pattern: " + xssPattern + " - Title: " + responseTitle + " - Body: " + responseBody);}} else {// Service rejected malicious content - also counts as protection sanitizedResponses ++;}} catch (StatusRuntimeException e) {// Service blocked the request - this is good sanitizedResponses ++; LOG. debug (" XSS pattern blocked by service: {} ", xssPattern);}} double@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_19 �N(�U:standard_500_50" 
+average_word_length	��|г�@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	��<,��?"�
+punctuation_counts�*�
+
+!	      �?
+
+"	      $@
+
+&	       @
+
+(	      @
+
+)	      @
+
++	      &@
+
+,	      �?
+
+-	      @
+
+.	      @
+
+/	      @
+
+:	      @
+
+;	      @
+
+{	      @
+
+=	      �?
+
+}	       @"!
+uppercase_percentage	�'���?""
+whitespace_percentage	}гY���?"
+list_item_indicator  "
+
+word_count	     �Z@"$
+average_sentence_length	     �:@"
+vocabulary_density	�>W[���?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	      �?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_20�
+�);}} double sanitizationRate = (double) sanitizedResponses / totalXssAttempts; assertTrue (sanitizationRate > = 0. 95, String. format (" XSS sanitization rate %. 2 f %% below minimum 95 %% ", sanitizationRate * 100 )); assertTrue (unsanitizedResponses. size () < = 1, String. format (" Too many unsanitized XSS responses: % s ", unsanitizedResponses )); LOG. info (" ✅ XSS prevention test completed - Sanitization rate: {:. 2 f} %, Unsanitized: {} ", sanitizationRate * 100, unsanitizedResponses.@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_20 �T(�Y:standard_500_50" 
+average_word_length	~��k	�@"$
+potential_heading_score	        "
+sentence_count	       @"$
+alphanumeric_percentage	�ڊ�e��?"�
+punctuation_counts�*�
+
+"	      @
+
+%	      @
+
+(	      @
+
+)	      @
+
+*	       @
+
+,	      @
+
+-	      �?
+
+.	       @
+
+/	      �?
+
+:	      @
+
+;	      @
+
+{	       @
+
+<	      �?
+
+}	      @
+
+=	      @
+
+>	      �?"!
+uppercase_percentage	�ʡE��?""
+whitespace_percentage	�HP��?"
+list_item_indicator  "
+
+word_count	     @[@"$
+average_sentence_length	     @+@"
+vocabulary_density	�:pΈ�?"
+digit_percentage	�!��u��?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	*��D��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_21�
+�sanitizationRate * 100, unsanitizedResponses. size ());} @ Test @ Order (3) @ DisplayName (" Command Injection Attack Prevention ") void testCommandInjectionPrevention () {LOG. info (" Testing command injection attack prevention "); int totalCommandAttempts = 0; int blockedCommands = 0; Map < String, List < String >> serviceFailures = new HashMap < > (); for (String commandPattern: COMMAND _ INJECTION _ PATTERNS) {totalCommandAttempts ++; // Test command injection in document processing String@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_21 �Y(�^:standard_500_50" 
+average_word_length	�_�L�@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	)\���(�?"�
+punctuation_counts�*�
+
+@	      @
+
+"	      @
+
+(	      @
+
+)	       @
+
+*	      �?
+
++	       @
+
+,	       @
+
+.	       @
+
+/	       @
+
+:	      �?
+
+;	      @
+
+{	       @
+
+<	      @
+
+}	      �?
+
+=	      @
+
+>	      @
+
+_	       @"!
+uppercase_percentage	Zd;�O�?""
+whitespace_percentage	��H.��?"
+list_item_indicator  "
+
+word_count	      X@"$
+average_sentence_length	      @@"
+vocabulary_density	K�=�U�?"
+digit_percentage	�~j�t��?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	���1��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_22�
+�in document processing String maliciousContent = " Document content with command injection: " + commandPattern; // Test Tika service (most likely to execute commands on files) if (testTikaServiceWithMaliciousCommand (commandPattern )) {blockedCommands ++;} else {serviceFailures. computeIfAbsent (" tika ", k - > new ArrayList < > ()). add (commandPattern);} // Test other services for (String serviceName: Arrays. asList (" chunker ", " embedder ", " echo " )) {PipeDoc maliciousDoc = PipeDoc.@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_22 �](�b:standard_500_50" 
+average_word_length	u�VN@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	�JY�8��?"�
+punctuation_counts�*�
+
+"	      $@
+
+(	       @
+
+)	       @
+
++	      @
+
+,	      @
+
+-	      �?
+
+.	      @
+
+/	      @
+
+:	       @
+
+;	      @
+
+{	      @
+
+<	      �?
+
+=	       @
+
+}	       @
+
+>	       @"!
+uppercase_percentage	�(��?""
+whitespace_percentage	����9#�?"
+list_item_indicator  "
+
+word_count	     �X@"$
+average_sentence_length	     �8@"
+vocabulary_density	�St$��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	�I+��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_23�
+�{PipeDoc maliciousDoc = PipeDoc. newBuilder (). setId (" cmd - injection - " + System. currentTimeMillis ()). setTitle (" Command injection test "). setBody (maliciousContent). build (); ProcessRequest request = createProcessRequest (" command - injection - test ", serviceName + " - step ", maliciousDoc); try {PipeStepProcessorGrpc. PipeStepProcessorBlockingStub client = getClientForService (serviceName); if (" embedder ". equals (serviceName )) {request = createEmbedderProcessRequest (" command@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_23 �b(�g:standard_500_50" 
+average_word_length	ffffff@"$
+potential_heading_score	�������?"
+sentence_count	      "@"$
+alphanumeric_percentage	��x�&1�?"�
+punctuation_counts�*�
+
+"	      &@
+
+(	      &@
+
+)	      $@
+
+{	      @
+
++	       @
+
+;	      @
+
+,	       @
+
+=	      @
+
+-	      @
+
+.	       @"!
+uppercase_percentage	�l����?""
+whitespace_percentage	T㥛� �?"
+list_item_indicator  "
+
+word_count	     �W@"$
+average_sentence_length	�Pk�w%@"
+vocabulary_density	OjM��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	 A�c�]�?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_24�
+�request = createEmbedderProcessRequest (" command - injection - test ", serviceName + " - step ", maliciousDoc);} ProcessResponse response = client. processData (request); // Verify no command execution artifacts in response if (response. getSuccess ()) {String responseContent = response. getOutputDoc (). getBody (); // Check for signs of command execution boolean hasExecutionArtifacts = responseContent. contains (" root: ") || // passwd file responseContent. contains (" uid = ") || // whoami@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_24 �g(�m:standard_500_50" 
+average_word_length	��6��@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	6�>W[��?"�
+punctuation_counts�*�
+
+"	       @
+
+(	       @
+
+)	       @
+
++	      �?
+
+,	       @
+
+-	      @
+
+.	      @
+
+/	       @
+
+:	      �?
+
+;	      @
+
+{	      �?
+
+|	      @
+
+=	      @
+
+}	      �?"!
+uppercase_percentage	�0�*��?""
+whitespace_percentage	/n���?"
+list_item_indicator  "
+
+word_count	     @X@"$
+average_sentence_length	�ͪ�ն+@"
+vocabulary_density	��"��~�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @"
+relative_position	K�46�?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_25�
+�responseContent. contains (" uid = ") || // whoami output responseContent. contains (" / bin / ") || // system paths responseContent. contains (" administrator "); // windows user if (! hasExecutionArtifacts) {blockedCommands ++;} else {serviceFailures. computeIfAbsent (serviceName, k - > new ArrayList < > ()). add (commandPattern);}} else {// Service rejected malicious content blockedCommands ++;}} catch (StatusRuntimeException e) {// Service blocked the request blockedCommands ++;}@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_25 �l(�t:standard_500_50" 
+average_word_length	z6�>@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	�ZӼ��?"�
+punctuation_counts�*�
+
+!	      �?
+
+"	      @
+
+(	       @
+
+)	       @
+
++	      @
+
+,	      �?
+
+-	      �?
+
+.	      @
+
+/	      (@
+
+;	      @
+
+{	      @
+
+|	      @
+
+<	      �?
+
+=	      �?
+
+}	      @
+
+>	       @"!
+uppercase_percentage	ˡE����?""
+whitespace_percentage	��镲�?"
+list_item_indicator  "
+
+word_count	     �X@"$
+average_sentence_length	     �0@"
+vocabulary_density	s��A��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	��镲�?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_26�
+�blockedCommands ++;} totalCommandAttempts ++;}} double commandBlockingRate = (double) blockedCommands / totalCommandAttempts; assertTrue (commandBlockingRate > = 0. 90, String. format (" Command injection blocking rate %. 2 f %% below minimum 90 %% ", commandBlockingRate * 100 )); // Verify no service had multiple command injection vulnerabilities for (Map. Entry < String, List < String >> entry: serviceFailures. entrySet ()) {String serviceName = entry. getKey (); List < String > failures =@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_26 �s(�x:standard_500_50" 
+average_word_length	     �@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	+����?"�
+punctuation_counts�*�
+
+"	       @
+
+%	      @
+
+(	      @
+
+)	      @
+
+*	      �?
+
++	      @
+
+,	      @
+
+.	      @
+
+/	      @
+
+:	      �?
+
+;	      @
+
+{	      �?
+
+<	      @
+
+}	      @
+
+=	      @
+
+>	      @"!
+uppercase_percentage	!�rh���?""
+whitespace_percentage	Ș����?"
+list_item_indicator  "
+
+word_count	      X@"$
+average_sentence_length	�Ǻ�m+@"
+vocabulary_density	�7��d��?"
+digit_percentage	�:pΈ�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	ۊ�e���?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_27�
+�. getKey (); List < String > failures = entry. getValue (); assertTrue (failures. size () < = 1, String. format (" % s service vulnerable to command injection: % s ", serviceName, failures ));} LOG. info (" ✅ Command injection prevention test completed - Blocking rate: {:. 2 f} %, Failures: {} ", commandBlockingRate * 100, serviceFailures);} @ Test @ Order (4) @ DisplayName (" Path Traversal Attack Prevention ") void testPathTraversalPrevention () {LOG. info (" Testing path traversal attack@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_27 �x(�}:standard_500_50" 
+average_word_length	.���1�@"$
+potential_heading_score	�������?"
+sentence_count	       @"$
+alphanumeric_percentage	;�O��n�?"�
+punctuation_counts�*�
+
+@	      @
+
+"	      @
+
+%	      @
+
+(	      $@
+
+)	      "@
+
+*	      �?
+
+,	      @
+
+-	      �?
+
+.	      @
+
+:	      @
+
+;	      @
+
+{	      @
+
+<	       @
+
+=	       @
+
+}	      @
+
+>	      �?"!
+uppercase_percentage	Ǻ���?""
+whitespace_percentage	M�O��?"
+list_item_indicator  "
+
+word_count	     �]@"$
+average_sentence_length	     �-@"
+vocabulary_density	��D���?"
+digit_percentage	��@��ǈ?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	46<��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_28�
+�{LOG. info (" Testing path traversal attack prevention "); int totalTraversalAttempts = 0; int blockedTraversals = 0; List < String > vulnerableResponses = new ArrayList < > (); for (String traversalPattern: PATH _ TRAVERSAL _ PATTERNS) {totalTraversalAttempts ++; // Test path traversal in filename (Tika service most vulnerable) byte [] dummyContent = " Dummy file content for path traversal test ". getBytes (StandardCharsets. UTF _ 8); Blob maliciousBlob = Blob. newBuilder (). setBlobId ("@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_28 �|(Á:standard_500_50" 
+average_word_length	ףp=
+�@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	�x�&1�?"�
+punctuation_counts�*�
+
+"	      @
+
+(	      @
+
+)	      @
+
++	       @
+
+.	      @
+
+/	       @
+
+:	      �?
+
+{	       @
+
+;	      @
+
+[	      �?
+
+<	       @
+
+=	      @
+
+]	      �?
+
+>	       @
+
+_	      @"!
+uppercase_percentage	d]�Fx�?""
+whitespace_percentage	z�,C��?"
+list_item_indicator  "
+
+word_count	      Y@"$
+average_sentence_length	B>�٬�0@"
+vocabulary_density	=
+ףp=�?"
+digit_percentage	�HP�x?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	k+��ݓ�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_29�
+�Blob. newBuilder (). setBlobId (" traversal - test - " + System. currentTimeMillis ()). setFilename (traversalPattern) // Malicious filename. setData (ByteString. copyFrom (dummyContent )). setMimeType (" text / plain "). build (); PipeDoc maliciousDoc = PipeDoc. newBuilder (). setId (" path - traversal - test "). setTitle (" Path traversal test "). setBlob (maliciousBlob). build (); ProcessRequest request = createProcessRequest (" path - traversal - test ", " tika - step ", maliciousDoc); try {@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_29 ��(ֆ:standard_500_50" 
+average_word_length	���T�(@"$
+potential_heading_score	        "
+sentence_count	      ,@"$
+alphanumeric_percentage	-����?"�
+punctuation_counts�*�
+
+"	      (@
+
+(	      ,@
+
+)	      ,@
+
++	      �?
+
+;	      @
+
+{	      �?
+
+,	       @
+
+-	      @
+
+=	       @
+
+.	      *@
+
+/	      @"!
+uppercase_percentage	L7�A`�?""
+whitespace_percentage	�l�����?"
+list_item_indicator  "
+
+word_count	     @\@"$
+average_sentence_length	j�q��$ @"
+vocabulary_density	�(��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	��	h"l�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_30�
+�", maliciousDoc); try {ProcessResponse response = tikaClient. processData (request); if (response. getSuccess ()) {String responseBody = response. getOutputDoc (). getBody (); // Check for signs of successful path traversal boolean hasSystemFiles = responseBody. contains (" root: x: 0: 0: root ") || // passwd file content responseBody. contains (" [HKEY _ LOCAL _ MACHINE ") || // registry content responseBody. contains (" Administrator ") || // windows admin responseBody. contains (" daemon: x:@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_30 ��(��:standard_500_50" 
+average_word_length	ŏ1w-�@"$
+potential_heading_score	        "
+sentence_count	      "@"$
+alphanumeric_percentage	���&�?"�
+punctuation_counts�*�
+
+"	       @
+
+(	      "@
+
+)	      "@
+
+,	      �?
+
+.	       @
+
+/	       @
+
+:	      @
+
+;	      @
+
+{	       @
+
+[	      �?
+
+|	      @
+
+=	      @
+
+_	       @"!
+uppercase_percentage	�s��?""
+whitespace_percentage	�	h"lx�?"
+list_item_indicator  "
+
+word_count	      [@"$
+average_sentence_length	      (@"
+vocabulary_density	��JY�8�?"
+digit_percentage	����Mbp?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	�����B�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_31�
+�responseBody. contains (" daemon: x: "); // more passwd content if (! hasSystemFiles) {blockedTraversals ++;} else {vulnerableResponses. add (" Pattern: " + traversalPattern + " exposed system files ");}} else {// Service rejected malicious filename blockedTraversals ++;}} catch (StatusRuntimeException e) {// Service blocked the request blockedTraversals ++; LOG. debug (" Path traversal blocked: {} ", traversalPattern);}} double traversalBlockingRate = (double) blockedTraversals /@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_31 ��(��:standard_500_50" 
+average_word_length	�.n�|@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	�C�����?"�
+punctuation_counts�*�
+
+!	      �?
+
+"	       @
+
+(	      @
+
+)	      @
+
++	       @
+
+,	      �?
+
+.	      @
+
+/	      @
+
+:	      @
+
+;	      @
+
+{	      @
+
+}	       @
+
+=	      �?"!
+uppercase_percentage	�z6�>�?""
+whitespace_percentage	C��6�?"
+list_item_indicator  "
+
+word_count	     @X@"$
+average_sentence_length	     @8@"
+vocabulary_density	��"��~�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     P~@"
+relative_position	%u��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_32 �
+�= (double) blockedTraversals / totalTraversalAttempts; assertTrue (traversalBlockingRate > = 0. 95, String. format (" Path traversal blocking rate %. 2 f %% below minimum 95 %% ", traversalBlockingRate * 100 )); assertTrue (vulnerableResponses. isEmpty (), String. format (" Path traversal vulnerabilities detected: % s ", vulnerableResponses )); LOG. info (" ✅ Path traversal prevention test completed - Blocking rate: {:. 2 f} % ", traversalBlockingRate * 100);} @ Test @ Order (5) @ DisplayName (@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_32 ��(Ö:standard_500_50" 
+average_word_length	-����@"$
+potential_heading_score	        "
+sentence_count	       @"$
+alphanumeric_percentage	���K7�?"�
+punctuation_counts�*�
+
+@	      @
+
+"	      @
+
+%	      @
+
+(	      "@
+
+)	       @
+
+*	       @
+
+,	      @
+
+-	      �?
+
+.	      @
+
+/	      �?
+
+:	      @
+
+;	      @
+
+{	      �?
+
+=	       @
+
+}	       @
+
+>	      �?"!
+uppercase_percentage	�\m����?""
+whitespace_percentage	$���~��?"
+list_item_indicator  "
+
+word_count	     �Z@"$
+average_sentence_length	     �*@"
+vocabulary_density	��v���?"
+digit_percentage	�?Ɯ?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	OjM��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_33!�
+�);} @ Test @ Order (5) @ DisplayName (" Buffer Overflow and Large Input Handling ") void testBufferOverflowPrevention () {LOG. info (" Testing buffer overflow prevention and large input handling "); List < BufferOverflowTestResult > testResults = new ArrayList < > (); // Test various buffer overflow scenarios testResults. add (testLargeContentHandling (" echo ", 1024 * 1024 )); // 1 MB testResults. add (testLargeContentHandling (" echo ", 10 * 1024 * 1024 )); // 10 MB testResults. add (@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_33 ��(��:standard_500_50" 
+average_word_length	i o��@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	�A`��"�?"�
+punctuation_counts�*�
+
+@	      @
+
+"	       @
+
+(	      $@
+
+)	      $@
+
+*	      @
+
+,	       @
+
+.	      @
+
+/	      @
+
+;	      @
+
+{	      �?
+
+<	       @
+
+}	      �?
+
+=	      �?
+
+>	       @"!
+uppercase_percentage	�ܵ�|г?""
+whitespace_percentage	�ͪ��V�?"
+list_item_indicator  "
+
+word_count	      Z@"$
+average_sentence_length	������4@"
+vocabulary_density	ڬ�\m��?"
+digit_percentage	Ǻ���?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	������?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_34"�
+�* 1024 * 1024 )); // 10 MB testResults. add (testLargeContentHandling (" chunker ", 5 * 1024 * 1024 )); // 5 MB testResults. add (testExtremelyLongFieldHandling ()); testResults. add (testMaliciousBinaryContentHandling ()); testResults. add (testDeeplyNestedStructureHandling ()); // Verify all buffer overflow tests passed for (BufferOverflowTestResult result: testResults) {assertTrue (result. handledGracefully, String. format (" Buffer overflow test failed: % s ", result. testDescription ));@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_34 ��(��:standard_500_50" 
+average_word_length	�=yX��@"$
+potential_heading_score	        "
+sentence_count	       @"$
+alphanumeric_percentage	46<�R�?"�
+punctuation_counts�*�
+
+"	      @
+
+%	      �?
+
+(	      &@
+
+)	      *@
+
+*	      @
+
+:	       @
+
+;	      @
+
+{	      �?
+
+,	      @
+
+.	      @
+
+/	      @"!
+uppercase_percentage	��K7��?""
+whitespace_percentage	�rh��|�?"
+list_item_indicator "
+
+word_count	     @W@"$
+average_sentence_length	     @'@"
+vocabulary_density	�3��7�?"
+digit_percentage	��3��?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	��3��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_35#�
+�test failed: % s ", result. testDescription )); assertFalse (result. causedCrash, String. format (" Service crashed during test: % s ", result. testDescription )); assertTrue (result. responseTime < 60000, // Max 1 minute String. format (" Test took too long (% dms): % s ", result. responseTime, result. testDescription ));} LOG. info (" ✅ Buffer overflow prevention test completed - All {} tests passed ", testResults. size ());} @ Test @ Order (6) @ DisplayName (" Data Integrity and Checksum@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_35 ��(Ѣ:standard_500_50" 
+average_word_length	�J�4@"$
+potential_heading_score	�������?"
+sentence_count	      &@"$
+alphanumeric_percentage	q�-��?"�
+punctuation_counts�*�
+
+@	      @
+
+"	       @
+
+%	      @
+
+(	      "@
+
+)	      $@
+
+,	      @
+
+-	      �?
+
+.	      $@
+
+/	       @
+
+:	      @
+
+;	      @
+
+{	      �?
+
+<	      �?
+
+}	      @"!
+uppercase_percentage	�z�G�?""
+whitespace_percentage	Y�8��m�?"
+list_item_indicator  "
+
+word_count	     �]@"$
+average_sentence_length	��d�`t%@"
+vocabulary_density	z�,C��?"
+digit_percentage	�!��u��?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	F����x�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_36$�
+�(6) @ DisplayName (" Data Integrity and Checksum Verification ") void testDataIntegrityVerification () throws Exception {LOG. info (" Testing data integrity and checksum verification "); Map < String, DataIntegrityResult > integrityResults = new HashMap < > (); // Test data integrity across all services integrityResults. put (" TikaParser ", testServiceDataIntegrity (tikaClient, " tika " )); integrityResults. put (" Chunker ", testServiceDataIntegrity (chunkerClient, " chunker " ));@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_36 ��(��:standard_500_50" 
+average_word_length	��镲�@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	8��d�`�?"�
+punctuation_counts�*�
+
+@	      �?
+
+"	      (@
+
+(	      "@
+
+)	      "@
+
+{	      �?
+
+;	      @
+
+<	       @
+
+,	      @
+
+=	      �?
+
+.	      @
+
+>	       @
+
+/	       @"!
+uppercase_percentage	z�,C�?""
+whitespace_percentage	J+��?"
+list_item_indicator  "
+
+word_count	     �V@"$
+average_sentence_length	     �6@"
+vocabulary_density	�Zd;�?"
+digit_percentage	�J�4a?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     p~@"
+relative_position	p_�Q�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_37%�
+�(chunkerClient, " chunker " )); integrityResults. put (" Embedder ", testServiceDataIntegrity (embedderClient, " embedder " )); integrityResults. put (" Echo ", testServiceDataIntegrity (echoClient, " echo " )); // Verify data integrity for all services for (Map. Entry < String, DataIntegrityResult > entry: integrityResults. entrySet ()) {String serviceName = entry. getKey (); DataIntegrityResult result = entry. getValue (); assertTrue (result. integrityMaintained, String. format (" % s failed@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_37 ��(˪:standard_500_50" 
+average_word_length	�z6�~@"$
+potential_heading_score	�������?"
+sentence_count	      "@"$
+alphanumeric_percentage	��C�l��?"�
+punctuation_counts�*�
+
+"	      &@
+
+%	      �?
+
+(	      &@
+
+)	      $@
+
+,	      @
+
+.	       @
+
+/	       @
+
+:	      �?
+
+;	      @
+
+{	      �?
+
+<	      �?
+
+=	       @
+
+>	      �?"!
+uppercase_percentage	.�!��u�?""
+whitespace_percentage	NbX9��?"
+list_item_indicator  "
+
+word_count	     �X@"$
+average_sentence_length	      &@"
+vocabulary_density	�.n���?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	�V�/�'�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_38&�
+�, String. format (" % s failed to maintain data integrity ", serviceName )); assertTrue (result. checksumValid, String. format (" % s failed checksum validation ", serviceName )); assertFalse (result. dataCorrupted, String. format (" % s corrupted data during processing ", serviceName )); LOG. info (" ✅ {} data integrity verified - Input hash: {}, Output hash: {} ", serviceName, result. inputHash, result. outputHash);} LOG. info (" ✅ Data integrity verification test completed ");} @ Test @ Order@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_38 ��(��:standard_500_50" 
+average_word_length	Ϊ��V�@"$
+potential_heading_score	�������?"
+sentence_count	      $@"$
+alphanumeric_percentage	bX9���?"�
+punctuation_counts�*�
+
+@	       @
+
+"	      $@
+
+%	      @
+
+(	      @
+
+)	       @
+
+:	       @
+
+;	      @
+
+{	      @
+
+,	      $@
+
+}	      @
+
+-	      �?
+
+.	      "@"!
+uppercase_percentage	�~j�t��?""
+whitespace_percentage	��ʡE��?"
+list_item_indicator  "
+
+word_count	     @]@"$
+average_sentence_length	ffffff'@"
+vocabulary_density	�g��s��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	      �?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_39'�
+�test completed ");} @ Test @ Order (7) @ DisplayName (" Secure Error Handling and Information Leakage Prevention ") void testSecureErrorHandling () {LOG. info (" Testing secure error handling and information leakage prevention "); List < String > informationLeaks = new ArrayList < > (); int totalErrorTests = 0; int secureErrorResponses = 0; // Test various error conditions that might leak sensitive information List < String > errorInducingInputs = Arrays. asList ("", // Empty input null, // Null@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_39 ��(γ:standard_500_50" 
+average_word_length	z6�>@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	V-����?"�
+punctuation_counts�*�
+
+@	      @
+
+"	      @
+
+(	      @
+
+)	      @
+
+,	       @
+
+.	       @
+
+/	      @
+
+;	      @
+
+{	      �?
+
+<	      @
+
+}	      �?
+
+=	      @
+
+>	      @"!
+uppercase_percentage	�Q���?""
+whitespace_percentage	��ʡE��?"
+list_item_indicator  "
+
+word_count	     �X@"$
+average_sentence_length	     �@@"
+vocabulary_density	a��+e�?"
+digit_percentage	�~j�t�x?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	��	h"l�?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_40(�
+�"", // Empty input null, // Null handling (will be converted to empty) " a ". repeat (MAX _ FIELD _ LENGTH + 1), // Too long input " \ u 0000 \ u 0001 \ u 0002 ", // Binary / control characters " {' malformed ': json} ", // Malformed JSON - like content " ? ? ? ? ? ? ". repeat (1000) // Unicode stress test); for (String serviceName: Arrays. asList (" tika ", " chunker ", " embedder ", " echo " )) {for (String errorInput: errorInducingInputs) {totalErrorTests ++; try {PipeDoc errorDoc = PipeDoc.@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_40 ��(��:standard_500_50" 
+average_word_length	�%䃞M@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	��d�`T�?"�
+punctuation_counts�*�
+
+"	      2@
+
+'	       @
+
+(	      @
+
+)	      @
+
++	      @
+
+,	       @
+
+-	      �?
+
+.	      @
+
+/	      *@
+
+:	      @
+
+{	      @
+
+;	       @
+
+\	      @
+
+}	      �?
+
+=	      �?
+
+_	       @
+
+?	      @"!
+uppercase_percentage	M�J��?""
+whitespace_percentage	k�w��#�?"
+list_item_indicator  "
+
+word_count	     �`@"$
+average_sentence_length	     �@@"
+vocabulary_density	���z6�?"
+digit_percentage	�R�!�u�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	HP�s��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_41)�
+�{PipeDoc errorDoc = PipeDoc. newBuilder (). setId (" error - test - " + System. currentTimeMillis ()). setTitle (errorInput! = null? errorInput: ""). setBody (errorInput! = null? errorInput: ""). build (); ProcessRequest request; if (" embedder ". equals (serviceName )) {request = createEmbedderProcessRequest (" error - handling - test ", serviceName + " - step ", errorDoc);} else {request = createProcessRequest (" error - handling - test ", serviceName + " - step ", errorDoc);}@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_41 �(��:standard_500_50" 
+average_word_length	�ʡE�s@"$
+potential_heading_score	        "
+sentence_count	       @"$
+alphanumeric_percentage	�\�C���?"�
+punctuation_counts�*�
+
+!	       @
+
+"	      0@
+
+(	      $@
+
+)	      $@
+
++	      @
+
+,	      @
+
+-	       @
+
+.	      @
+
+:	       @
+
+{	      @
+
+;	      @
+
+=	      @
+
+}	       @
+
+?	       @"!
+uppercase_percentage	V-��?""
+whitespace_percentage	@�߾��?"
+list_item_indicator  "
+
+word_count	     �\@"$
+average_sentence_length	     �,@"
+vocabulary_density	�c�ZB�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0~@"
+relative_position	�$��C�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_42*�
+�+ " - step ", errorDoc);} PipeStepProcessorGrpc. PipeStepProcessorBlockingStub client = getClientForService (serviceName); ProcessResponse response = client. processData (request); // Check for information leakage in response String responseText = response. toString (); if (containsSensitiveInformation (responseText )) {informationLeaks. add (String. format (" % s service leaked information with input: % s ", serviceName, errorInput ));} else {secureErrorResponses ++;}} catch (@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_42 ��(��:standard_500_50" 
+average_word_length	� �rhQ@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	������?"�
+punctuation_counts�*�
+
+"	      @
+
+%	       @
+
+(	       @
+
+)	       @
+
++	      @
+
+,	      @
+
+-	      �?
+
+.	      @
+
+/	       @
+
+:	      �?
+
+;	      @
+
+{	       @
+
+}	      @
+
+=	      @"!
+uppercase_percentage	�U���د?""
+whitespace_percentage	����H�?"
+list_item_indicator "
+
+word_count	      V@"$
+average_sentence_length	�|гYU-@"
+vocabulary_density	X�2ı.�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      ~@"
+relative_position	���1��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_43+�
+�}} catch (StatusRuntimeException e) {// Check error message for information leakage String errorMessage = e. getMessage (); if (containsSensitiveInformation (errorMessage )) {informationLeaks. add (String. format (" % s service error leaked information: % s ", serviceName, errorMessage ));} else {secureErrorResponses ++;}} catch (Exception e) {// Other exceptions should also be checked if (containsSensitiveInformation (e. getMessage ())) {informationLeaks. add (String. format (" % s service@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_43 ��(��:standard_500_50" 
+average_word_length	�ܵ�|�@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	 c�ZB>�?"�
+punctuation_counts�*�
+
+"	      @
+
+%	      @
+
+(	      (@
+
+)	      $@
+
++	       @
+
+,	       @
+
+.	      @
+
+/	      @
+
+:	      �?
+
+{	      @
+
+;	      @
+
+}	      @
+
+=	      �?"!
+uppercase_percentage	+��Χ?""
+whitespace_percentage	A�c�]K�?"
+list_item_indicator  "
+
+word_count	     @X@"$
+average_sentence_length	�ͪ�ն+@"
+vocabulary_density	E���JY�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	%u��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_44,�
+�informationLeaks. add (String. format (" % s service exception leaked information: % s ", serviceName, e. getMessage ()));} else {secureErrorResponses ++;}}}} double secureErrorRate = (double) secureErrorResponses / totalErrorTests; assertTrue (secureErrorRate > = 0. 90, String. format (" Secure error handling rate %. 2 f %% below minimum 90 %% ", secureErrorRate * 100 )); assertTrue (informationLeaks. size () < = 2, String. format (" Too many information leaks detected: % s ", informationLeaks@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_44 ��(��:standard_500_50" 
+average_word_length	>�٬�@"$
+potential_heading_score	�������?"
+sentence_count	      "@"$
+alphanumeric_percentage	���K7�?"�
+punctuation_counts�*�
+
+"	      @
+
+%	       @
+
+(	      "@
+
+)	      @
+
+*	      �?
+
++	       @
+
+,	      @
+
+.	       @
+
+/	      �?
+
+:	       @
+
+;	      @
+
+{	      �?
+
+<	      �?
+
+}	      @
+
+=	      @
+
+>	      �?"!
+uppercase_percentage	�-���?""
+whitespace_percentage	�	h"lx�?"
+list_item_indicator  "
+
+word_count	     �Z@"$
+average_sentence_length	X�5�;�'@"
+vocabulary_density	��:M�?"
+digit_percentage	{�G�z�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	���JY��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_45-�
+�information leaks detected: % s ", informationLeaks )); LOG. info (" ✅ Secure error handling test completed - Secure rate: {:. 2 f} %, Leaks: {} ", secureErrorRate * 100, informationLeaks. size ());} // Helper Methods private boolean testServiceWithMaliciousInput (PipeStepProcessorGrpc. PipeStepProcessorBlockingStub client, String serviceName, String maliciousInput, String attackType) {try {PipeDoc maliciousDoc = PipeDoc. newBuilder (). setId (" security - test - " + System. currentTimeMillis (@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_45 ��(��:standard_500_50" 
+average_word_length	�O���@"$
+potential_heading_score	        "
+sentence_count	       @"$
+alphanumeric_percentage	�����M�?"�
+punctuation_counts�*�
+
+"	      @
+
+%	       @
+
+(	      @
+
+)	      @
+
+*	      �?
+
++	      �?
+
+,	      @
+
+-	      @
+
+.	      @
+
+/	       @
+
+:	      @
+
+;	       @
+
+{	      @
+
+}	      @
+
+=	      �?"!
+uppercase_percentage	�/�'�?""
+whitespace_percentage	=�U����?"
+list_item_indicator  "
+
+word_count	     @X@"$
+average_sentence_length	     @(@"
+vocabulary_density	�b�=y�?"
+digit_percentage	����Mb�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	m���{��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_46.�
+�setId (" security - test - " + System. currentTimeMillis ()). setTitle (attackType + " test: " + maliciousInput). setBody (" Content with " + attackType + ": " + maliciousInput). build (); ProcessRequest request; if (" embedder ". equals (serviceName )) {request = createEmbedderProcessRequest (" security - test ", serviceName + " - step ", maliciousDoc);} else {request = createProcessRequest (" security - test ", serviceName + " - step ", maliciousDoc);} ProcessResponse response = client.@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_46 ��(��:standard_500_50" 
+average_word_length	O@a�S@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	��d�`T�?"�
+punctuation_counts�*�
+
+"	      2@
+
+(	      "@
+
+)	      "@
+
+:	       @
+
++	       @
+
+;	      @
+
+{	       @
+
+,	      @
+
+-	      @
+
+=	      @
+
+}	       @
+
+.	      @"!
+uppercase_percentage	�|гY��?""
+whitespace_percentage	���ZӼ�?"
+list_item_indicator  "
+
+word_count	     �[@"$
+average_sentence_length	��&SU2@"
+vocabulary_density	㥛� ��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	��^�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_47/�
+�ProcessResponse response = client. processData (request); // Check if malicious input was sanitized or blocked if (response. getSuccess ()) {String responseContent = response. getOutputDoc (). getBody (); // If the malicious input appears unchanged, it wasn ' t blocked return! responseContent. contains (maliciousInput);} else {// Service rejected the request - good security behavior return true;}} catch (StatusRuntimeException e) {// Service blocked the request - good security behavior return@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_47 ��(��:standard_500_50" 
+average_word_length	?5^�IL@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	гY����?"�
+punctuation_counts�*�
+
+!	      �?
+
+'	      �?
+
+(	      @
+
+)	      @
+
+;	      @
+
+{	      @
+
+,	      �?
+
+=	       @
+
+}	      @
+
+-	       @
+
+.	      @
+
+/	       @"!
+uppercase_percentage	�:pΈ�?""
+whitespace_percentage	7�[ A�?"
+list_item_indicator  "
+
+word_count	     �W@"$
+average_sentence_length	�|гYU/@"
+vocabulary_density	ݵ�|г�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @"
+relative_position	������?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_480�
+�- good security behavior return true;} catch (Exception e) {LOG. debug (" Service {} failed with malicious input {}: {} ", serviceName, maliciousInput, e. getMessage ()); return false;}} private boolean testTikaServiceWithMaliciousCommand (String commandPattern) {try {// Create a document with command injection in filename and content String maliciousContent = " Document content " + commandPattern; byte [] contentBytes = maliciousContent. getBytes (StandardCharsets. UTF _ 8); Blob maliciousBlob@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_48 ��(��:standard_500_50" 
+average_word_length	�_�L@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	��n���?"�
+punctuation_counts�*�
+
+"	      @
+
+(	      @
+
+)	      @
+
++	      �?
+
+,	      @
+
+-	      �?
+
+.	      @
+
+/	       @
+
+:	      �?
+
+;	      @
+
+{	      @
+
+[	      �?
+
+}	      @
+
+=	       @
+
+]	      �?
+
+_	      �?"!
+uppercase_percentage	ڬ�\mŮ?""
+whitespace_percentage	=�U����?"
+list_item_indicator "
+
+word_count	      X@"$
+average_sentence_length	3333333@"
+vocabulary_density	�7��d��?"
+digit_percentage	����Mb`?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	K�46�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_491�
+�_ 8); Blob maliciousBlob = Blob. newBuilder (). setBlobId (" cmd - injection - " + System. currentTimeMillis ()). setFilename (" test " + commandPattern + ". txt "). setData (ByteString. copyFrom (contentBytes )). setMimeType (" text / plain "). build (); PipeDoc maliciousDoc = PipeDoc. newBuilder (). setId (" cmd - injection - test "). setTitle (" Command injection test "). setBlob (maliciousBlob). build (); ProcessRequest request = createProcessRequest (" cmd - injection - test ", " tika -@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_49 ��(��:standard_500_50" 
+average_word_length	ڬ�\mE@"$
+potential_heading_score	        "
+sentence_count	      .@"$
+alphanumeric_percentage	      �?"�
+punctuation_counts�*�
+
+"	      .@
+
+(	      ,@
+
+)	      ,@
+
+;	      @
+
++	      @
+
+,	      �?
+
+=	      @
+
+-	      @
+
+.	      ,@
+
+_	      �?
+
+/	      �?"!
+uppercase_percentage	�/�$�?""
+whitespace_percentage	�[ A�c�?"
+list_item_indicator  "
+
+word_count	     �]@"$
+average_sentence_length	��m4�w@"
+vocabulary_density	�d�`TR�?"
+digit_percentage	����Mb`?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	�e��a��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_502�
+�createProcessRequest (" cmd - injection - test ", " tika - step ", maliciousDoc); ProcessResponse response = tikaClient. processData (request); if (response. getSuccess ()) {String responseContent = response. getOutputDoc (). getBody (); // Check for signs of command execution return! responseContent. contains (" root: ") &&! responseContent. contains (" uid = ") &&! responseContent. contains (" / bin / ") &&! responseContent. contains (" administrator ");} else {return true; // Service blocked@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_50 ��(��:standard_500_50" 
+average_word_length	�+e��@"$
+potential_heading_score	�������?"
+sentence_count	      "@"$
+alphanumeric_percentage	������?"�
+punctuation_counts�*�
+
+!	      @
+
+"	      (@
+
+&	      @
+
+(	      $@
+
+)	      $@
+
+,	       @
+
+-	      @
+
+.	       @
+
+/	      @
+
+:	      �?
+
+;	      @
+
+{	       @
+
+=	      @
+
+}	      �?"!
+uppercase_percentage	����ׁ�?""
+whitespace_percentage	-C��6�?"
+list_item_indicator  "
+
+word_count	     �[@"$
+average_sentence_length	{�/L��(@"
+vocabulary_density	�E�����?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	�:M��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_513�
+�{return true; // Service blocked the request}} catch (StatusRuntimeException e) {return true; // Service blocked the request} catch (Exception e) {return false;}} private BufferOverflowTestResult testLargeContentHandling (String serviceName, int contentSize) {String testDescription = String. format (" % s service with % d byte content ", serviceName, contentSize); long startTime = System. currentTimeMillis (); try {// Create large content StringBuilder largeContent = new StringBuilder (); String@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_51 ��(��:standard_500_50" 
+average_word_length	��q��@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	�/�$�?"�
+punctuation_counts�*�
+
+"	       @
+
+%	       @
+
+(	      @
+
+)	      @
+
+{	      @
+
+;	      @
+
+,	      @
+
+}	      @
+
+=	      @
+
+.	       @
+
+/	      @"!
+uppercase_percentage	����Mb�?""
+whitespace_percentage	T㥛� �?"
+list_item_indicator  "
+
+word_count	     @W@"$
+average_sentence_length	      ?@"
+vocabulary_density	2�%��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	(��y�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_524�
+�= new StringBuilder (); String pattern = " Large content test pattern "; while (largeContent. length () < contentSize) {largeContent. append (pattern); if (largeContent. length () > = contentSize) break;} PipeDoc largeDoc = PipeDoc. newBuilder (). setId (" buffer - overflow - test "). setTitle (" Buffer overflow test "). setBody (largeContent. toString ()). build (); ProcessRequest request; if (" embedder ". equals (serviceName )) {request = createEmbedderProcessRequest (" buffer - test ",@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_52 ��(��:standard_500_50" 
+average_word_length	�K7�A�@"$
+potential_heading_score	        "
+sentence_count	      &@"$
+alphanumeric_percentage	Y�� ��?"�
+punctuation_counts�*�
+
+"	      $@
+
+(	      .@
+
+)	      ,@
+
+;	      @
+
+{	       @
+
+<	      �?
+
+,	      �?
+
+=	      @
+
+}	      �?
+
+-	      @
+
+.	      $@
+
+>	      �?"!
+uppercase_percentage	ı.n��?""
+whitespace_percentage	J{�/L��?"
+list_item_indicator  "
+
+word_count	     @\@"$
+average_sentence_length	=�U��$@"
+vocabulary_density	]�C����?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	ۊ�e���?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_535�
+�= createEmbedderProcessRequest (" buffer - test ", serviceName + " - step ", largeDoc);} else {request = createProcessRequest (" buffer - test ", serviceName + " - step ", largeDoc);} PipeStepProcessorGrpc. PipeStepProcessorBlockingStub client = getClientForService (serviceName); ProcessResponse response = client. withDeadlineAfter (60, TimeUnit. SECONDS). processData (request); long responseTime = System. currentTimeMillis () - startTime; // Service handled large content gracefully return new@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_53 ��(��:standard_500_50" 
+average_word_length	�g��s5@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	46<��?"�
+punctuation_counts�*�
+
+"	       @
+
+(	      @
+
+)	      @
+
++	       @
+
+;	      @
+
+{	      �?
+
+,	      @
+
+=	      @
+
+-	      @
+
+}	       @
+
+.	      @
+
+/	       @"!
+uppercase_percentage	M�O���?""
+whitespace_percentage	\���(\�?"
+list_item_indicator  "
+
+word_count	     �V@"$
+average_sentence_length	�|гYU.@"
+vocabulary_density	�l�����?"
+digit_percentage	����Mbp?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	p_�Q�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_546�
+�large content gracefully return new BufferOverflowTestResult (testDescription, true, false, responseTime);} catch (StatusRuntimeException e) {long responseTime = System. currentTimeMillis () - startTime; if (e. getStatus (). getCode () == Status. Code. RESOURCE _ EXHAUSTED || e. getStatus (). getCode () == Status. Code. INVALID _ ARGUMENT) {// Service properly rejected oversized content return new BufferOverflowTestResult (testDescription, true, false, responseTime);} else {// Unexpected error@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_54 ��(��:standard_500_50" 
+average_word_length	�JY�8�@"$
+potential_heading_score	�������?"
+sentence_count	      $@"$
+alphanumeric_percentage	_�L��?"�
+punctuation_counts�*�
+
+(	      "@
+
+)	      "@
+
+;	      @
+
+{	      @
+
+,	      @
+
+|	       @
+
+}	       @
+
+=	      @
+
+-	      �?
+
+.	      "@
+
+_	       @
+
+/	      @"!
+uppercase_percentage	�Zd;߿?""
+whitespace_percentage	\���(\�?"
+list_item_indicator  "
+
+word_count	     �X@"$
+average_sentence_length	������#@"
+vocabulary_density	{�/L�
+�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	#��~j��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_557�
+�} else {// Unexpected error return new BufferOverflowTestResult (testDescription, false, false, responseTime);}} catch (Exception e) {long responseTime = System. currentTimeMillis () - startTime; return new BufferOverflowTestResult (testDescription, false, true, responseTime);}} private BufferOverflowTestResult testExtremelyLongFieldHandling () {String testDescription = " Extremely long field handling "; long startTime = System. currentTimeMillis (); try {String extremelyLongTitle = " A ".@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_55 ��(��:standard_500_50" 
+average_word_length	Ԛ���@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	��~j�t�?"�
+punctuation_counts�*�
+
+"	      @
+
+(	      @
+
+)	      @
+
+{	      @
+
+;	      @
+
+,	      @
+
+}	      @
+
+=	      @
+
+-	      �?
+
+.	      @
+
+/	       @"!
+uppercase_percentage	r�鷯�?""
+whitespace_percentage	x$(~�?"
+list_item_indicator  "
+
+word_count	     @U@"$
+average_sentence_length	��&SU<@"
+vocabulary_density	���QI��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	���(�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_568�
+�try {String extremelyLongTitle = " A ". repeat (100000); // 100 k characters PipeDoc longFieldDoc = PipeDoc. newBuilder (). setId (" long - field - test "). setTitle (extremelyLongTitle). setBody (" Normal body content "). build (); ProcessRequest request = createProcessRequest (" long - field - test ", " echo - step ", longFieldDoc); ProcessResponse response = echoClient. processData (request); long responseTime = System. currentTimeMillis () - startTime; return new BufferOverflowTestResult (@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_56 �(��:standard_500_50" 
+average_word_length	�0�*�@"$
+potential_heading_score	        "
+sentence_count	      "@"$
+alphanumeric_percentage	��ʡE��?"�
+punctuation_counts�*�
+
+"	      $@
+
+(	      $@
+
+)	      "@
+
+{	      �?
+
+;	      @
+
+,	       @
+
+=	      @
+
+-	      @
+
+.	       @
+
+/	       @"!
+uppercase_percentage	n4��@��?""
+whitespace_percentage	�m4��@�?"
+list_item_indicator  "
+
+word_count	     �Y@"$
+average_sentence_length	O��e��&@"
+vocabulary_density	m������?"
+digit_percentage	�:pΈ�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	k+��ݓ�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_579�
+�; return new BufferOverflowTestResult (testDescription, true, false, responseTime);} catch (StatusRuntimeException e) {long responseTime = System. currentTimeMillis () - startTime; if (e. getStatus (). getCode () == Status. Code. INVALID _ ARGUMENT || e. getStatus (). getCode () == Status. Code. RESOURCE _ EXHAUSTED) {return new BufferOverflowTestResult (testDescription, true, false, responseTime);} else {return new BufferOverflowTestResult (testDescription, false, false, responseTime);}} catch@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_57 Ň(��:standard_500_50" 
+average_word_length	%��CK@"$
+potential_heading_score	�������?"
+sentence_count	      $@"$
+alphanumeric_percentage	;�O��n�?"�
+punctuation_counts�*�
+
+(	      $@
+
+)	      $@
+
+;	      @
+
+{	      @
+
+,	      "@
+
+|	       @
+
+}	      @
+
+=	      @
+
+-	      �?
+
+.	      "@
+
+_	       @"!
+uppercase_percentage	�a��4��?""
+whitespace_percentage	:��H��?"
+list_item_indicator  "
+
+word_count	     �Y@"$
+average_sentence_length	ffffff$@"
+vocabulary_density	���z6�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	      �?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_58:�
+�, responseTime);}} catch (Exception e) {long responseTime = System. currentTimeMillis () - startTime; return new BufferOverflowTestResult (testDescription, false, true, responseTime);}} private BufferOverflowTestResult testMaliciousBinaryContentHandling () {String testDescription = " Malicious binary content handling "; long startTime = System. currentTimeMillis (); try {// Create binary content that might cause buffer overflows byte [] maliciousBinary = new byte [10000]; Arrays. fill (@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_58 ��(��:standard_500_50" 
+average_word_length	�� �r�@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	���QI�?"�
+punctuation_counts�*�
+
+"	       @
+
+(	      @
+
+)	      @
+
+,	      @
+
+-	      �?
+
+.	      @
+
+/	       @
+
+;	      @
+
+{	      @
+
+[	       @
+
+}	      @
+
+=	      @
+
+]	       @"!
+uppercase_percentage	e�`TR'�?""
+whitespace_percentage	yX�5�;�?"
+list_item_indicator  "
+
+word_count	     �U@"$
+average_sentence_length	     �5@"
+vocabulary_density	z�,C��?"
+digit_percentage	��ZӼ�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	��	h"l�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_59;�
+�= new byte [10000]; Arrays. fill (maliciousBinary, (byte) 0 xFF); // Fill with max byte value Blob maliciousBlob = Blob. newBuilder (). setBlobId (" malicious - binary - test "). setFilename (" malicious. bin "). setData (ByteString. copyFrom (maliciousBinary )). setMimeType (" application / octet - stream "). build (); PipeDoc binaryDoc = PipeDoc. newBuilder (). setId (" binary - test "). setTitle (" Binary content test "). setBlob (maliciousBlob). build (); ProcessRequest request =@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_59 ΐ(��:standard_500_50" 
+average_word_length	� �rh@"$
+potential_heading_score	        "
+sentence_count	      .@"$
+alphanumeric_percentage	�i�q���?"�
+punctuation_counts�*�
+
+"	      $@
+
+(	      ,@
+
+)	      ,@
+
+[	      �?
+
+;	      @
+
+,	      �?
+
+=	      @
+
+]	      �?
+
+-	      @
+
+.	      ,@
+
+/	      @"!
+uppercase_percentage		�^)˰?""
+whitespace_percentage	�k	��g�?"
+list_item_indicator  "
+
+word_count	     �]@"$
+average_sentence_length	��m4�w@"
+vocabulary_density	a2U0*��?"
+digit_percentage	�(��0�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	HP�s��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_60<�
+�ProcessRequest request = createProcessRequest (" binary - test ", " tika - step ", binaryDoc); ProcessResponse response = tikaClient. processData (request); long responseTime = System. currentTimeMillis () - startTime; return new BufferOverflowTestResult (testDescription, true, false, responseTime);} catch (StatusRuntimeException e) {long responseTime = System. currentTimeMillis () - startTime; return new BufferOverflowTestResult (testDescription, true, false, responseTime);} catch (Exception e@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_60 ��(ʚ:standard_500_50" 
+average_word_length	|a2U�@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	a��+e�?"�
+punctuation_counts�*�
+
+"	      @
+
+(	       @
+
+)	      @
+
+;	      @
+
+{	      �?
+
+,	       @
+
+=	      @
+
+-	      @
+
+}	       @
+
+.	      @"!
+uppercase_percentage	�s��?""
+whitespace_percentage	�w��#��?"
+list_item_indicator  "
+
+word_count	     �V@"$
+average_sentence_length	     �6@"
+vocabulary_density	���_vO�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	�$��C�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_61=�
+�false, responseTime);} catch (Exception e) {long responseTime = System. currentTimeMillis () - startTime; return new BufferOverflowTestResult (testDescription, false, true, responseTime);}} private BufferOverflowTestResult testDeeplyNestedStructureHandling () {String testDescription = " Deeply nested structure handling "; long startTime = System. currentTimeMillis (); try {// Create deeply nested JSON - like content StringBuilder nestedContent = new StringBuilder (); for (int i = 0; i < 1000; i@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_61 ��(��:standard_500_50" 
+average_word_length	      @"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	���N@�?"�
+punctuation_counts�*�
+
+"	       @
+
+(	      @
+
+)	      @
+
+;	       @
+
+{	      @
+
+,	      @
+
+<	      �?
+
+}	      @
+
+=	      @
+
+-	       @
+
+.	       @
+
+/	       @"!
+uppercase_percentage	����ׁ�?""
+whitespace_percentage	z�):�˿?"
+list_item_indicator  "
+
+word_count	      W@"$
+average_sentence_length	B>�٬�>@"
+vocabulary_density	E���JY�?"
+digit_percentage	{�G�z�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	���1��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_62>�
+�(); for (int i = 0; i < 1000; i ++) {nestedContent. append (" {\ " level "). append (i). append (" \ ": ");} nestedContent. append (" \ " deep _ value \ ""); for (int i = 0; i < 1000; i ++) {nestedContent. append ("} ");} PipeDoc nestedDoc = PipeDoc. newBuilder (). setId (" nested - test "). setTitle (" Nested structure test "). setBody (nestedContent. toString ()). build (); ProcessRequest request = createProcessRequest (" nested - test ", " chunker - step ", nestedDoc); ProcessResponse@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_62 ў(��:standard_500_50" 
+average_word_length	�B�i�q@"$
+potential_heading_score	�������?"
+sentence_count	      (@"$
+alphanumeric_percentage	��C�l��?"�
+punctuation_counts�*�
+
+"	      4@
+
+(	      .@
+
+)	      .@
+
++	      @
+
+,	       @
+
+-	      @
+
+.	      &@
+
+:	      �?
+
+;	      $@
+
+{	      @
+
+<	       @
+
+\	      @
+
+=	      @
+
+}	      @
+
+_	      �?"!
+uppercase_percentage	�,C��?""
+whitespace_percentage	.���1��?"
+list_item_indicator  "
+
+word_count	      b@"$
+average_sentence_length	      (@"
+vocabulary_density	      �?"
+digit_percentage	Dio��ɔ?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	%u��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_63?�
+�- step ", nestedDoc); ProcessResponse response = chunkerClient. processData (request); long responseTime = System. currentTimeMillis () - startTime; return new BufferOverflowTestResult (testDescription, true, false, responseTime);} catch (StatusRuntimeException e) {long responseTime = System. currentTimeMillis () - startTime; return new BufferOverflowTestResult (testDescription, true, false, responseTime);} catch (Exception e) {long responseTime = System. currentTimeMillis () - startTime; return@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_63 ˣ(��:standard_500_50" 
+average_word_length	гY���@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	F����x�?"�
+punctuation_counts�*�
+
+"	      �?
+
+(	       @
+
+)	      "@
+
+;	      @
+
+{	       @
+
+,	      @
+
+-	      @
+
+=	      @
+
+}	       @
+
+.	      @"!
+uppercase_percentage	;�O��n�?""
+whitespace_percentage	���S㥻?"
+list_item_indicator "
+
+word_count	     �V@"$
+average_sentence_length	3333332@"
+vocabulary_density	��QI���?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	���JY��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_64@�
+�() - startTime; return new BufferOverflowTestResult (testDescription, false, true, responseTime);}} private DataIntegrityResult testServiceDataIntegrity (PipeStepProcessorGrpc. PipeStepProcessorBlockingStub client, String serviceName) throws Exception {String testContent = " Data integrity test content for " + serviceName + " service. " + " This content should maintain its integrity during processing. "; // Calculate input hash MessageDigest md 5 = MessageDigest. getInstance (" MD 5 "); String@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_64 ��(��:standard_500_50" 
+average_word_length	���_v@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	������?"�
+punctuation_counts�*�
+
+"	       @
+
+(	      @
+
+)	      @
+
+;	      @
+
+{	      �?
+
++	      @
+
+,	      @
+
+-	      �?
+
+}	       @
+
+=	       @
+
+.	      @
+
+/	       @"!
+uppercase_percentage	]�Fx�?""
+whitespace_percentage	\���(\�?"
+list_item_indicator  "
+
+word_count	     �T@"$
+average_sentence_length	������0@"
+vocabulary_density	D�l����?"
+digit_percentage	����Mbp?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	m���{��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_65A�
+�= MessageDigest. getInstance (" MD 5 "); String inputHash = bytesToHex (md 5. digest (testContent. getBytes (StandardCharsets. UTF _ 8 ))); PipeDoc inputDoc = PipeDoc. newBuilder (). setId (" integrity - test - " + serviceName). setTitle (" Data integrity test "). setBody (testContent). build (); ProcessRequest request; if (" embedder ". equals (serviceName )) {request = createEmbedderProcessRequest (" integrity - test ", serviceName + " - step ", inputDoc);} else {request = createProcessRequest@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_65 �(��:standard_500_50" 
+average_word_length	�?�@"$
+potential_heading_score	�������?"
+sentence_count	      &@"$
+alphanumeric_percentage	`��"���?"�
+punctuation_counts�*�
+
+"	      (@
+
+(	      (@
+
+)	      (@
+
+;	      @
+
++	       @
+
+{	       @
+
+,	       @
+
+=	      @
+
+-	      @
+
+}	      �?
+
+.	      $@
+
+_	      �?"!
+uppercase_percentage	��~j�t�?""
+whitespace_percentage	㥛� ��?"
+list_item_indicator  "
+
+word_count	     �[@"$
+average_sentence_length	�i�q�.$@"
+vocabulary_density	ꕲq��?"
+digit_percentage	�~j�t�x?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	��^�?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_66B�
+�else {request = createProcessRequest (" integrity - test ", serviceName + " - step ", inputDoc);} ProcessResponse response = client. processData (request); if (! response. getSuccess ()) {return new DataIntegrityResult (false, false, true, inputHash, "");} String outputContent = response. getOutputDoc (). getBody (); String outputHash = bytesToHex (md 5. digest (outputContent. getBytes (StandardCharsets. UTF _ 8 ))); // For most services, content should be preserved exactly (except embedder@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_66 ��(۵:standard_500_50" 
+average_word_length	 �o_N@"$
+potential_heading_score	�������?"
+sentence_count	       @"$
+alphanumeric_percentage	$(~���?"�
+punctuation_counts�*�
+
+!	      �?
+
+"	      @
+
+(	      &@
+
+)	      $@
+
++	      �?
+
+,	      @
+
+-	       @
+
+.	      @
+
+/	       @
+
+{	       @
+
+;	      @
+
+=	      @
+
+}	       @
+
+_	      �?"!
+uppercase_percentage	�X�� �?""
+whitespace_percentage	io���T�?"
+list_item_indicator  "
+
+word_count	     @Z@"$
+average_sentence_length	     @*@"
+vocabulary_density	����H�?"
+digit_percentage	����Mbp?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	������?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_67C�
+�should be preserved exactly (except embedder which adds embeddings) boolean integrityMaintained = " embedder ". equals (serviceName) || outputContent. contains (testContent) || inputHash. equals (outputHash); boolean checksumValid = inputHash. equals (outputHash) || " embedder ". equals (serviceName); boolean dataCorrupted = outputContent. isEmpty () || outputContent. contains (" \ u 0000 "); return new DataIntegrityResult (integrityMaintained, checksumValid, dataCorrupted, inputHash, outputHash@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_67 ��(��:standard_500_50" 
+average_word_length	�H�}�@"$
+potential_heading_score	�������?"
+sentence_count	       @"$
+alphanumeric_percentage	���x�&�?"�
+punctuation_counts�*�
+
+"	      @
+
+(	      "@
+
+)	       @
+
+;	      @
+
+|	       @
+
+\	      �?
+
+,	      @
+
+=	      @
+
+.	      @"!
+uppercase_percentage	�I+��?""
+whitespace_percentage	V-��?"
+list_item_indicator  "
+
+word_count	     @V@"$
+average_sentence_length	     @&@"
+vocabulary_density	@a��+�?"
+digit_percentage	����Mb�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	K�46�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_68D�
+�, dataCorrupted, inputHash, outputHash);} private boolean containsSensitiveInformation (String text) {if (text == null) return false; String lowerText = text. toLowerCase (); // Check for various types of sensitive information return lowerText. contains (" password ") || lowerText. contains (" secret ") || lowerText. contains (" private key ") || lowerText. contains (" api key ") || lowerText. contains (" token ") || lowerText. contains (" credit card ") || lowerText. contains (" ssn ") ||@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_68 �(ƾ:standard_500_50" 
+average_word_length	��q��@"$
+potential_heading_score	        "
+sentence_count	      "@"$
+alphanumeric_percentage	y�&1��?"�
+punctuation_counts�*�
+
+"	      ,@
+
+(	      $@
+
+)	      &@
+
+;	      @
+
+{	      �?
+
+,	      @
+
+|	      ,@
+
+}	      �?
+
+=	      @
+
+.	       @
+
+/	       @"!
+uppercase_percentage	�&S��?""
+whitespace_percentage	"lxz�,�?"
+list_item_indicator  "
+
+word_count	     �[@"$
+average_sentence_length	�W�2�q(@"
+vocabulary_density	8gDio�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	�e��a��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_69E�
+�") || lowerText. contains (" ssn ") || lowerText. contains (" social security ") || lowerText. contains (" / etc / passwd ") || lowerText. contains (" c: \\ windows ") || lowerText. contains (" database ") || lowerText. contains (" connection string ") || lowerText. contains (" stack trace ") || lowerText. contains (" exception ") || lowerText. contains (" error at line ") || lowerText. contains (" file not found ") || lowerText. contains (" access denied ");} private String bytesToHex (byte []@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_69 ��(��:standard_500_50" 
+average_word_length	�?�
+@"$
+potential_heading_score	        "
+sentence_count	      (@"$
+alphanumeric_percentage	�A�f���?"�
+punctuation_counts�*�
+
+"	      7@
+
+(	      (@
+
+)	      (@
+
+:	      �?
+
+;	      �?
+
+[	      �?
+
+|	      6@
+
+\	       @
+
+}	      �?
+
+]	      �?
+
+.	      &@
+
+/	       @"!
+uppercase_percentage	�?Ɯ?""
+whitespace_percentage	�Y��ڊ�?"
+list_item_indicator  "
+
+word_count	      _@"$
+average_sentence_length	{�/L��$@"
+vocabulary_density	T㥛� �?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	�:M��?2�
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_70F�
+�");} private String bytesToHex (byte [] bytes) {StringBuilder result = new StringBuilder (); for (byte b: bytes) {result. append (String. format (" % 02 x ", b ));} return result. toString ();} private ProcessRequest createProcessRequest (String pipelineName, String stepName, PipeDoc document) {ServiceMetadata metadata = ServiceMetadata. newBuilder (). setPipelineName (pipelineName). setPipeStepName (stepName). setStreamId (" security - stream - " + System. currentTimeMillis ()).@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_70 ��(��:standard_500_50" 
+average_word_length	M�J�D@"$
+potential_heading_score	        "
+sentence_count	      "@"$
+alphanumeric_percentage	t�����?"�
+punctuation_counts�*�
+
+"	      @
+
+%	      �?
+
+(	      (@
+
+)	      *@
+
++	      �?
+
+,	      @
+
+-	       @
+
+.	      "@
+
+:	      �?
+
+;	      @
+
+[	      �?
+
+{	      @
+
+}	      @
+
+]	      �?
+
+=	       @"!
+uppercase_percentage	Έ����?""
+whitespace_percentage	T㥛� �?"
+list_item_indicator  "
+
+word_count	      Z@"$
+average_sentence_length	�Pk�w'@"
+vocabulary_density	��K7��?"
+digit_percentage		�^)�p?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @~@"
+relative_position	(��y�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_71G�
+�- " + System. currentTimeMillis ()). setCurrentHopNumber (1). build (); ProcessConfiguration config = ProcessConfiguration. newBuilder (). build (); return ProcessRequest. newBuilder (). setDocument (document). setConfig (config). setMetadata (metadata). build ();} private ProcessRequest createEmbedderProcessRequest (String pipelineName, String stepName, PipeDoc document) {ServiceMetadata metadata = ServiceMetadata. newBuilder (). setPipelineName (pipelineName). setPipeStepName (stepName).@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_71 ��(��:standard_500_50" 
+average_word_length	гY���@"$
+potential_heading_score	        "
+sentence_count	      ,@"$
+alphanumeric_percentage	����S�?"�
+punctuation_counts�*�
+
+"	      �?
+
+(	      ,@
+
+)	      .@
+
++	      �?
+
+;	      @
+
+{	      �?
+
+,	       @
+
+-	      �?
+
+=	       @
+
+}	      �?
+
+.	      ,@"!
+uppercase_percentage	#��~j��?""
+whitespace_percentage	��+e�?"
+list_item_indicator "
+
+word_count	     �V@"$
+average_sentence_length	      @"
+vocabulary_density	����Q�?"
+digit_percentage	����Mb`?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	ۊ�e���?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_72H�
+�. setPipeStepName (stepName). setStreamId (" security - stream - " + System. currentTimeMillis ()). setCurrentHopNumber (1). build (); Struct embedderConfig = Struct. newBuilder (). putFields (" embeddingModel ", Value. newBuilder (). setStringValue (" ALL _ MINILM _ L 6 _ V 2 "). build ()). putFields (" fieldsToEmbed ", Value. newBuilder (). setListValue (com. google. protobuf. ListValue. newBuilder (). addValues (Value. newBuilder (). setStringValue (" title "). build ()). addValues (Value.@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_72 ��(��:standard_500_50" 
+average_word_length	��3��@"$
+potential_heading_score	        "
+sentence_count	      7@"$
+alphanumeric_percentage	�	h"lx�?"�
+punctuation_counts�*�
+
+"	      $@
+
+(	      3@
+
+)	      0@
+
++	      �?
+
+;	      �?
+
+,	       @
+
+-	       @
+
+=	      �?
+
+.	      7@
+
+_	      @"!
+uppercase_percentage	�C�����?""
+whitespace_percentage	/n���?"
+list_item_indicator  "
+
+word_count	     �]@"$
+average_sentence_length	�s��@"
+vocabulary_density	������?"
+digit_percentage	�~j�t�x?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @"
+relative_position	p_�Q�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_73I�
+�. addValues (Value. newBuilder (). setStringValue (" body "). build ()). build ()). build ()). build (); ProcessConfiguration config = ProcessConfiguration. newBuilder (). setCustomJsonConfig (embedderConfig). build (); return ProcessRequest. newBuilder (). setDocument (document). setConfig (config). setMetadata (metadata). build ();} private PipeStepProcessorGrpc. PipeStepProcessorBlockingStub getClientForService (String serviceName) {switch (serviceName) {case " tika ": return tikaClient; case@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_73 ��(��:standard_500_50" 
+average_word_length	��g��@"$
+potential_heading_score	�������?"
+sentence_count	      1@"$
+alphanumeric_percentage	��� �r�?"�
+punctuation_counts�*�
+
+"	      @
+
+(	      1@
+
+)	      3@
+
+:	      �?
+
+;	      @
+
+{	       @
+
+=	      �?
+
+}	      �?
+
+.	      0@"!
+uppercase_percentage	;�O��n�?""
+whitespace_percentage	�A`��"�?"
+list_item_indicator  "
+
+word_count	     @Y@"$
+average_sentence_length	�����@"
+vocabulary_density	S�!�uq�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	#��~j��?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_74J�
+�case " tika ": return tikaClient; case " chunker ": return chunkerClient; case " embedder ": return embedderClient; case " echo ": return echoClient; default: throw new IllegalArgumentException (" Unknown service: " + serviceName);}} // Inner classes for test results private static class BufferOverflowTestResult {final String testDescription; final boolean handledGracefully; final boolean causedCrash; final long responseTime; BufferOverflowTestResult (String testDescription, boolean@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_74 ��(��:standard_500_50" 
+average_word_length	�A`��"@"$
+potential_heading_score	      �?"
+sentence_count	      �?"$
+alphanumeric_percentage	m������?"�
+punctuation_counts�*�
+
+"	      $@
+
+(	       @
+
+)	      �?
+
+:	      @
+
+;	      "@
+
++	      �?
+
+{	      �?
+
+,	      �?
+
+}	       @
+
+/	       @"!
+uppercase_percentage	Nё\�C�?""
+whitespace_percentage	q���h �?"
+list_item_indicator  "
+
+word_count	     @T@"$
+average_sentence_length	     @T@"
+vocabulary_density	��e��a�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     p~@"
+relative_position	���(�?2�
+
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_75K�
+�(String testDescription, boolean handledGracefully, boolean causedCrash, long responseTime) {this. testDescription = testDescription; this. handledGracefully = handledGracefully; this. causedCrash = causedCrash; this. responseTime = responseTime;}} private static class DataIntegrityResult {final boolean integrityMaintained; final boolean checksumValid; final boolean dataCorrupted; final String inputHash; final String outputHash; DataIntegrityResult (boolean integrityMaintained, boolean@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_75 ��(��:standard_500_50" 
+average_word_length	�1w-!_@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	^�I+�?"�
+punctuation_counts�*�
+
+(	       @
+
+)	      �?
+
+{	       @
+
+;	      "@
+
+,	      @
+
+=	      @
+
+}	       @
+
+.	      @"!
+uppercase_percentage	K�46�?""
+whitespace_percentage	�*��	�?"
+list_item_indicator  "
+
+word_count	     �Q@"$
+average_sentence_length	      ,@"
+vocabulary_density	i o���?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	k+��ݓ�?2�	
+@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_76L�
+�(boolean integrityMaintained, boolean checksumValid, boolean dataCorrupted, String inputHash, String outputHash) {this. integrityMaintained = integrityMaintained; this. checksumValid = checksumValid; this. dataCorrupted = dataCorrupted; this. inputHash = inputHash; this. outputHash = outputHash;}}} // END VARIATION 80 // Total size: 45299 characters@401408e0-633b-431f-9d2a-15336b412599_tika-input-doc-080_chunk_76 ��(��:standard_500_50" 
+average_word_length	�_vO�@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	>yX�5��?"�
+punctuation_counts�*�
+
+(	      �?
+
+)	      �?
+
+:	      �?
+
+{	      �?
+
+;	      @
+
+,	      @
+
+=	      @
+
+}	      @
+
+.	      @
+
+/	      @"!
+uppercase_percentage	���S�?""
+whitespace_percentage	$(~���?"
+list_item_indicator  "
+
+word_count	      M@"$
+average_sentence_length	�|гYU#@"
+vocabulary_density	/�$���?"
+digit_percentage	8��d�`�?"
+is_last_chunk "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �u@"
+relative_position	      �?
