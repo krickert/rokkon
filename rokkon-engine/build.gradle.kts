@@ -37,7 +37,8 @@ dependencies {
     implementation("com.rokkon.pipeline:engine-models:1.0.0-SNAPSHOT")
     
     // Proto definitions
-    implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
     
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.quarkus:quarkus-junit5-mockito")
@@ -76,16 +77,11 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-// Extract proto files from jar
-val extractProtos = tasks.register<Copy>("extractProtos") {
-    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("proto-definitions") }.singleFile))
-    include("**/*.proto")
-    into("src/main/proto")
-    includeEmptyDirs = false
-}
-
-tasks.named("quarkusGenerateCode") {
-    dependsOn(extractProtos)
+// Configure Quarkus to use Mutiny for gRPC code generation
+quarkus {
+    buildForkOptions {
+        systemProperty("quarkus.grpc.codegen.type", "mutiny")
+    }
 }
 
 // Integration test source set is already configured by Quarkus

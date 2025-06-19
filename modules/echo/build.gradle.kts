@@ -15,7 +15,8 @@ dependencies {
     implementation(libs.quarkus.grpc)
     implementation("io.quarkus:quarkus-config-yaml")
     implementation("io.quarkus:quarkus-arc")
-    implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
     testImplementation(libs.quarkus.junit5)
     testImplementation(libs.assertj)
     testImplementation("io.rest-assured:rest-assured")
@@ -30,14 +31,18 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
+quarkus {
+    buildForkOptions {
+        systemProperty("quarkus.grpc.codegen.type", "mutiny")
+    }
+}
+
 
 publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
-            groupId = project.group.toString()
-            artifactId = project.name
-            version = project.version.toString()
+            artifactId = "echo-module"
         }
     }
 }

@@ -56,6 +56,12 @@ public class EmbedderComprehensiveTest {
         testDataHelper.getChunkerPipeDocuments().forEach(chunkedDocuments::add);
         LOG.info("Loaded {} chunked documents for embedding", chunkedDocuments.size());
         
+        // Verify we have documents
+        if (chunkedDocuments.isEmpty()) {
+            LOG.error("No chunker documents were loaded! Check ProtobufTestDataHelper.");
+            throw new AssertionError("No chunker documents were loaded");
+        }
+        
         LOG.info("\n=== Testing Model 1: nomic-ai/nomic-embed-text-v1.5 (768 dimensions) ===");
         
         Path outputDir = Paths.get("build/test-data/embedder/output-nomic");

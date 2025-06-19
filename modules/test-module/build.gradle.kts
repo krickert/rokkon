@@ -14,19 +14,20 @@ val quarkusPlatformArtifactId: String by project
 val quarkusPlatformVersion: String by project
 
 dependencies {
-    implementation("io.quarkus:quarkus-jackson")
-    implementation(enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}"))
-    implementation("io.quarkus:quarkus-smallrye-health")
     implementation("io.quarkus:quarkus-container-image-docker")
-    implementation("io.quarkus:quarkus-smallrye-openapi")
+    implementation(enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}"))
     implementation("io.quarkus:quarkus-grpc")
     implementation("io.quarkus:quarkus-config-yaml")
-    implementation("io.quarkus:quarkus-micrometer")
     implementation("io.quarkus:quarkus-arc")
+    implementation("io.quarkus:quarkus-jackson")
+    implementation("io.quarkus:quarkus-smallrye-health")
+    implementation("io.quarkus:quarkus-smallrye-openapi")
+    implementation("io.quarkus:quarkus-micrometer")
     implementation("io.grpc:grpc-services:1.58.0")
-
+    
     // Proto definitions from shared project
-    implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
     
     // Engine modules for Consul integration
     implementation("com.rokkon.pipeline:engine-consul:1.0.0-SNAPSHOT")
@@ -53,6 +54,12 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
+quarkus {
+    buildForkOptions {
+        systemProperty("quarkus.grpc.codegen.type", "mutiny")
+    }
+}
+
 // Exclude integration tests from regular test task (like reference implementation)
 tasks.test {
     exclude("**/*IT.class")
@@ -64,4 +71,13 @@ tasks.withType<Test> {
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+            artifactId = "test-module"
+        }
+    }
 }

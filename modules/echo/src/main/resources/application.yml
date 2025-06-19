@@ -6,8 +6,11 @@ quarkus:
       port: 49090
       host: 0.0.0.0
       enable-reflection-service: true
+      max-inbound-message-size: 1073741824  # 1GB
+      max-outbound-message-size: 1073741824  # 1GB for responses
     clients:
-      # Add gRPC client configurations here if needed
+      echoService:
+        max-inbound-message-size: 1073741824  # 1GB
   log:
     level: INFO
     category:
@@ -30,3 +33,7 @@ quarkus:
     grpc:
       server:
         port: 0  # Use random port for tests
+        max-inbound-message-size: 1073741824  # 1GB for tests
+      clients:
+        echoService:
+          max-inbound-message-size: 1073741824  # 1GB

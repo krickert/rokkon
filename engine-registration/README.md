@@ -1,83 +1,190 @@
-# engine-registration
+# Engine Registration
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+## Overview
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+The Engine Registration module implements the `ModuleRegistrationService` gRPC service that handles module registration for the Rokkon Engine. This service runs as part of the main engine but is maintained as a separate module for clarity and modularity.
 
-## Running the application in dev mode
+## Architecture
 
-You can run your application in dev mode that enables live coding using:
+This module provides:
+- gRPC service implementation for module registration
+- Module validation logic and whitelisting
+- Integration with engine-consul for Consul writes
+- Module health verification via `RegistrationCheck` RPC
 
-```shell script
-./gradlew quarkusDev
+## Core Service: ModuleRegistrationService
+
+```proto
+service ModuleRegistration {
+  // Register a module with the engine
+  rpc RegisterModule(ModuleInfo) returns (RegistrationStatus);
+  
+  // Unregister a module
+  rpc UnregisterModule(ModuleId) returns (UnregistrationStatus);
+  
+  // Heartbeat from module to engine
+  rpc Heartbeat(ModuleHeartbeat) returns (HeartbeatAck);
+  
+  // Get health status of a specific module
+  rpc GetModuleHealth(ModuleId) returns (ModuleHealthStatus);
+  
+  // List all registered modules
+  rpc ListModules(google.protobuf.Empty) returns (ModuleList);
+}
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+## Registration Flow
 
-## Packaging and running the application
+1. **Receive Registration Request**
+   - CLI tool (running in module container) calls `RegisterModule`
+   - Request includes module metadata, host/port info
 
-The application can be packaged using:
+2. **Validate Module**
+   - Check module name against whitelist
+   - Allowed modules: `echo`, `chunker`, `parser`, `embedder`, `opensearch-sink`
+   - Verify required fields are present
 
-```shell script
-./gradlew build
+3. **Health Check**
+   - Connect to module's gRPC endpoint
+   - Perform standard gRPC health check
+   - Call module's `RegistrationCheck` RPC with test data
+
+4. **Register with Consul**
+   - Call engine-consul service to write to Consul
+   - Never write to Consul directly
+   - Include gRPC health check configuration
+
+5. **Return Status**
+   - Success with Consul service ID
+   - Or failure with detailed error message
+
+## Module Validation
+
+### Whitelist Enforcement
+```java
+private static final Set<String> WHITELISTED_MODULES = Set.of(
+    "echo",
+    "chunker", 
+    "parser",
+    "embedder",
+    "opensearch-sink"
+);
 ```
 
-It produces the `quarkus-run.jar` file in the `build/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `build/quarkus-app/lib/` directory.
+### RegistrationCheck Validation
+- Creates a test `ProcessRequest` with minimal data
+- Calls module's `RegistrationCheck` RPC
+- Expects successful `ProcessResponse`
+- Verifies module can handle basic requests
 
-The application is now runnable using `java -jar build/quarkus-app/quarkus-run.jar`.
+## Integration with Engine-Consul
 
-If you want to build an _über-jar_, execute the following command:
+All Consul operations go through engine-consul:
+```java
+@Inject
+ConsulRegistrationService consulService;
 
-```shell script
-./gradlew build -Dquarkus.package.jar.type=uber-jar
+// Register module in Consul
+ConsulServiceRegistration registration = ConsulServiceRegistration.builder()
+    .name(moduleInfo.getServiceName())
+    .id(moduleInfo.getServiceId())
+    .address(moduleInfo.getHost())
+    .port(moduleInfo.getPort())
+    .check(ConsulHealthCheck.grpc(
+        moduleInfo.getHost() + ":" + moduleInfo.getPort(),
+        "10s"
+    ))
+    .build();
+
+consulService.registerService(registration);
 ```
 
-The application, packaged as an _über-jar_, is now runnable using `java -jar build/*-runner.jar`.
+## Configuration
 
-## Creating a native executable
+### application.yml
+```yaml
+quarkus:
+  grpc:
+    server:
+      port: 9099  # gRPC port for registration service
+    clients:
+      engine-consul:
+        host: localhost
+        port: 9098  # engine-consul gRPC port
 
-You can create a native executable using:
-
-```shell script
-./gradlew build -Dquarkus.native.enabled=true
+registration:
+  validation:
+    enabled: true
+    whitelist: ${REGISTRATION_WHITELIST:echo,chunker,parser,embedder,opensearch-sink}
+  health-check:
+    timeout: 5s
+    test-data-size: 1024  # bytes for test document
 ```
 
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
+## Error Handling
 
-```shell script
-./gradlew build -Dquarkus.native.enabled=true -Dquarkus.native.container-build=true
+### Registration Failures
+- Module not in whitelist → `PERMISSION_DENIED`
+- Health check failed → `UNAVAILABLE`
+- RegistrationCheck failed → `FAILED_PRECONDITION`
+- Consul write failed → `INTERNAL`
+
+### Retry Logic
+- Health checks: 3 retries with exponential backoff
+- Consul writes: Handled by engine-consul with CAS logic
+
+## Testing
+
+### Unit Tests
+- Mock Consul service
+- Test whitelist validation
+- Test error scenarios
+
+### Integration Tests
+- Use test-module for end-to-end flow
+- Verify Consul registration
+- Test health check integration
+
+## API Usage Example
+
+### From CLI Tool
+```java
+// Inside module container
+ManagedChannel channel = ManagedChannelBuilder
+    .forAddress(engineHost, enginePort)
+    .usePlaintext()
+    .build();
+
+ModuleRegistrationGrpc.ModuleRegistrationBlockingStub stub = 
+    ModuleRegistrationGrpc.newBlockingStub(channel);
+
+ModuleInfo moduleInfo = ModuleInfo.newBuilder()
+    .setServiceName("chunker")
+    .setServiceId("chunker-" + UUID.randomUUID())
+    .setHost(containerHostname)
+    .setPort(9090)
+    .putMetadata("version", "1.0.0")
+    .build();
+
+RegistrationStatus status = stub.registerModule(moduleInfo);
 ```
 
-You can then execute your native executable with: `./build/engine-registration-1.0.0-SNAPSHOT-runner`
+## Monitoring
 
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/gradle-tooling>.
+### Metrics
+- `module_registrations_total` - Counter of registration attempts
+- `module_registration_duration_seconds` - Histogram of registration time
+- `active_modules` - Gauge of currently registered modules
 
-## Related Guides
+### Logging
+- INFO: Successful registrations
+- WARN: Validation failures
+- ERROR: System failures (Consul, network)
 
-- REST Jackson ([guide](https://quarkus.io/guides/rest#json-serialisation)): Jackson serialization support for Quarkus REST. This extension is not compatible with the quarkus-resteasy extension, or any of the extensions that depend on it
-- SmallRye Fault Tolerance ([guide](https://quarkus.io/guides/smallrye-fault-tolerance)): Build fault-tolerant network services
-- YAML Configuration ([guide](https://quarkus.io/guides/config-yaml)): Use YAML to configure your Quarkus application
-- REST Client ([guide](https://quarkus.io/guides/rest-client)): Call REST services
+## Future Enhancements
 
-## Provided Code
-
-### YAML Config
-
-Configure your application with YAML
-
-[Related guide section...](https://quarkus.io/guides/config-reference#configuration-examples)
-
-The Quarkus application configuration is located in `src/main/resources/application.yml`.
-
-### REST Client
-
-Invoke different services through REST with JSON
-
-[Related guide section...](https://quarkus.io/guides/rest-client)
-
-### REST
-
-Easily start your REST Web Services
-
-[Related guide section...](https://quarkus.io/guides/getting-started-reactive#reactive-jax-rs-resources)
+- [ ] Module capability discovery
+- [ ] Version compatibility checks
+- [ ] Resource requirement validation
+- [ ] Module dependency resolution
+- [ ] Automatic re-registration on failure

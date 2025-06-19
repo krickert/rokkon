@@ -16,9 +16,6 @@ dependencies {
     implementation("io.quarkus:quarkus-config-yaml")
     implementation("io.quarkus:quarkus-arc")
     implementation("io.quarkus:quarkus-jackson")
-    implementation("io.quarkus:quarkus-smallrye-health")
-    implementation("io.quarkus:quarkus-logging-json")
-    implementation("io.grpc:grpc-services")
     implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
     implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
 
@@ -35,8 +32,7 @@ dependencies {
     // Apache Commons for utilities
     implementation("org.apache.commons:commons-lang3:3.12.0")
 
-    // Jackson for JSON processing
-    implementation("com.fasterxml.jackson.core:jackson-databind:2.16.1")
+    // Jackson is provided by quarkus-jackson
 
     testImplementation(libs.quarkus.junit5)
     testImplementation(libs.assertj)
@@ -64,9 +60,7 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
-            groupId = project.group.toString()
-            artifactId = project.name
-            version = project.version.toString()
+            artifactId = "embedder-module"
         }
     }
 }

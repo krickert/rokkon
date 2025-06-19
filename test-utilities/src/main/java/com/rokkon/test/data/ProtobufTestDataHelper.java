@@ -931,6 +931,20 @@ public class ProtobufTestDataHelper {
                     }
                 }
             }
+        } else if (directory.contains("chunker-pipe-docs")) {
+            // Try to load chunker output files with known naming pattern
+            for (int i = 0; i < 200; i++) {
+                String filename = String.format("chunker_output_%03d.%s", i, fileExtension);
+                T message = loadFromClasspath(directory + "/" + filename, parser);
+                if (message != null) {
+                    messages.add(message);
+                } else {
+                    // If we fail to load a file in sequence, try a few more before giving up
+                    if (i > 10 && messages.isEmpty()) {
+                        break;
+                    }
+                }
+            }
         }
         // Add more patterns as needed for other directories
         

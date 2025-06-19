@@ -30,7 +30,8 @@ dependencies {
     implementation("io.grpc:grpc-services")
     
     // Proto definitions from shared project
-    implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
     
     // Engine validators for schema validation
     implementation("com.rokkon.pipeline:engine-validators:1.0.0-SNAPSHOT")
@@ -50,16 +51,11 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-// Extract proto files from jar for gRPC client stubs
-val extractProtos = tasks.register<Copy>("extractProtos") {
-    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("proto-definitions") }.singleFile))
-    include("**/*.proto")
-    into("src/main/proto")
-    includeEmptyDirs = false
-}
-
-tasks.named("quarkusGenerateCode") {
-    dependsOn(extractProtos)
+// Configure Quarkus to use Mutiny for gRPC code generation
+quarkus {
+    buildForkOptions {
+        systemProperty("quarkus.grpc.codegen.type", "mutiny")
+    }
 }
 
 
@@ -70,4 +66,13 @@ tasks.withType<Test> {
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
+}
+
+publishing {
+    publications {
+        create<MavenPublication>("maven") {
+            from(components["java"])
+            artifactId = "engine-registration"
+        }
+    }
 }

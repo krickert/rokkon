@@ -3,7 +3,7 @@ quarkus:
     name: embedder-module
   grpc:
     server:
-      port: 49091  # Different port from echo module
+      port: 49093  # Different port from parser (49091) and chunker (49092)
       host: 0.0.0.0
       enable-reflection-service: true
       max-inbound-message-size: 1073741824  # 1GB

@@ -9,7 +9,11 @@ pluginManagement {
 
 rootProject.name = "rokkon-engine-workspace"
 
-includeBuild("proto-definitions") // This build uses its OWN settings.gradle.kts
+// Core protobuf and common libraries
+includeBuild("rokkon-protobuf")
+includeBuild("rokkon-commons")
+
+// Test utilities
 includeBuild("test-utilities")
 includeBuild("engine-models")
 includeBuild("engine-validators")
