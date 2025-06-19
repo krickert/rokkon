@@ -1,74 +1,219 @@
-# parser
+# Parser Module
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+## Overview
+The Parser module is a document parsing service for the Rokkon Engine pipeline. It extracts structured content from raw documents using Apache Tika, converting various file formats into standardized text and metadata for downstream processing.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+## Architecture
 
-## Running the application in dev mode
+### Service Implementation
+- **gRPC Service**: Implements `PipeStepProcessor` interface
+- **Port**: 49091
+- **Main Class**: `ParserServiceImpl`
 
-You can run your application in dev mode that enables live coding using:
+### Core Functionality
+1. **Document Parsing**
+   - Extracts text content from various document formats (PDF, DOCX, TXT, HTML, etc.)
+   - Preserves document metadata (author, creation date, etc.)
+   - Handles encoding detection automatically
+   - Supports over 1000 file formats via Apache Tika
 
-```shell script
+2. **Metadata Extraction**
+   - Document properties (title, author, keywords)
+   - Creation and modification timestamps
+   - Content type detection
+   - Language detection
+
+3. **Error Handling**
+   - Graceful fallback for unsupported formats
+   - Detailed error logging
+   - Maintains pipeline flow even on parsing failures
+
+## Container Deployment
+
+### Docker Structure
+```
+parser-container/
+├── parser-service (this module)
+├── rokkon-cli (registration tool)
+└── docker-entrypoint.sh
+```
+
+### Registration Flow
+1. Container starts parser service on port 49091
+2. CLI tool connects to localhost:49091
+3. Calls `GetServiceRegistration()` to get module info
+4. Registers with Rokkon Engine's ModuleRegistrationService
+5. Engine validates via `RegistrationCheck()` with test document
+6. Engine registers service in Consul with gRPC health checks
+
+### Example docker-entrypoint.sh
+```bash
+#!/bin/bash
+# Start the parser service
+java -jar /app/parser-service.jar &
+
+# Wait for service to be ready
+while ! grpc_health_probe -addr=localhost:49091 2>/dev/null; do
+  echo "Waiting for parser service..."
+  sleep 1
+done
+
+# Register with engine
+rokkon-cli register \
+  --module-port=49091 \
+  --engine-host=${ENGINE_HOST} \
+  --engine-port=${ENGINE_PORT}
+
+# Keep container running
+wait
+```
+
+## Configuration
+
+### application.yml
+```yaml
+quarkus:
+  application:
+    name: parser
+  grpc:
+    server:
+      port: 49091
+      host: 0.0.0.0
+      enable-reflection-service: true
+      max-inbound-message-size: 1073741824  # 1GB
+  tika:
+    # Tika configuration
+    parse-timeout: 300000  # 5 minutes
+    detect-timeout: 60000  # 1 minute
+```
+
+## Development
+
+### Building
+```bash
+# Standard build
+./gradlew build
+
+# Build with tests
+./gradlew build test
+
+# Build Docker image
+./gradlew build -Dquarkus.container-image.build=true
+```
+
+### Testing
+```bash
+# Run unit tests
+./gradlew test
+
+# Run integration tests
+./gradlew quarkusIntTest
+
+# Run in dev mode with live reload
 ./gradlew quarkusDev
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+### Local Development
+```bash
+# Start in dev mode
+./gradlew quarkusDev
 
-## Packaging and running the application
-
-The application can be packaged using:
-
-```shell script
-./gradlew build
+# Test with grpcurl
+grpcurl -plaintext localhost:49091 list
+grpcurl -plaintext localhost:49091 com.rokkon.PipeStepProcessor/GetServiceRegistration
 ```
 
-It produces the `quarkus-run.jar` file in the `build/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `build/quarkus-app/lib/` directory.
+## Integration with Pipeline
 
-The application is now runnable using `java -jar build/quarkus-app/quarkus-run.jar`.
+### Input Format
+Receives `ProcessRequest` with:
+- Raw document bytes in `Document.content`
+- Document metadata (source, timestamp, etc.)
+- Pipeline context
 
-If you want to build an _über-jar_, execute the following command:
+### Output Format
+Returns `ProcessResponse` with:
+- Parsed text in `Document.extractedText`
+- Updated metadata including detected properties
+- Processing logs for debugging
 
-```shell script
-./gradlew build -Dquarkus.package.jar.type=uber-jar
+### Example Usage
+```java
+// From previous pipeline step
+Document rawDoc = Document.newBuilder()
+    .setId("doc-123")
+    .setContent(ByteString.copyFrom(pdfBytes))
+    .setSource("uploads/report.pdf")
+    .build();
+
+ProcessRequest request = ProcessRequest.newBuilder()
+    .setDocument(rawDoc)
+    .setPipelineId("pipeline-1")
+    .build();
+
+// Parser processes and returns
+ProcessResponse response = parserService.processData(request).await();
+Document parsedDoc = response.getOutputDoc();
+String extractedText = parsedDoc.getExtractedText();
 ```
 
-The application, packaged as an _über-jar_, is now runnable using `java -jar build/*-runner.jar`.
+## Health Checks
 
-## Creating a native executable
+The module exposes standard gRPC health check endpoints:
+- Overall service health: `/grpc.health.v1.Health/Check`
+- Watch health changes: `/grpc.health.v1.Health/Watch`
 
-You can create a native executable using:
+Consul monitors these endpoints every 10 seconds to maintain service availability.
 
-```shell script
-./gradlew build -Dquarkus.native.enabled=true
+## Troubleshooting
+
+### Common Issues
+
+1. **Out of Memory on Large Documents**
+   - Increase heap size: `-Xmx2g`
+   - Configure Tika streaming for large files
+   - Implement document size limits
+
+2. **Parsing Timeouts**
+   - Adjust `tika.parse-timeout` in configuration
+   - Check for corrupted input files
+   - Monitor CPU usage during parsing
+
+3. **Unsupported Format**
+   - Check Tika logs for format detection
+   - Verify file isn't corrupted
+   - Consider custom parser implementation
+
+### Debug Logging
+```yaml
+quarkus:
+  log:
+    category:
+      "com.rokkon.parser":
+        level: DEBUG
+      "org.apache.tika":
+        level: DEBUG
 ```
 
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
+## Dependencies
+- Quarkus gRPC
+- Apache Tika
+- Rokkon Protobuf definitions
+- Rokkon Commons utilities
 
-```shell script
-./gradlew build -Dquarkus.native.enabled=true -Dquarkus.native.container-build=true
-```
+## Performance Considerations
 
-You can then execute your native executable with: `./build/parser-1.0.0-SNAPSHOT-runner`
+1. **Memory Usage**
+   - Tika can be memory intensive for large documents
+   - Configure appropriate heap sizes
+   - Use streaming for documents over 100MB
 
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/gradle-tooling>.
+2. **CPU Usage**
+   - OCR operations are CPU intensive
+   - Complex formats (PDF) require more processing
+   - Consider horizontal scaling for high throughput
 
-## Related Guides
-
-- YAML Configuration ([guide](https://quarkus.io/guides/config-yaml)): Use YAML to configure your Quarkus application
-
-## Provided Code
-
-### YAML Config
-
-Configure your application with YAML
-
-[Related guide section...](https://quarkus.io/guides/config-reference#configuration-examples)
-
-The Quarkus application configuration is located in `src/main/resources/application.yml`.
-
-### gRPC
-
-Create your first gRPC service
-
-[Related guide section...](https://quarkus.io/guides/grpc-getting-started)
+3. **Optimization Tips**
+   - Pre-filter by content type if possible
+   - Implement caching for repeated documents
+   - Use Tika's SAX parser for better streaming
