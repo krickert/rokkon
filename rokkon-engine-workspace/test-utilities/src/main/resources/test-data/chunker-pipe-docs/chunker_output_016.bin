@@ -1,0 +1,1625 @@
+
+tika-input-doc-018*��source-code/PipelineConfigService.java source-code/PipelineConfigService.javapackage com.rokkon.search.config.pipeline.service; import com.fasterxml.jackson.core.JsonProcessingException; import com.fasterxml.jackson.databind.JsonNode; import com.fasterxml.jackson.databind.ObjectMapper; import com.fasterxml.jackson.databind.node.ObjectNode; import com.rokkon.search.config.pipeline.model.*; import com.rokkon.search.config.pipeline.service.events.ConfigChangeEvent; import com.rokkon.search.config.pipeline.service.validation.ValidationResult; import io.quarkus.runtime.annotations.RegisterForReflection; import org.slf4j.Logger; import org.slf4j.LoggerFactory; import jakarta.enterprise.context.ApplicationScoped; import jakarta.enterprise.event.Event; import jakarta.inject.Inject; import java.net.URI; import java.net.http.HttpClient; import java.net.http.HttpRequest; import java.net.http.HttpResponse; import java.nio.charset.StandardCharsets; import java.security.MessageDigest; import java.security.NoSuchAlgorithmException; import java.time.Duration; import java.util.*; import java.util.concurrent.CompletableFuture; import java.util.concurrent.CompletionStage; /**  * Main service for CRUD operations on pipeline configurations.  * Implements per-pipeline storage in Consul with comprehensive validation.  */ @ApplicationScoped @RegisterForReflection public class PipelineConfigService {          private static final Logger LOG = LoggerFactory.getLogger(PipelineConfigService.class);          private final ObjectMapper objectMapper;     private final ConfigValidationService validationService;     private final SchemaValidationService schemaValidationService;     private final Event<ConfigChangeEvent> configChangeEvent;     private final HttpClient httpClient;          // Consul configuration     private final String consulHost;     private final String consulPort;     private final String consulBaseUrl;          @Inject     public PipelineConfigService(             ObjectMapper objectMapper,             ConfigValidationService validationService,             SchemaValidationService schemaValidationService,             Event<ConfigChangeEvent> configChangeEvent,             @org.eclipse.microprofile.config.inject.ConfigProperty(name = "quarkus.consul-config.agent.host-port")              Optional<String> consulConfig) {                  this.objectMapper = objectMapper;         this.validationService = validationService;         this.schemaValidationService = schemaValidationService;         this.configChangeEvent = configChangeEvent;         this.httpClient = HttpClient.newBuilder()                 .connectTimeout(Duration.ofSeconds(10))                 .build();                  // Parse Consul configuration         if (consulConfig.isPresent()) {             String[] hostPort = consulConfig.get().split(":");             this.consulHost = hostPort[0];             this.consulPort = hostPort.length > 1 ? hostPort[1] : "8500";         } else {             this.consulHost = "localhost";             this.consulPort = "8500";         }         this.consulBaseUrl = "http://" + consulHost + ":" + consulPort;                  LOG.info("PipelineConfigService initialized with Consul at: {}", consulBaseUrl);     }          /**      * Creates a new pipeline in the specified cluster.      */     public CompletionStage<ValidationResult> createPipeline(String clusterName, String pipelineId,                                                             PipelineConfig config, String initiatedBy) {         LOG.info("Creating pipeline '{}' in cluster '{}'", pipelineId, clusterName);                  return validatePipelineForCreation(clusterName, pipelineId, config)                 .thenCompose(validationResult -> {                     if (!validationResult.valid()) {                         return CompletableFuture.completedFuture(validationResult);                     }                                          return storePipelineInConsul(clusterName, pipelineId, config)                             .thenApply(success -> {                                 if (success) {                                     // Fire creation event                                     configChangeEvent.fire(ConfigChangeEvent.pipelineCreated(                                             clusterName, pipelineId, config, initiatedBy));                                                                          LOG.info("Successfully created pipeline '{}' in cluster '{}'", pipelineId, clusterName);                                     return ValidationResult.success();                                 } else {                                     return ValidationResult.failure("Failed to store pipeline in Consul");                                 }                             });                 });     }          /**      * Updates an existing pipeline.      */     public CompletionStage<ValidationResult> updatePipeline(String clusterName, String pipelineId,                                                            PipelineConfig newConfig, String initiatedBy) {         LOG.info("Updating pipeline '{}' in cluster '{}'", pipelineId, clusterName);                  return getPipeline(clusterName, pipelineId)                 .thenCompose(oldConfig -> {                     if (oldConfig.isEmpty()) {                         return CompletableFuture.completedFuture(                                 ValidationResult.failure("Pipeline '" + pipelineId + "' not found"));                     }                                          return validatePipelineForUpdate(clusterName, pipelineId, newConfig, oldConfig.get())                             .thenCompose(validationResult -> {                                 if (!validationResult.valid()) {                                     return CompletableFuture.completedFuture(validationResult);                                 }                                                                  return storePipelineInConsul(clusterName, pipelineId, newConfig)                                         .thenApply(success -> {                                             if (success) {                                                 // Fire update event                                                 configChangeEvent.fire(ConfigChangeEvent.pipelineUpdated(                                                         clusterName, pipelineId, newConfig, oldConfig.get(), initiatedBy));                                                                                                  LOG.info("Successfully updated pipeline '{}' in cluster '{}'", pipelineId, clusterName);                                                 return ValidationResult.success();                                             } else {                                                 return ValidationResult.failure("Failed to update pipeline in Consul");                                             }                                         });                             });                 });     }          /**      * Deletes a pipeline.      */     public CompletionStage<ValidationResult> deletePipeline(String clusterName, String pipelineId, String initiatedBy) {         LOG.info("Deleting pipeline '{}' from cluster '{}'", pipelineId, clusterName);                  return getPipeline(clusterName, pipelineId)                 .thenCompose(oldConfig -> {                     if (oldConfig.isEmpty()) {                         return CompletableFuture.completedFuture(                                 ValidationResult.failure("Pipeline '" + pipelineId + "' not found"));                     }                                          return deletePipelineFromConsul(clusterName, pipelineId)                             .thenApply(success -> {                                 if (success) {                                     // Fire deletion event                                     configChangeEvent.fire(ConfigChangeEvent.pipelineDeleted(                                             clusterName, pipelineId, oldConfig.get(), initiatedBy));                                                                          LOG.info("Successfully deleted pipeline '{}' from cluster '{}'", pipelineId, clusterName);                                     return ValidationResult.success();                                 } else {                                     return ValidationResult.failure("Failed to delete pipeline from Consul");                                 }                             });                 });     }          /**      * Gets a pipeline configuration.      */     public CompletionStage<Optional<PipelineConfig>> getPipeline(String clusterName, String pipelineId) {         return retrievePipelineFromConsul(clusterName, pipelineId);     }          /**      * Lists all pipelines in a cluster.      */     public CompletionStage<Map<String, PipelineConfig>> listPipelines(String clusterName) {         return listPipelinesFromConsul(clusterName);     }          /**      * Analyzes the impact of deleting a pipeline or module.      */     public CompletionStage<DependencyImpactAnalysis> analyzeDeletionImpact(String clusterName, String targetId,                                                                             DependencyType targetType) {         LOG.info("Analyzing deletion impact for {} '{}' in cluster '{}'", targetType, targetId, clusterName);                  return listPipelines(clusterName)                 .thenApply(pipelines -> {                     List<String> affectedPipelines = new ArrayList<>();                     List<String> orphanedTopics = new ArrayList<>();                     List<String> orphanedServices = new ArrayList<>();                                          for (var entry : pipelines.entrySet()) {                         String pipelineId = entry.getKey();                         PipelineConfig pipeline = entry.getValue();                                                  if (targetType == DependencyType.PIPELINE && targetId.equals(pipelineId)) {                             continue; // Skip the target pipeline itself                         }                                                  boolean isAffected = checkPipelineAffectedByDeletion(pipeline, targetId, targetType);                         if (isAffected) {                             affectedPipelines.add(pipelineId);                         }                     }                                          return new DependencyImpactAnalysis(                             targetId,                             targetType,                             affectedPipelines,                             orphanedTopics,                             orphanedServices,                             affectedPipelines.isEmpty()                     );                 });     }          /**      * Canonicalizes JSON for consistent ordering and hashing.      * Based on the pattern from the old ConsulModuleRegistrationService.      */     public String canonicalizeJson(String jsonString) throws JsonProcessingException {         JsonNode node = objectMapper.readTree(jsonString);         return canonicalizeJsonNode(node);     }          private String canonicalizeJsonNode(JsonNode node) throws JsonProcessingException {         if (node.isObject()) {             ObjectNode sortedNode = objectMapper.createObjectNode();             List<String> fieldNames = new ArrayList<>();             node.fieldNames().forEachRemaining(fieldNames::add);             Collections.sort(fieldNames);                          for (String fieldName : fieldNames) {                 JsonNode childNode = node.get(fieldName);                 if (childNode.isObject() || childNode.isArray()) {                     sortedNode.set(fieldName, objectMapper.readTree(canonicalizeJsonNode(childNode)));                 } else {                     sortedNode.set(fieldName, childNode);                 }             }             return objectMapper.writeValueAsString(sortedNode);         }                  return objectMapper.writeValueAsString(node);     }          /**      * Generates an MD5 digest for configuration versioning.      */     public String generateConfigDigest(String configJson) throws NoSuchAlgorithmException {         MessageDigest md = MessageDigest.getInstance("MD5");         byte[] digest = md.digest(configJson.getBytes(StandardCharsets.UTF_8));         return Base64.getEncoder().encodeToString(digest);     }          // Private helper methods          private CompletionStage<ValidationResult> validatePipelineForCreation(String clusterName, String pipelineId,                                                                           PipelineConfig config) {         return validationService.validatePipelineStructure(pipelineId, config)                 .thenCompose(structuralResult -> {                     if (!structuralResult.valid()) {                         return CompletableFuture.completedFuture(structuralResult);                     }                                          // JSON Schema validation                     try {                         String configJson = objectMapper.writeValueAsString(config);                         return schemaValidationService.validatePipelineStepConfig(configJson)                                 .thenApply(schemaResult -> structuralResult.combine(schemaResult));                     } catch (JsonProcessingException e) {                         return CompletableFuture.completedFuture(                                 ValidationResult.failure("Failed to serialize pipeline config: " + e.getMessage()));                     }                 });     }          private CompletionStage<ValidationResult> validatePipelineForUpdate(String clusterName, String pipelineId,                                                                        PipelineConfig newConfig, PipelineConfig oldConfig) {         // Same validation as creation for now, but could add update-specific checks         return validatePipelineForCreation(clusterName, pipelineId, newConfig);     }          private CompletionStage<Boolean> storePipelineInConsul(String clusterName, String pipelineId, PipelineConfig config) {         return CompletableFuture.supplyAsync(() -> {             try {                 String configJson = canonicalizeJson(objectMapper.writeValueAsString(config));                 String consulKey = buildPipelineKey(clusterName, pipelineId);                                  HttpRequest request = HttpRequest.newBuilder()                         .uri(URI.create(consulBaseUrl + "/v1/kv/" + consulKey))                         .PUT(HttpRequest.BodyPublishers.ofString(configJson))                         .build();                                  HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());                 boolean success = response.statusCode() == 200;                                  if (success) {                     LOG.debug("Stored pipeline '{}' in Consul at key '{}'", pipelineId, consulKey);                 } else {                     LOG.error("Failed to store pipeline '{}' in Consul. Status: {}, Body: {}",                              pipelineId, response.statusCode(), response.body());                 }                                  return success;             } catch (Exception e) {                 LOG.error("Error storing pipeline '{}' in Consul: {}", pipelineId, e.getMessage(), e);                 return false;             }         });     }          private CompletionStage<Optional<PipelineConfig>> retrievePipelineFromConsul(String clusterName, String pipelineId) {         return CompletableFuture.supplyAsync(() -> {             try {                 String consulKey = buildPipelineKey(clusterName, pipelineId);                                  HttpRequest request = HttpRequest.newBuilder()                         .uri(URI.create(consulBaseUrl + "/v1/kv/" + consulKey + "?raw"))                         .GET()                         .build();                                  HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());                                  if (response.statusCode() == 200) {                     PipelineConfig config = objectMapper.readValue(response.body(), PipelineConfig.class);                     return Optional.of(config);                 } else if (response.statusCode() == 404) {                     return Optional.<PipelineConfig>empty();                 } else {                     LOG.error("Failed to retrieve pipeline '{}' from Consul. Status: {}", pipelineId, response.statusCode());                     return Optional.<PipelineConfig>empty();                 }             } catch (Exception e) {                 LOG.error("Error retrieving pipeline '{}' from Consul: {}", pipelineId, e.getMessage(), e);                 return Optional.<PipelineConfig>empty();             }         });     }          private CompletionStage<Boolean> deletePipelineFromConsul(String clusterName, String pipelineId) {         return CompletableFuture.supplyAsync(() -> {             try {                 String consulKey = buildPipelineKey(clusterName, pipelineId);                                  HttpRequest request = HttpRequest.newBuilder()                         .uri(URI.create(consulBaseUrl + "/v1/kv/" + consulKey))                         .DELETE()                         .build();                                  HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());                 boolean success = response.statusCode() == 200;                                  if (success) {                     LOG.debug("Deleted pipeline '{}' from Consul at key '{}'", pipelineId, consulKey);                 } else {                     LOG.error("Failed to delete pipeline '{}' from Consul. Status: {}", pipelineId, response.statusCode());                 }                                  return success;             } catch (Exception e) {                 LOG.error("Error deleting pipeline '{}' from Consul: {}", pipelineId, e.getMessage(), e);                 return false;             }         });     }          private CompletionStage<Map<String, PipelineConfig>> listPipelinesFromConsul(String clusterName) {         return CompletableFuture.supplyAsync(() -> {             try {                 String consulPrefix = buildClusterPrefix(clusterName) + "pipelines/";                                  HttpRequest request = HttpRequest.newBuilder()                         .uri(URI.create(consulBaseUrl + "/v1/kv/" + consulPrefix + "?keys"))                         .GET()                         .build();                                  HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());                                  if (response.statusCode() == 200) {                     String[] keys = objectMapper.readValue(response.body(), String[].class);                     Map<String, PipelineConfig> pipelines = new HashMap<>();                                          for (String key : keys) {                         String pipelineId = extractPipelineIdFromKey(key);                         if (pipelineId != null) {                             Optional<PipelineConfig> config = retrievePipelineFromConsul(clusterName, pipelineId).toCompletableFuture().join();                             config.ifPresent(c -> pipelines.put(pipelineId, c));                         }                     }                                          return pipelines;                 } else if (response.statusCode() == 404) {                     return new HashMap<String, PipelineConfig>();                 } else {                     LOG.error("Failed to list pipelines from Consul. Status: {}", response.statusCode());                     return new HashMap<String, PipelineConfig>();                 }             } catch (Exception e) {                 LOG.error("Error listing pipelines from Consul: {}", e.getMessage(), e);                 return new HashMap<String, PipelineConfig>();             }         });     }          private boolean checkPipelineAffectedByDeletion(PipelineConfig pipeline, String targetId, DependencyType targetType) {         if (pipeline.pipelineSteps() == null) {             return false;         }                  for (PipelineStepConfig step : pipeline.pipelineSteps().values()) {             if (targetType == DependencyType.MODULE && step.processorInfo() != null &&                  targetId.equals(step.processorInfo().grpcServiceName())) {                 return true;             }                          if (step.outputs() != null) {                 for (var output : step.outputs().values()) {                     if (output.grpcTransport() != null &&                          targetId.equals(output.grpcTransport().serviceName())) {                         return true;                     }                 }             }         }                  return false;     }          private String buildPipelineKey(String clusterName, String pipelineId) {         return buildClusterPrefix(clusterName) + "pipelines/" + pipelineId + "/config";     }          private String buildClusterPrefix(String clusterName) {         return "rokkon-clusters/" + clusterName + "/";     }          private String extractPipelineIdFromKey(String key) {         // Extract from: rokkon-clusters/{cluster}/pipelines/{pipelineId}/config         String[] parts = key.split("/");         if (parts.length >= 4 && "pipelines".equals(parts[2])) {             return parts[3];         }         return null;     }          // Supporting classes          public record DependencyImpactAnalysis(             String targetId,             DependencyType targetType,             List<String> affectedPipelines,             List<String> orphanedTopics,             List<String> orphanedServices,             boolean canSafelyDelete     ) {}          public enum DependencyType {         PIPELINE, MODULE, SCHEMA     } }b�
+
+loc472
+6
+x_tika_encodingdetectorUniversalEncodingDetector
+q
+x_tika_parsed_by_full_setTRorg.apache.tika.parser.DefaultParser; org.apache.tika.parser.code.SourceCodeParser
+$
+content_typetext/x-java-source
+ 
+content_encoding
+ISO-8859-1
+'
+x_tika_detectedencoding
+ISO-8859-1
+8
+resourcename(&source-code/PipelineConfigService.java
+h
+x_tika_parsed_byTRorg.apache.tika.parser.DefaultParser; org.apache.tika.parser.code.SourceCodeParserj��
+$5fef66d2-b1f5-48ea-bfca-cbc46d6f808cbodystandard_500_50*chunks_chunker_standard_500_502�	
+?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_0�
+�source - code / PipelineConfigService. java source - code / PipelineConfigService. javapackage com. rokkon. search. config. pipeline. service; import com. fasterxml. jackson. core. JsonProcessingException; import com. fasterxml. jackson. databind. JsonNode; import com. fasterxml. jackson. databind. ObjectMapper; import com. fasterxml. jackson. databind. node. ObjectNode; import com. rokkon. search. config. pipeline. model. *; import com. rokkon. search. config. pipeline. service. events.?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_0  (�:standard_500_50" 
+average_word_length	i o�@"$
+potential_heading_score	        "
+sentence_count	     �B@"$
+alphanumeric_percentage	�!�uq�?"h
+punctuation_countsR*P
+
+*	      �?
+
+;	      @
+
+-	       @
+
+.	     �B@
+
+/	       @"!
+uppercase_percentage	�Zd;�?""
+whitespace_percentage	X�2ı.�?"
+list_item_indicator  "
+
+word_count	     �Y@"$
+average_sentence_length	�(�@"
+vocabulary_density	� �rh��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk "
+character_count	     �~@"
+relative_position	        2�	
+?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_1�
+�com. rokkon. search. config. pipeline. service. events. ConfigChangeEvent; import com. rokkon. search. config. pipeline. service. validation. ValidationResult; import io. quarkus. runtime. annotations. RegisterForReflection; import org. slf 4 j. Logger; import org. slf 4 j. LoggerFactory; import jakarta. enterprise. context. ApplicationScoped; import jakarta. enterprise. event. Event; import jakarta. inject. Inject; import java. net. URI; import java. net. http. HttpClient; import java. net.?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_1 �(�:standard_500_50" 
+average_word_length	���S�%@"$
+potential_heading_score	        "
+sentence_count	     �B@"$
+alphanumeric_percentage	�HP��?"8
+punctuation_counts"* 
+
+;	      $@
+
+.	     �B@"!
+uppercase_percentage	��3��?""
+whitespace_percentage	`��"���?"
+list_item_indicator  "
+
+word_count	      [@"$
+average_sentence_length	�ZB>�Y@"
+vocabulary_density	��(��?"
+digit_percentage	����Mbp?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	%u��?2�	
+?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_2�
+�import java. net. http. HttpClient; import java. net. http. HttpRequest; import java. net. http. HttpResponse; import java. nio. charset. StandardCharsets; import java. security. MessageDigest; import java. security. NoSuchAlgorithmException; import java. time. Duration; import java. util. *; import java. util. concurrent. CompletableFuture; import java. util. concurrent. CompletionStage; / ** * Main service for CRUD operations on pipeline configurations. * Implements per - pipeline storage in?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_2 �(�	:standard_500_50" 
+average_word_length	ё\�C:@"$
+potential_heading_score	�������?"
+sentence_count	      <@"$
+alphanumeric_percentage	�	��?"h
+punctuation_countsR*P
+
+*	      @
+
+;	      $@
+
+-	      �?
+
+.	      ;@
+
+/	      �?"!
+uppercase_percentage	ݵ�|г�?""
+whitespace_percentage	��x�&1�?"
+list_item_indicator  "
+
+word_count	     @Y@"$
+average_sentence_length	z6�>W�@"
+vocabulary_density	S�!�uq�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	%u��?2�
+
+?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_3�
+�. * Implements per - pipeline storage in Consul with comprehensive validation. * / @ ApplicationScoped @ RegisterForReflection public class PipelineConfigService {private static final Logger LOG = LoggerFactory. getLogger (PipelineConfigService. class); private final ObjectMapper objectMapper; private final ConfigValidationService validationService; private final SchemaValidationService schemaValidationService; private final Event < ConfigChangeEvent > configChangeEvent; private final HttpClient?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_3 �	(�:standard_500_50" 
+average_word_length	      @"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	����S�?"�
+punctuation_counts�*�
+
+@	       @
+
+(	      �?
+
+)	      �?
+
+*	       @
+
+{	      �?
+
+;	      @
+
+<	      �?
+
+-	      �?
+
+=	      �?
+
+.	      @
+
+>	      �?
+
+/	      �?"!
+uppercase_percentage	{�G�z�?""
+whitespace_percentage	9��v���?"
+list_item_indicator  "
+
+word_count	      P@"$
+average_sentence_length	������)@"
+vocabulary_density	9��m4��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	�ׁsF��?2�
+
+?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_4�
+�> configChangeEvent; private final HttpClient httpClient; // Consul configuration private final String consulHost; private final String consulPort; private final String consulBaseUrl; @ Inject public PipelineConfigService (ObjectMapper objectMapper, ConfigValidationService validationService, SchemaValidationService schemaValidationService, Event < ConfigChangeEvent > configChangeEvent, @ org. eclipse. microprofile. config. inject. ConfigProperty (name = " quarkus. consul - config. agent. host -?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_4 �(�:standard_500_50" 
+average_word_length	�_�L�@"$
+potential_heading_score	        "
+sentence_count	      "@"$
+alphanumeric_percentage	�(���?"�
+punctuation_counts�*�
+
+@	       @
+
+"	      �?
+
+(	       @
+
+;	      @
+
+,	      @
+
+<	      �?
+
+=	      �?
+
+-	       @
+
+>	       @
+
+.	       @
+
+/	       @"!
+uppercase_percentage	�3��7��?""
+whitespace_percentage	[B>�٬�?"
+list_item_indicator  "
+
+word_count	      R@"$
+average_sentence_length	       @"
+vocabulary_density	<�R�!��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	%u��?2�
+?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_5�
+�(name = " quarkus. consul - config. agent. host - port ") Optional < String > consulConfig) {this. objectMapper = objectMapper; this. validationService = validationService; this. schemaValidationService = schemaValidationService; this. configChangeEvent = configChangeEvent; this. httpClient = HttpClient. newBuilder (). connectTimeout (Duration. ofSeconds (10 )). build (); // Parse Consul configuration if (consulConfig. isPresent ()) {String [] hostPort = consulConfig. get (). split (": "); this?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_5 �(�:standard_500_50" 
+average_word_length	;M�@"$
+potential_heading_score	�������?"
+sentence_count	      0@"$
+alphanumeric_percentage	�Q����?"�
+punctuation_counts�*�
+
+"	      @
+
+(	      "@
+
+)	      $@
+
+-	       @
+
+.	      .@
+
+/	       @
+
+:	      �?
+
+{	       @
+
+;	      @
+
+[	      �?
+
+<	      �?
+
+=	      @
+
+]	      �?
+
+>	      �?"!
+uppercase_percentage	:��H��?""
+whitespace_percentage	��	h"l�?"
+list_item_indicator  "
+
+word_count	     �Y@"$
+average_sentence_length	     �@"
+vocabulary_density	w��/��?"
+digit_percentage	����Mbp?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	��<,��?2�
+?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_6�
+�= consulConfig. get (). split (": "); this. consulHost = hostPort [0]; this. consulPort = hostPort. length > 1? hostPort [1]: " 8500 ";} else {this. consulHost = " localhost "; this. consulPort = " 8500 ";} this. consulBaseUrl = " http: // " + consulHost + ": " + consulPort; LOG. info (" PipelineConfigService initialized with Consul at: {} ", consulBaseUrl);} / ** * Creates a new pipeline in the specified cluster. * / public CompletionStage < ValidationResult > createPipeline (String clusterName?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_6 �(�:standard_500_50" 
+average_word_length	q���h@"$
+potential_heading_score	�������?"
+sentence_count	      &@"$
+alphanumeric_percentage	�ʡE���?"�
+punctuation_counts�*�
+
+"	      ,@
+
+(	      @
+
+)	      @
+
+*	      @
+
++	      @
+
+,	      �?
+
+.	      $@
+
+/	      @
+
+:	      @
+
+;	      @
+
+[	       @
+
+{	       @
+
+<	      �?
+
+=	      @
+
+]	       @
+
+}	      @
+
+>	       @
+
+?	      �?"!
+uppercase_percentage	V-��?""
+whitespace_percentage	ˡE����?"
+list_item_indicator  "
+
+word_count	     �^@"$
+average_sentence_length	�i�q�.&@"
+vocabulary_density	�K7�A`�?"
+digit_percentage	�I+��?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	d;�O���?2�
+
+?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_7�
+�> createPipeline (String clusterName, String pipelineId, PipelineConfig config, String initiatedBy) {LOG. info (" Creating pipeline ' {} ' in cluster ' {} ' ", pipelineId, clusterName); return validatePipelineForCreation (clusterName, pipelineId, config). thenCompose (validationResult - > {if (! validationResult. valid ()) {return CompletableFuture. completedFuture (validationResult);} return storePipelineInConsul (clusterName, pipelineId, config). thenApply (success - > {if (success) {// Fire?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_7 �(� :standard_500_50" 
+average_word_length	����:@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	[B>�٬�?"�
+punctuation_counts�*�
+
+!	      �?
+
+"	       @
+
+'	      @
+
+(	      $@
+
+)	       @
+
+,	      "@
+
+-	       @
+
+.	      @
+
+/	       @
+
+{	      @
+
+;	       @
+
+}	      @
+
+>	      @"!
+uppercase_percentage	�Q�|�?""
+whitespace_percentage	�?Ƽ?"
+list_item_indicator  "
+
+word_count	     @X@"$
+average_sentence_length	B>�٬*0@"
+vocabulary_density	�.n���?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position		�c�Z�?2�
+
+?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_8�
+�) {// Fire creation event configChangeEvent. fire (ConfigChangeEvent. pipelineCreated (clusterName, pipelineId, config, initiatedBy )); LOG. info (" Successfully created pipeline ' {} ' in cluster ' {} ' ", pipelineId, clusterName); return ValidationResult. success ();} else {return ValidationResult. failure (" Failed to store pipeline in Consul ");}});});} / ** * Updates an existing pipeline. * / public CompletionStage < ValidationResult > updatePipeline (String clusterName, String pipelineId,?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_8 � (�&:standard_500_50" 
+average_word_length	гY���@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	B`��"��?"�
+punctuation_counts�*�
+
+"	      @
+
+'	      @
+
+(	      @
+
+)	       @
+
+*	      @
+
+,	      @
+
+.	      @
+
+/	      @
+
+{	      @
+
+;	      @
+
+<	      �?
+
+}	      @
+
+>	      �?"!
+uppercase_percentage	q���h�?""
+whitespace_percentage	=�U����?"
+list_item_indicator  "
+
+word_count	     �Y@"$
+average_sentence_length	�Ǻ�m-@"
+vocabulary_density	r�鷯�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	��_vO�?2�
+
+?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_9	�
+�(String clusterName, String pipelineId, PipelineConfig newConfig, String initiatedBy) {LOG. info (" Updating pipeline ' {} ' in cluster ' {} ' ", pipelineId, clusterName); return getPipeline (clusterName, pipelineId). thenCompose (oldConfig - > {if (oldConfig. isEmpty ()) {return CompletableFuture. completedFuture (ValidationResult. failure (" Pipeline ' " + pipelineId + " ' not found " ));} return validatePipelineForUpdate (clusterName, pipelineId, newConfig, oldConfig. get ()). thenCompose (?95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_9 �&(�,:standard_500_50" 
+average_word_length	ё\�C:@"$
+potential_heading_score	        "
+sentence_count	       @"$
+alphanumeric_percentage	+�����?"�
+punctuation_counts�*�
+
+"	      @
+
+'	      @
+
+(	      &@
+
+)	      "@
+
+{	      @
+
+;	       @
+
++	       @
+
+,	      "@
+
+}	      @
+
+-	      �?
+
+.	      @
+
+>	      �?"!
+uppercase_percentage	��&S�?""
+whitespace_percentage	��x�&1�?"
+list_item_indicator  "
+
+word_count	     @Y@"$
+average_sentence_length	     @)@"
+vocabulary_density	��MbX�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	��D���?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_10
+�
+�. get ()). thenCompose (validationResult - > {if (! validationResult. valid ()) {return CompletableFuture. completedFuture (validationResult);} return storePipelineInConsul (clusterName, pipelineId, newConfig). thenApply (success - > {if (success) {// Fire update event configChangeEvent. fire (ConfigChangeEvent. pipelineUpdated (clusterName, pipelineId, newConfig, oldConfig. get (), initiatedBy )); LOG. info (" Successfully updated pipeline ' {} ' in cluster ' {} ' ", pipelineId, clusterName);@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_10 �,(�3:standard_500_50" 
+average_word_length	�ŏ17@"$
+potential_heading_score	        "
+sentence_count	      $@"$
+alphanumeric_percentage	�x�&1�?"�
+punctuation_counts�*�
+
+!	      �?
+
+"	       @
+
+'	      @
+
+(	      (@
+
+)	      &@
+
+,	       @
+
+-	       @
+
+.	      "@
+
+/	       @
+
+{	      @
+
+;	      @
+
+}	      @
+
+>	       @"!
+uppercase_percentage	.�!��u�?""
+whitespace_percentage	�t�V�?"
+list_item_indicator  "
+
+word_count	     �Y@"$
+average_sentence_length	ffffff$@"
+vocabulary_density	@�߾��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	�:pΈ��?2�
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_11�
+�' {} ' in cluster ' {} ' ", pipelineId, clusterName); return ValidationResult. success ();} else {return ValidationResult. failure (" Failed to update pipeline in Consul ");}});});});} / ** * Deletes a pipeline. * / public CompletionStage < ValidationResult > deletePipeline (String clusterName, String pipelineId, String initiatedBy) {LOG. info (" Deleting pipeline ' {} ' from cluster ' {} ' ", pipelineId, clusterName); return getPipeline (clusterName, pipelineId). thenCompose (oldConfig - > {if@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_11 �3(�::standard_500_50" 
+average_word_length	����C@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	l	��g��?"�
+punctuation_counts�*�
+
+"	      @
+
+'	       @
+
+(	      @
+
+)	      "@
+
+*	      @
+
+,	      @
+
+-	      �?
+
+.	      @
+
+/	       @
+
+{	      @
+
+;	      @
+
+<	      �?
+
+}	      $@
+
+>	       @"!
+uppercase_percentage	z�):�˯?""
+whitespace_percentage	-C��6�?"
+list_item_indicator  "
+
+word_count	     @]@"$
+average_sentence_length	     �3@"
+vocabulary_density	���QI��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	NbX9��?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_12�
+�. thenCompose (oldConfig - > {if (oldConfig. isEmpty ()) {return CompletableFuture. completedFuture (ValidationResult. failure (" Pipeline ' " + pipelineId + " ' not found " ));} return deletePipelineFromConsul (clusterName, pipelineId). thenApply (success - > {if (success) {// Fire deletion event configChangeEvent. fire (ConfigChangeEvent. pipelineDeleted (clusterName, pipelineId, oldConfig. get (), initiatedBy )); LOG. info (" Successfully deleted pipeline ' {} ' from cluster ' {} ' ",@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_12 �9(�@:standard_500_50" 
+average_word_length		�^)�@"$
+potential_heading_score	        "
+sentence_count	      $@"$
+alphanumeric_percentage	`vOj�?"�
+punctuation_counts�*�
+
+"	      @
+
+'	      @
+
+(	      (@
+
+)	      "@
+
++	       @
+
+,	      @
+
+-	       @
+
+.	      "@
+
+/	       @
+
+{	      @
+
+;	       @
+
+}	      @
+
+>	       @"!
+uppercase_percentage	�p=
+ף�?""
+whitespace_percentage	|a2U0*�?"
+list_item_indicator  "
+
+word_count	     �Y@"$
+average_sentence_length	������$@"
+vocabulary_density	�J�4�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	������?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_13�
+�deleted pipeline ' {} ' from cluster ' {} ' ", pipelineId, clusterName); return ValidationResult. success ();} else {return ValidationResult. failure (" Failed to delete pipeline from Consul ");}});});} / ** * Gets a pipeline configuration. * / public CompletionStage < Optional < PipelineConfig >> getPipeline (String clusterName, String pipelineId) {return retrievePipelineFromConsul (clusterName, pipelineId);} / ** * Lists all pipelines in a cluster. * / public CompletionStage < Map < String,@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_13 �@(�E:standard_500_50" 
+average_word_length	��:MD@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	����o�?"�
+punctuation_counts�*�
+
+"	      @
+
+'	      @
+
+(	      @
+
+)	      @
+
+*	       @
+
+,	      @
+
+.	      @
+
+/	      @
+
+{	      @
+
+;	      @
+
+<	      @
+
+}	       @
+
+>	       @"!
+uppercase_percentage	�<,Ԛ�?""
+whitespace_percentage	/n���?"
+list_item_indicator  "
+
+word_count	     @Z@"$
+average_sentence_length	      5@"
+vocabulary_density	�2ı.n�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @"
+relative_position	�b�=y�?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_14�
+�. * / public CompletionStage < Map < String, PipelineConfig >> listPipelines (String clusterName) {return listPipelinesFromConsul (clusterName);} / ** * Analyzes the impact of deleting a pipeline or module. * / public CompletionStage < DependencyImpactAnalysis > analyzeDeletionImpact (String clusterName, String targetId, DependencyType targetType) {LOG. info (" Analyzing deletion impact for {} ' {} ' in cluster ' {} ' ", targetType, targetId, clusterName); return listPipelines (clusterName).@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_14 �E(�J:standard_500_50" 
+average_word_length	aTR'��@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	2�%��?"�
+punctuation_counts�*�
+
+"	       @
+
+'	      @
+
+(	      @
+
+)	      @
+
+*	      @
+
+,	      @
+
+.	      @
+
+/	      @
+
+{	      @
+
+;	       @
+
+<	      @
+
+}	      @
+
+>	      @"!
+uppercase_percentage	�HP��?""
+whitespace_percentage	�S㥛��?"
+list_item_indicator  "
+
+word_count	     @W@"$
+average_sentence_length	     @7@"
+vocabulary_density	�3��7��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position		�c�Z�?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_15�
+�listPipelines (clusterName). thenApply (pipelines - > {List < String > affectedPipelines = new ArrayList < > (); List < String > orphanedTopics = new ArrayList < > (); List < String > orphanedServices = new ArrayList < > (); for (var entry: pipelines. entrySet ()) {String pipelineId = entry. getKey (); PipelineConfig pipeline = entry. getValue (); if (targetType == DependencyType. PIPELINE && targetId. equals (pipelineId )) {continue; // Skip the target pipeline itself} boolean isAffected =@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_15 �I(�P:standard_500_50" 
+average_word_length	�=�U�@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	OjM��?"�
+punctuation_counts�*�
+
+&	       @
+
+(	      &@
+
+)	      $@
+
+-	      �?
+
+.	      @
+
+/	       @
+
+:	      �?
+
+{	      @
+
+;	      @
+
+<	      @
+
+=	       @
+
+}	      �?
+
+>	      @"!
+uppercase_percentage	M�O��?""
+whitespace_percentage	���S��?"
+list_item_indicator  "
+
+word_count	     �Z@"$
+average_sentence_length	a2U0*I.@"
+vocabulary_density	B>�٬��?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	[���<�?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_16�
+�boolean isAffected = checkPipelineAffectedByDeletion (pipeline, targetId, targetType); if (isAffected) {affectedPipelines. add (pipelineId);}} return new DependencyImpactAnalysis (targetId, targetType, affectedPipelines, orphanedTopics, orphanedServices, affectedPipelines. isEmpty ());});} / ** * Canonicalizes JSON for consistent ordering and hashing. * Based on the pattern from the old ConsulModuleRegistrationService. * / public String canonicalizeJson (String jsonString) throws@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_16 �O(�V:standard_500_50" 
+average_word_length	     �@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	?5^�I�?"�
+punctuation_counts�*�
+
+(	      @
+
+)	      @
+
+*	      @
+
+;	      @
+
+{	      �?
+
+,	      @
+
+=	      �?
+
+}	      @
+
+.	      @
+
+/	       @"!
+uppercase_percentage	�-����?""
+whitespace_percentage	c�ZB>�?"
+list_item_indicator  "
+
+word_count	      T@"$
+average_sentence_length	      0@"
+vocabulary_density	333333�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @~@"
+relative_position	��_vO�?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_17�
+�String canonicalizeJson (String jsonString) throws JsonProcessingException {JsonNode node = objectMapper. readTree (jsonString); return canonicalizeJsonNode (node);} private String canonicalizeJsonNode (JsonNode node) throws JsonProcessingException {if (node. isObject ()) {ObjectNode sortedNode = objectMapper. createObjectNode (); List < String > fieldNames = new ArrayList < > (); node. fieldNames (). forEachRemaining (fieldNames :: add); Collections. sort (fieldNames); for (String fieldName:@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_17 �V(�Z:standard_500_50" 
+average_word_length	=�U��m@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	vOjM�?"�
+punctuation_counts�*�
+
+(	      (@
+
+)	      &@
+
+:	      @
+
+{	      @
+
+;	      @
+
+<	       @
+
+=	      @
+
+}	      �?
+
+.	      @
+
+>	       @"!
+uppercase_percentage	o��ʡ�?""
+whitespace_percentage	�ͪ��V�?"
+list_item_indicator  "
+
+word_count	     �V@"$
+average_sentence_length	      *@"
+vocabulary_density	�2ı.n�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @"
+relative_position	      �?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_18�
+�; for (String fieldName: fieldNames) {JsonNode childNode = node. get (fieldName); if (childNode. isObject () || childNode. isArray ()) {sortedNode. set (fieldName, objectMapper. readTree (canonicalizeJsonNode (childNode )));} else {sortedNode. set (fieldName, childNode);}} return objectMapper. writeValueAsString (sortedNode);} return objectMapper. writeValueAsString (node);} / ** * Generates an MD 5 digest for configuration versioning. * / public String generateConfigDigest (String configJson)@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_18 �Z(�_:standard_500_50" 
+average_word_length	�p=
+ף@"$
+potential_heading_score	        "
+sentence_count	      $@"$
+alphanumeric_percentage	_�L��?"�
+punctuation_counts�*�
+
+(	      (@
+
+)	      (@
+
+:	      �?
+
+*	      @
+
+;	      @
+
+{	      @
+
+|	       @
+
+,	       @
+
+=	      �?
+
+}	      @
+
+.	      "@
+
+/	       @"!
+uppercase_percentage	O��e��?""
+whitespace_percentage	Zd;�O�?"
+list_item_indicator  "
+
+word_count	      Y@"$
+average_sentence_length	      $@"
+vocabulary_density	�������?"
+digit_percentage	����Mb`?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	��D���?2�
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_19�
+�String generateConfigDigest (String configJson) throws NoSuchAlgorithmException {MessageDigest md = MessageDigest. getInstance (" MD 5 "); byte [] digest = md. digest (configJson. getBytes (StandardCharsets. UTF _ 8 )); return Base 64. getEncoder (). encodeToString (digest);} // Private helper methods private CompletionStage < ValidationResult > validatePipelineForCreation (String clusterName, String pipelineId, PipelineConfig config) {return validationService. validatePipelineStructure (@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_19 �_(�d:standard_500_50" 
+average_word_length	|a2U0j@"$
+potential_heading_score	        "
+sentence_count	       @"$
+alphanumeric_percentage	�A�f��?"�
+punctuation_counts�*�
+
+"	       @
+
+(	       @
+
+)	      @
+
+,	       @
+
+.	      @
+
+/	       @
+
+{	       @
+
+;	      @
+
+[	      �?
+
+<	      �?
+
+=	       @
+
+]	      �?
+
+}	      �?
+
+>	      �?
+
+_	      �?"!
+uppercase_percentage	��ͪ�ն?""
+whitespace_percentage	�x�&1�?"
+list_item_indicator  "
+
+word_count	     �T@"$
+average_sentence_length	     �$@"
+vocabulary_density	�9#J{��?"
+digit_percentage	��ǘ���?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	R'�����?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_20�
+�validationService. validatePipelineStructure (pipelineId, config). thenCompose (structuralResult - > {if (! structuralResult. valid ()) {return CompletableFuture. completedFuture (structuralResult);} // JSON Schema validation try {String configJson = objectMapper. writeValueAsString (config); return schemaValidationService. validatePipelineStepConfig (configJson). thenApply (schemaResult - > structuralResult. combine (schemaResult ));} catch (JsonProcessingException e) {return CompletableFuture@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_20 �c(�i:standard_500_50" 
+average_word_length	�_�LU@"$
+potential_heading_score	�������?"
+sentence_count	      "@"$
+alphanumeric_percentage	_�L�J�?"�
+punctuation_counts�*�
+
+!	      �?
+
+(	      $@
+
+)	      "@
+
+{	      @
+
+;	      @
+
+,	      �?
+
+-	       @
+
+}	       @
+
+=	      �?
+
+.	       @
+
+>	       @
+
+/	       @"!
+uppercase_percentage	�3��7��?""
+whitespace_percentage	�ׁsF��?"
+list_item_indicator  "
+
+word_count	     �S@"$
+average_sentence_length	�|гYU!@"
+vocabulary_density	q���h�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	�:pΈ��?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_21�
+�{return CompletableFuture. completedFuture (ValidationResult. failure (" Failed to serialize pipeline config: " + e. getMessage ()));}});} private CompletionStage < ValidationResult > validatePipelineForUpdate (String clusterName, String pipelineId, PipelineConfig newConfig, PipelineConfig oldConfig) {// Same validation as creation for now, but could add update - specific checks return validatePipelineForCreation (clusterName, pipelineId, newConfig);} private CompletionStage < Boolean >@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_21 �i(�n:standard_500_50" 
+average_word_length	fffff�@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	8gDio��?"�
+punctuation_counts�*�
+
+"	       @
+
+(	      @
+
+)	      @
+
++	      �?
+
+,	      @
+
+-	      �?
+
+.	      @
+
+/	       @
+
+:	      �?
+
+{	       @
+
+;	      @
+
+<	       @
+
+}	      @
+
+>	       @"!
+uppercase_percentage	e�X��?""
+whitespace_percentage	�=�U��?"
+list_item_indicator  "
+
+word_count	      T@"$
+average_sentence_length	      4@"
+vocabulary_density	ffffff�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	�N@a��?2�
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_22�
+�);} private CompletionStage < Boolean > storePipelineInConsul (String clusterName, String pipelineId, PipelineConfig config) {return CompletableFuture. supplyAsync (() - > {try {String configJson = canonicalizeJson (objectMapper. writeValueAsString (config )); String consulKey = buildPipelineKey (clusterName, pipelineId); HttpRequest request = HttpRequest. newBuilder (). uri (URI. create (consulBaseUrl + " / v 1 / kv / " + consulKey )). PUT (HttpRequest. BodyPublishers. ofString (configJson )).@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_22 �n(�s:standard_500_50" 
+average_word_length	��ǘ��@"$
+potential_heading_score	        "
+sentence_count	      "@"$
+alphanumeric_percentage	���(\��?"�
+punctuation_counts�*�
+
+"	       @
+
+(	      &@
+
+)	      &@
+
++	       @
+
+,	      @
+
+-	      �?
+
+.	      "@
+
+/	      @
+
+;	      @
+
+{	      @
+
+<	      �?
+
+}	      �?
+
+=	      @
+
+>	       @"!
+uppercase_percentage	�-���?""
+whitespace_percentage	*:��H�?"
+list_item_indicator  "
+
+word_count	     @W@"$
+average_sentence_length	{�/L��$@"
+vocabulary_density	2�%��?"
+digit_percentage	����Mb`?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	0�'��?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_23�
+�. ofString (configJson )). build (); HttpResponse < String > response = httpClient. send (request, HttpResponse. BodyHandlers. ofString ()); boolean success = response. statusCode () == 200; if (success) {LOG. debug (" Stored pipeline ' {} ' in Consul at key ' {} ' ", pipelineId, consulKey);} else {LOG. error (" Failed to store pipeline ' {} ' in Consul. Status: {}, Body: {} ", pipelineId, response. statusCode (), response. body ());} return success;} catch (Exception e) {LOG. error (" Error@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_23 �r(�x:standard_500_50" 
+average_word_length	/n��	@"$
+potential_heading_score	�������?"
+sentence_count	      *@"$
+alphanumeric_percentage	$(~��k�?"�
+punctuation_counts�*�
+
+"	      @
+
+'	      @
+
+(	      (@
+
+)	      (@
+
+,	      @
+
+.	      (@
+
+:	       @
+
+;	      @
+
+{	       @
+
+<	      �?
+
+=	      @
+
+}	       @
+
+>	      �?"!
+uppercase_percentage	�/�$�?""
+whitespace_percentage	h"lxz��?"
+list_item_indicator  "
+
+word_count	     �`@"$
+average_sentence_length	g��j+v$@"
+vocabulary_density	/�$��?"
+digit_percentage	�~j�t�x?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	���S��?2�
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_24�
+�(Exception e) {LOG. error (" Error storing pipeline ' {} ' in Consul: {} ", pipelineId, e. getMessage (), e); return false;}});} private CompletionStage < Optional < PipelineConfig >> retrievePipelineFromConsul (String clusterName, String pipelineId) {return CompletableFuture. supplyAsync (() - > {try {String consulKey = buildPipelineKey (clusterName, pipelineId); HttpRequest request = HttpRequest. newBuilder (). uri (URI. create (consulBaseUrl + " / v 1 / kv / " + consulKey + "? raw " )). GET (@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_24 �x(�}:standard_500_50" 
+average_word_length	��	h�@"$
+potential_heading_score	        "
+sentence_count	       @"$
+alphanumeric_percentage	-����?"�
+punctuation_counts�*�
+
+"	      @
+
+'	       @
+
+(	      &@
+
+)	      $@
+
++	      @
+
+,	      @
+
+-	      �?
+
+.	      @
+
+/	      @
+
+:	      �?
+
+{	      @
+
+;	      @
+
+<	       @
+
+}	      @
+
+=	       @
+
+>	      @
+
+?	      �?"!
+uppercase_percentage	j�t��?""
+whitespace_percentage	�l�����?"
+list_item_indicator  "
+
+word_count	     �\@"$
+average_sentence_length	     �,@"
+vocabulary_density	����9#�?"
+digit_percentage	����Mb`?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @@"
+relative_position	��ǘ���?2�
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_25�
+�consulKey + "? raw " )). GET (). build (); HttpResponse < String > response = httpClient. send (request, HttpResponse. BodyHandlers. ofString ()); if (response. statusCode () == 200) {PipelineConfig config = objectMapper. readValue (response. body (), PipelineConfig. class); return Optional. of (config);} else if (response. statusCode () == 404) {return Optional. < PipelineConfig > empty ();} else {LOG. error (" Failed to retrieve pipeline ' {} ' from Consul. Status: {} ", pipelineId, response.@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_25 �|(��:standard_500_50" 
+average_word_length	333333@"$
+potential_heading_score	        "
+sentence_count	      .@"$
+alphanumeric_percentage	|a2U0�?"�
+punctuation_counts�*�
+
+"	      @
+
+'	       @
+
+(	      *@
+
+)	      ,@
+
++	      �?
+
+,	      @
+
+.	      .@
+
+:	      �?
+
+;	      @
+
+{	      @
+
+<	       @
+
+=	      @
+
+}	      @
+
+>	       @
+
+?	      �?"!
+uppercase_percentage	q���h�?""
+whitespace_percentage	$���~��?"
+list_item_indicator  "
+
+word_count	     @_@"$
+average_sentence_length	{�/L�� @"
+vocabulary_density	���S��?"
+digit_percentage	�~j�t��?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	+��ݓ��?2�
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_26�
+�} ' from Consul. Status: {} ", pipelineId, response. statusCode ()); return Optional. < PipelineConfig > empty ();}} catch (Exception e) {LOG. error (" Error retrieving pipeline ' {} ' from Consul: {} ", pipelineId, e. getMessage (), e); return Optional. < PipelineConfig > empty ();}});} private CompletionStage < Boolean > deletePipelineFromConsul (String clusterName, String pipelineId) {return CompletableFuture. supplyAsync (() - > {try {String consulKey = buildPipelineKey (clusterName,@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_26 ��(�:standard_500_50" 
+average_word_length	z6�>W[@"$
+potential_heading_score	        "
+sentence_count	       @"$
+alphanumeric_percentage	�(\����?"�
+punctuation_counts�*�
+
+"	      @
+
+'	      @
+
+(	      $@
+
+)	      $@
+
+,	      @
+
+-	      �?
+
+.	      @
+
+:	       @
+
+{	      @
+
+;	      @
+
+<	      @
+
+}	      "@
+
+=	      �?
+
+>	      @"!
+uppercase_percentage	46<��?""
+whitespace_percentage	���h o�?"
+list_item_indicator  "
+
+word_count	      \@"$
+average_sentence_length	      ,@"
+vocabulary_density	гY����?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	�	h"lx�?2�
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_27�
+�String consulKey = buildPipelineKey (clusterName, pipelineId); HttpRequest request = HttpRequest. newBuilder (). uri (URI. create (consulBaseUrl + " / v 1 / kv / " + consulKey )). DELETE (). build (); HttpResponse < String > response = httpClient. send (request, HttpResponse. BodyHandlers. ofString ()); boolean success = response. statusCode () == 200; if (success) {LOG. debug (" Deleted pipeline ' {} ' from Consul at key ' {} ' ", pipelineId, consulKey);} else {LOG. error (" Failed to delete@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_27 ��(��:standard_500_50" 
+average_word_length	 A�c��@"$
+potential_heading_score	�������?"
+sentence_count	      (@"$
+alphanumeric_percentage	�4�8EG�?"�
+punctuation_counts�*�
+
+"	      @
+
+'	      @
+
+(	      (@
+
+)	      &@
+
++	       @
+
+,	      @
+
+.	      &@
+
+/	      @
+
+;	      @
+
+{	      @
+
+<	      �?
+
+=	      @
+
+}	      @
+
+>	      �?"!
+uppercase_percentage	-��臨?""
+whitespace_percentage	'1�Z�?"
+list_item_indicator  "
+
+word_count	      ^@"$
+average_sentence_length	      $@"
+vocabulary_density	ffffff�?"
+digit_percentage	����Mb�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     @"
+relative_position	~8gDi�?2�
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_28�
+�{LOG. error (" Failed to delete pipeline ' {} ' from Consul. Status: {} ", pipelineId, response. statusCode ());} return success;} catch (Exception e) {LOG. error (" Error deleting pipeline ' {} ' from Consul: {} ", pipelineId, e. getMessage (), e); return false;}});} private CompletionStage < Map < String, PipelineConfig >> listPipelinesFromConsul (String clusterName) {return CompletableFuture. supplyAsync (() - > {try {String consulPrefix = buildClusterPrefix (clusterName) + " pipelines / ";@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_28 ˋ(ߐ:standard_500_50" 
+average_word_length	�q����@"$
+potential_heading_score	        "
+sentence_count	      @"$
+alphanumeric_percentage	u���?"�
+punctuation_counts�*�
+
+"	      @
+
+'	      @
+
+(	      "@
+
+)	      "@
+
++	      �?
+
+,	      @
+
+-	      �?
+
+.	      @
+
+/	      �?
+
+:	       @
+
+{	      "@
+
+;	      @
+
+<	       @
+
+}	      "@
+
+=	      �?
+
+>	      @"!
+uppercase_percentage	��H.��?""
+whitespace_percentage	�m4��@�?"
+list_item_indicator  "
+
+word_count	     �]@"$
+average_sentence_length	�f��j�0@"
+vocabulary_density	���QI�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	'1�Z�?2�
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_29�
+�= buildClusterPrefix (clusterName) + " pipelines / "; HttpRequest request = HttpRequest. newBuilder (). uri (URI. create (consulBaseUrl + " / v 1 / kv / " + consulPrefix + "? keys " )). GET (). build (); HttpResponse < String > response = httpClient. send (request, HttpResponse. BodyHandlers. ofString ()); if (response. statusCode () == 200) {String [] keys = objectMapper. readValue (response. body (), String []. class); Map < String, PipelineConfig > pipelines = new HashMap < > (); for (String@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_29 ��(�:standard_500_50" 
+average_word_length	H�}8�
+@"$
+potential_heading_score	�������?"
+sentence_count	      *@"$
+alphanumeric_percentage	"��u���?"�
+punctuation_counts�*�
+
+"	      @
+
+(	      ,@
+
+)	      *@
+
++	      @
+
+,	      @
+
+.	      (@
+
+/	      @
+
+;	      @
+
+{	      �?
+
+[	       @
+
+<	      @
+
+=	      @
+
+]	       @
+
+>	      @
+
+?	      �?"!
+uppercase_percentage	����ׁ�?""
+whitespace_percentage	d�]K��?"
+list_item_indicator  "
+
+word_count	      _@"$
+average_sentence_length	�ʡE�#@"
+vocabulary_density	�ݓ��Z�?"
+digit_percentage	����Mb�?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	�D���J�?2�
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_30�
+�for (String key: keys) {String pipelineId = extractPipelineIdFromKey (key); if (pipelineId! = null) {Optional < PipelineConfig > config = retrievePipelineFromConsul (clusterName, pipelineId). toCompletableFuture (). join (); config. ifPresent (c - > pipelines. put (pipelineId, c ));}} return pipelines;} else if (response. statusCode () == 404) {return new HashMap < String, PipelineConfig > ();} else {LOG. error (" Failed to list pipelines from Consul. Status: {} ", response. statusCode ());@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_30 �(ɛ:standard_500_50" 
+average_word_length	��� �r@"$
+potential_heading_score	        "
+sentence_count	      "@"$
+alphanumeric_percentage	���?"�
+punctuation_counts�*�
+
+!	      �?
+
+"	       @
+
+(	      *@
+
+)	      *@
+
+,	      @
+
+-	      �?
+
+.	       @
+
+:	       @
+
+{	      @
+
+;	      @
+
+<	       @
+
+=	      @
+
+}	      @
+
+>	      @"!
+uppercase_percentage	���N@�?""
+whitespace_percentage	6<�R��?"
+list_item_indicator  "
+
+word_count	      ]@"$
+average_sentence_length	,Ԛ��)@"
+vocabulary_density	�Fx$�?"
+digit_percentage	�HP�x?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	[���<�?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_31�
+�from Consul. Status: {} ", response. statusCode ()); return new HashMap < String, PipelineConfig > ();}} catch (Exception e) {LOG. error (" Error listing pipelines from Consul: {} ", e. getMessage (), e); return new HashMap < String, PipelineConfig > ();}});} private boolean checkPipelineAffectedByDeletion (PipelineConfig pipeline, String targetId, DependencyType targetType) {if (pipeline. pipelineSteps () == null) {return false;} for (PipelineStepConfig step: pipeline. pipelineSteps (). values@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_31 ��(��:standard_500_50" 
+average_word_length	�s���@"$
+potential_heading_score	�������?"
+sentence_count	       @"$
+alphanumeric_percentage	��K7��?"�
+punctuation_counts�*�
+
+"	      @
+
+(	      &@
+
+)	      (@
+
+:	      @
+
+{	      @
+
+;	      @
+
+,	      @
+
+<	       @
+
+}	       @
+
+=	       @
+
+.	      @
+
+>	       @"!
+uppercase_percentage	L�
+F%u�?""
+whitespace_percentage	��	h"l�?"
+list_item_indicator  "
+
+word_count	     @\@"$
+average_sentence_length	     @,@"
+vocabulary_density	���V�/�?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     0@"
+relative_position	ŏ1w-�?2�
+
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_32 �
+�step: pipeline. pipelineSteps (). values ()) {if (targetType == DependencyType. MODULE && step. processorInfo ()! = null && targetId. equals (step. processorInfo (). grpcServiceName ())) {return true;} if (step. outputs ()! = null) {for (var output: step. outputs (). values ()) {if (output. grpcTransport ()! = null && targetId. equals (output. grpcTransport (). serviceName ())) {return true;}}}} return false;} private String buildPipelineKey (String clusterName, String pipelineId) {return@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_32 ��(ڥ:standard_500_50" 
+average_word_length	��3��@"$
+potential_heading_score	�������?"
+sentence_count	      .@"$
+alphanumeric_percentage	��d�`T�?"�
+punctuation_counts�*�
+
+!	      @
+
+&	      @
+
+(	      2@
+
+)	      3@
+
+:	       @
+
+{	      @
+
+;	      @
+
+,	      �?
+
+=	      @
+
+}	      @
+
+.	      ,@"!
+uppercase_percentage	$���~��?""
+whitespace_percentage	k�w��#�?"
+list_item_indicator  "
+
+word_count	     �]@"$
+average_sentence_length	]m����@"
+vocabulary_density	������?"
+digit_percentage	        "
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	     �~@"
+relative_position	��_vO�?2�
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_33!�
+�clusterName, String pipelineId) {return buildClusterPrefix (clusterName) + " pipelines / " + pipelineId + " / config ";} private String buildClusterPrefix (String clusterName) {return " rokkon - clusters / " + clusterName + " / ";} private String extractPipelineIdFromKey (String key) {// Extract from: rokkon - clusters / {cluster} / pipelines / {pipelineId} / config String [] parts = key. split (" / "); if (parts. length > = 4 && " pipelines ". equals (parts [2] )) {return parts [3];} return@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_33 ��(ש:standard_500_50" 
+average_word_length	Qk�w�"@"$
+potential_heading_score	�������?"
+sentence_count	      @"$
+alphanumeric_percentage	      �?"�
+punctuation_counts�*�
+
+"	      (@
+
+&	       @
+
+(	      @
+
+)	      @
+
++	      @
+
+,	      �?
+
+-	       @
+
+.	      @
+
+/	      &@
+
+:	      �?
+
+{	      @
+
+;	      @
+
+[	      @
+
+}	      @
+
+]	      @
+
+=	       @
+
+>	      �?"!
+uppercase_percentage	A��ǘ��?""
+whitespace_percentage	鷯��?"
+list_item_indicator  "
+
+word_count	     �]@"$
+average_sentence_length	     �=@"
+vocabulary_density	�^)���?"
+digit_percentage	�~j�t�x?"
+is_last_chunk  "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      @"
+relative_position	W�/�'�?2�	
+@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_34"�
+�return parts [3];} return null;} // Supporting classes public record DependencyImpactAnalysis (String targetId, DependencyType targetType, List < String > affectedPipelines, List < String > orphanedTopics, List < String > orphanedServices, boolean canSafelyDelete) {} public enum DependencyType {PIPELINE, MODULE, SCHEMA}}@95b47a92-b543-40fd-b811-127ac306e817_tika-input-doc-018_chunk_34 ��(�:standard_500_50" 
+average_word_length	�G�z�@"$
+potential_heading_score	333333�?"
+sentence_count	      �?"$
+alphanumeric_percentage	q=
+ףp�?"�
+punctuation_counts�*�
+
+(	      �?
+
+)	      �?
+
+[	      �?
+
+;	       @
+
+{	       @
+
+,	      @
+
+<	      @
+
+]	      �?
+
+}	      @
+
+>	      @
+
+/	       @"!
+uppercase_percentage	���{��?""
+whitespace_percentage	h��|?5�?"
+list_item_indicator  "
+
+word_count	     �L@"$
+average_sentence_length	     �L@"
+vocabulary_density	���S��?"
+digit_percentage	a��+ei?"
+is_last_chunk "
+contains_urlplaceholder  "
+is_first_chunk  "
+character_count	      t@"
+relative_position	      �?

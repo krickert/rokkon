@@ -1,0 +1,86 @@
+
+tika-input-doc-015"Sample Document for PDF Testing*≠Sample Document for PDF Testing Introduction This is a simple document created to test basic PDF functionality. It includes various text formatting options to ensure proper rendering in PDF readers. Text Formatting Examples 1. Bold text is used for emphasis. 2. Italic text can be used for titles or subtle emphasis. 3. Strikethrough is used to show deleted text. Lists Here's an example of an unordered list: Item 1 Item 2 Item 3 And here's an ordered list: 1. First item 2. Second item 3. Third item Quote This is an example of a block quote. It can be used to highlight important information or citations. Table Header 1 Header 2 Header 3 Row 1, Col 1 Row 1, Col 2 Row 1, Col 3 Row 2, Col 1 Row 2, Col 2 Row 2, Col 3 This document demonstrates various formatting options that should translate well to PDF format. This sample PDF file is provided by Sample-Files.com. Visit us for more sample files and resources. https://sample-files.com/bÃ
+ç
+pdf_docinfo_creator_toolqoMozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36
+i
+x_tika_parsed_by_full_setLJorg.apache.tika.parser.DefaultParser; org.apache.tika.parser.pdf.PDFParser
+(
+access_permission_fill_in_formtrue
+.
+pdf_docinfo_modified2024-07-09T13:31:41Z
+5
++access_permission_extract_for_accessibilitytrue
+&
+pdf_containsnonembeddedfontfalse
+
+pdf_annotationtypesnull
+&
+access_permission_can_modifytrue
+`
+x_tika_parsed_byLJorg.apache.tika.parser.DefaultParser; org.apache.tika.parser.pdf.PDFParser
+
+
+pdf_hasxfafalse
+
+pdf_num3dannotations0
+2
+)pdf_overallpercentageunmappedunicodechars0.0
+-
+pdf_docinfo_created2024-07-09T13:31:41Z
+!
+content_typeapplication/pdf
+-
+#access_permission_assemble_documenttrue
+Ñ
+xmp_creatortoolqoMozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36
+6
+pdf_docinfo_title!Sample Document for PDF Testing
+
+pdf_producerSkia/PDF m126
+.
+$access_permission_modify_annotationstrue
+ 
+pdf_annotationsubtypesLink
+
+
+pdf_hasxmpfalse
++
+	dc_formatapplication/pdf; version=1.4
+
+pdf_hascollectionfalse
+$
+pdf_totalunmappedunicodechars0
+
+dc_languageen
+
+xmptpg_npages1
+
+pdf_encryptedfalse
+"
+pdf_containsdamagedfontfalse
+*
+dcterms_modified2024-07-09T13:31:41Z
+
+pdf_pdfversion1.4
+&
+pdf_unmappedunicodecharsperpage0
+-
+dc_title!Sample Document for PDF Testing
+%
+access_permission_can_printtrue
+)
+dcterms_created2024-07-09T13:31:41Z
+
+pdf_ocrpagecount0
++
+!access_permission_extract_contenttrue
+
+resourcename	PDF.pdf
+'
+pdf_docinfo_producerSkia/PDF m126
+
+pdf_hasmarkedcontenttrue
+.
+$access_permission_can_print_faithfultrue
+
+pdf_charsperpage884

@@ -24,6 +24,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.UUID;
 
@@ -47,13 +48,14 @@ public class EmbedderComprehensiveTest {
     public void setup() {
         testDataHelper = new ProtobufTestDataHelper();
         chunkedDocuments = new ArrayList<>();
-        // Load the chunker output documents we just generated
-        testDataHelper.getChunkerPipeDocuments().forEach(chunkedDocuments::add);
-        LOG.info("Loaded {} chunked documents for embedding", chunkedDocuments.size());
     }
 
     @Test
     public void testEmbedWithNomicModel() throws Exception {
+        // Load chunker documents
+        testDataHelper.getChunkerPipeDocuments().forEach(chunkedDocuments::add);
+        LOG.info("Loaded {} chunked documents for embedding", chunkedDocuments.size());
+        
         LOG.info("\n=== Testing Model 1: nomic-ai/nomic-embed-text-v1.5 (768 dimensions) ===");
         
         Path outputDir = Paths.get("build/test-data/embedder/output-nomic");
@@ -136,6 +138,10 @@ public class EmbedderComprehensiveTest {
 
     @Test
     public void testEmbedWithBGEModel() throws Exception {
+        // Load chunker documents
+        testDataHelper.getChunkerPipeDocuments().forEach(chunkedDocuments::add);
+        LOG.info("Loaded {} chunked documents for embedding", chunkedDocuments.size());
+        
         LOG.info("\n=== Testing Model 2: BAAI/bge-small-en-v1.5 (384 dimensions) ===");
         
         Path outputDir = Paths.get("build/test-data/embedder/output-bge");

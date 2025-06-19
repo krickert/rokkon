@@ -1,0 +1,18 @@
+
+tika-input-doc-125"3// VARIATION 125 of Build Configuration (Variant 5)*§// VARIATION 125 of Build Configuration (Variant 5) // Generated on: 2025-06-18T14:38:08.506332482Z // Base file: source-code/build.gradle.kts plugins { java id("io.quarkus") } repositories { mavenCentral() mavenLocal() } val quarkusPlatformGroupId: String by project val quarkusPlatformArtifactId: String by project val quarkusPlatformVersion: String by project dependencies { implementation("io.quarkiverse.config:quarkus-config-consul") implementation("io.quarkus:quarkus-micrometer-registry-prometheus") implementation("io.quarkus:quarkus-logging-json") implementation("io.quarkus:quarkus-websockets") implementation("io.quarkus:quarkus-smallrye-openapi") implementation("io.swagger.core.v3:swagger-annotations:2.2.8") implementation("io.quarkus:quarkus-smallrye-stork") implementation("io.quarkus:quarkus-smallrye-jwt") implementation("io.quarkus:quarkus-hibernate-validator") implementation("io.quarkus:quarkus-smallrye-health") implementation("io.quarkus:quarkus-rest") implementation("io.quarkus:quarkus-rest-jackson") implementation("io.quarkus:quarkus-scheduler") implementation("io.quarkus:quarkus-kafka-client") implementation("io.quarkus:quarkus-grpc") implementation("io.grpc:grpc-services") // Includes gRPC health service implementation("io.quarkus:quarkus-rest-client-jackson") implementation(enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}")) implementation("io.quarkus:quarkus-config-yaml") implementation("io.quarkus:quarkus-arc") // JSON Schema validation implementation("com.networknt:json-schema-validator:1.5.2") testImplementation("io.quarkus:quarkus-junit5") testImplementation("io.rest-assured:rest-assured") implementation("io.smallrye.stork:stork-service-discovery-consul") implementation("io.smallrye.stork:stork-service-registration-consul") testImplementation("org.testcontainers:consul:1.21.1") testImplementation("org.testcontainers:junit-jupiter:1.21.1") // Add echo-service as test dependency for integration tests testImplementation(project(":modules:echo-service")) // https://mvnrepository.com/artifact/org.apache.commons/commons-lang3 implementation("org.apache.commons:commons-lang3:3.17.0") } group = "com.krickert.rokkon" version = "1.0.0-SNAPSHOT" java { sourceCompatibility = JavaVersion.VERSION_21 targetCompatibility = JavaVersion.VERSION_21 } tasks.withType<Test> { systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager") } tasks.withType<JavaCompile> { options.encoding = "UTF-8" options.compilerArgs.add("-parameters") } // END VARIATION 125 // Total size: 2764 charactersb√
+6
+x_tika_encodingdetectorUniversalEncodingDetector
+p
+x_tika_parsed_by_full_setSQorg.apache.tika.parser.DefaultParser; org.apache.tika.parser.csv.TextAndCSVParser
+0
+content_type text/plain; charset=ISO-8859-1
+ 
+content_encoding
+ISO-8859-1
+'
+x_tika_detectedencoding
+ISO-8859-1
+1
+resourcename!source-code/build_v5.gradle.kts
+g
+x_tika_parsed_bySQorg.apache.tika.parser.DefaultParser; org.apache.tika.parser.csv.TextAndCSVParser
