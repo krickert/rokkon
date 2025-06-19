@@ -9,13 +9,48 @@ import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
 
 /**
- * Event-driven router interface that handles routing between pipeline steps
- * using various transport mechanisms (gRPC, Kafka, etc.).
+ * Event-driven router interface that orchestrates message routing between pipeline steps
+ * using pluggable transport mechanisms.
  * 
- * This router follows an event-driven pattern where:
- * - Routing decisions are made based on step configuration
- * - Multiple transports can be used in parallel
- * - Events can be published for monitoring/observability
+ * <p>
+ * The EventDrivenRouter is a core abstraction in the Rokkon Engine that decouples
+ * the orchestration logic from specific transport implementations. It enables:
+ * </p>
+ * 
+ * <h2>Key Features:</h2>
+ * <ul>
+ *   <li><b>Transport Agnostic:</b> Supports multiple transport types (gRPC, Kafka, HTTP, etc.)</li>
+ *   <li><b>Parallel Routing:</b> Can route messages to multiple destinations simultaneously</li>
+ *   <li><b>Event-Driven Architecture:</b> Publishes routing events for monitoring and observability</li>
+ *   <li><b>Pluggable Handlers:</b> Transport handlers can be registered dynamically</li>
+ *   <li><b>Configuration-Based:</b> Routing decisions based on pipeline step configuration</li>
+ * </ul>
+ * 
+ * <h2>Usage Example:</h2>
+ * <pre>{@code
+ * @Inject
+ * EventDrivenRouter router;
+ * 
+ * // Route a request through the pipeline
+ * ProcessRequest request = createRequest();
+ * PipelineStepConfig stepConfig = getStepConfig();
+ * 
+ * router.routeRequest(request, stepConfig)
+ *     .onItem().invoke(response -> handleResponse(response))
+ *     .onFailure().invoke(error -> handleError(error));
+ * }</pre>
+ * 
+ * <h2>Implementation Note:</h2>
+ * <p>
+ * Implementations should ensure thread-safety as the router may be called
+ * from multiple concurrent pipeline executions. Transport handlers should
+ * be registered during application startup.
+ * </p>
+ * 
+ * @see TransportHandler
+ * @see PipelineStepConfig
+ * @see TransportType
+ * @since 1.0
  */
 public interface EventDrivenRouter {
     
