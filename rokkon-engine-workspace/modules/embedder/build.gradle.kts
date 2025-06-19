@@ -60,18 +60,6 @@ quarkus {
     }
 }
 
-// Extract proto files from jar for local stub generation
-val extractProtos = tasks.register<Copy>("extractProtos") {
-    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("rokkon-protobuf") }.singleFile))
-    include("**/*.proto")
-    into("src/main/proto")
-    includeEmptyDirs = false
-}
-
-tasks.named("quarkusGenerateCode") {
-    dependsOn(extractProtos)
-}
-
 publishing {
     publications {
         create<MavenPublication>("maven") {

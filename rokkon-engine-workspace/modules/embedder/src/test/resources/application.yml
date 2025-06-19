@@ -1,0 +1,28 @@
+quarkus:
+  application:
+    name: embedder-module-test
+  grpc:
+    server:
+      port: 0  # Use random port for tests
+      max-inbound-message-size: 1073741824  # 1GB - match the server
+      max-inbound-metadata-size: 10485760  # 10MB for metadata
+      max-outbound-message-size: 1073741824  # 1GB for responses
+    clients:
+      embedderService:
+        host: localhost
+        port: 0
+        max-inbound-message-size: 1073741824  # 1GB for client too
+
+# Processing buffer configuration for tests
+processing:
+  buffer:
+    enabled: true
+    capacity: 100
+    directory: target/test-data/embedder-output
+    prefix: embedder-output
+
+# DJL configuration for tests - disable GPU
+djl:
+  pytorch:
+    use-gpu: false
+    num-threads: 2

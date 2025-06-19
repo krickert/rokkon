@@ -16,8 +16,7 @@ import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
-import org.junit.jupiter.api.TestInstance;
-import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.BeforeEach;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,10 +43,12 @@ public class EmbedderComprehensiveTest {
     private ProtobufTestDataHelper testDataHelper;
     private List<PipeDoc> chunkedDocuments;
 
-    @BeforeAll
+    @BeforeEach
     public void setup() {
         testDataHelper = new ProtobufTestDataHelper();
-        chunkedDocuments = testDataHelper.loadTestData("test-data/chunker/output", PipeDoc.class);
+        chunkedDocuments = new ArrayList<>();
+        // Load the chunker output documents we just generated
+        testDataHelper.getChunkerPipeDocuments().forEach(chunkedDocuments::add);
         LOG.info("Loaded {} chunked documents for embedding", chunkedDocuments.size());
     }
 
@@ -110,7 +111,7 @@ public class EmbedderComprehensiveTest {
                     
                     // Check embeddings were created
                     int embeddingCount = outputDoc.getSemanticResultsCount() > 0 ? 
-                            outputDoc.getSemanticResults(0).getDocumentResultsCount() : 0;
+                            outputDoc.getSemanticResults(0).getChunksCount() : 0;
                     LOG.info("✓ Successfully created {} embeddings", embeddingCount);
                 } else {
                     failCount++;
@@ -192,7 +193,7 @@ public class EmbedderComprehensiveTest {
                     
                     // Check embeddings were created
                     int embeddingCount = outputDoc.getSemanticResultsCount() > 0 ? 
-                            outputDoc.getSemanticResults(0).getDocumentResultsCount() : 0;
+                            outputDoc.getSemanticResults(0).getChunksCount() : 0;
                     LOG.info("✓ Successfully created {} embeddings", embeddingCount);
                 } else {
                     failCount++;

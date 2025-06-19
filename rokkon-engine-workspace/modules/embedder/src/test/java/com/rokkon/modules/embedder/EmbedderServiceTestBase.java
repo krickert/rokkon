@@ -104,8 +104,9 @@ public abstract class EmbedderServiceTestBase {
 
     @Test
     void testProcessChunkerOutputData() {
-        // Get chunker output data from test-utilities (both default and small chunks)
-        Collection<PipeStream> chunkerOutputStreams = ProtobufTestDataHelper.getAllChunkerOutputStreams();
+        // Get chunker output data from test-utilities
+        ProtobufTestDataHelper testHelper = new ProtobufTestDataHelper();
+        Collection<PipeStream> chunkerOutputStreams = testHelper.getChunkerPipeStreams();
 
         // If no chunker output data is available, log a warning and skip the test
         if (chunkerOutputStreams.isEmpty()) {
