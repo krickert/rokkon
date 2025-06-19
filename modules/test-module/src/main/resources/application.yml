@@ -1,13 +1,15 @@
 quarkus:
   application:
     name: test-module
+  http:
+    port: 8094  # Different from default 8080
+    test-port: 0  # Random port for tests
   grpc:
     server:
       port: 49094  # Different from other modules
       host: 0.0.0.0
       enable-reflection-service: true
       max-inbound-message-size: 1073741824  # 1GB
-      max-outbound-message-size: 1073741824  # 1GB
       health:
         enabled: true
     clients:
