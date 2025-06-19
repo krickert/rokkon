@@ -5,7 +5,7 @@ import io.vertx.core.json.JsonArray;
 import io.vertx.core.json.JsonObject;
 import io.vertx.ext.consul.CheckList;
 import io.vertx.ext.consul.ConsulClient;
-import io.vertx.ext.consul.ServiceList;
+import io.vertx.ext.consul.ServiceEntryList;
 import io.vertx.mutiny.core.Vertx;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -55,14 +55,16 @@ public class ServiceDiscoveryService {
             // Just query for healthy service nodes without options for now
             consulClient.healthServiceNodes(serviceName, true)
                     .onSuccess(serviceList -> {
-                        if (serviceList.isEmpty()) {
+                        // serviceList is a ServiceEntryList (extends JsonArray)
+                        JsonArray entries = (JsonArray) serviceList;
+                        if (entries.isEmpty()) {
                             LOG.warn("No healthy instances found for service: {}", serviceName);
                             emitter.complete(null);
                             return;
                         }
 
                         // Simple random load balancing
-                        JsonObject selected = serviceList.getJsonObject(random.nextInt(serviceList.size()));
+                        JsonObject selected = entries.getJsonObject(random.nextInt(entries.size()));
                         
                         JsonObject service = selected.getJsonObject("Service");
                         String address = service.getString("Address");
@@ -100,9 +102,12 @@ public class ServiceDiscoveryService {
             // Query for healthy service nodes
             consulClient.healthServiceNodes(serviceName, true)
                     .onSuccess(serviceList -> {
-                        List<ServiceInstance> instances = serviceList.stream()
+                        // serviceList is a ServiceEntryList (extends JsonArray)
+                        JsonArray entries = (JsonArray) serviceList;
+                        List<ServiceInstance> instances = entries.stream()
                                 .map(obj -> {
-                                    JsonObject service = obj.getJsonObject("Service");
+                                    JsonObject entry = (JsonObject) obj;
+                                    JsonObject service = entry.getJsonObject("Service");
                                     return new ServiceInstance(
                                             serviceName,
                                             service.getString("ID"),
@@ -135,16 +140,15 @@ public class ServiceDiscoveryService {
         return Uni.createFrom().emitter(emitter -> {
             consulClient.healthChecks(serviceName)
                     .onSuccess(checks -> {
-                        // CheckList is a Vert.x type, iterate through it
+                        // checks is a CheckList (extends JsonArray)
+                        JsonArray checkArray = (JsonArray) checks;
                         boolean isHealthy = true;
-                        for (Object checkObj : checks) {
-                            if (checkObj instanceof JsonObject) {
-                                JsonObject check = (JsonObject) checkObj;
-                                if (serviceId.equals(check.getString("ServiceID")) && 
-                                    !"passing".equals(check.getString("Status"))) {
-                                    isHealthy = false;
-                                    break;
-                                }
+                        for (int i = 0; i < checkArray.size(); i++) {
+                            JsonObject check = checkArray.getJsonObject(i);
+                            if (serviceId.equals(check.getString("ServiceID")) && 
+                                !"passing".equals(check.getString("Status"))) {
+                                isHealthy = false;
+                                break;
                             }
                         }
                         

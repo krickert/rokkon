@@ -40,7 +40,7 @@ public class PipelineExecutorService {
     PipelineConfigService pipelineConfigService;
 
     @Inject
-    ModuleRouter moduleRouter;
+    EventDrivenRouter router;
 
     // Track active executions for monitoring
     private final Map<String, PipeStreamExecutionContext> activeExecutions = new ConcurrentHashMap<>();
@@ -164,7 +164,7 @@ public class PipelineExecutorService {
         ProcessRequest request = buildProcessRequest(context, stepConfig);
 
         // Route to module using appropriate transport
-        return moduleRouter.routeToModule(request, stepConfig)
+        return router.routeRequest(request, stepConfig)
                 .flatMap(processResponse -> {
                     // Record execution history
                     long endTime = System.currentTimeMillis();
@@ -271,42 +271,34 @@ public class PipelineExecutorService {
 
     /**
      * Determine the next step based on routing configuration.
-     * Also handles Kafka routing for asynchronous transport.
+     * Uses the event-driven router to handle all transports.
      */
     private String determineNextStep(PipelineStepConfig currentStep, PipeStream stream) {
         if (currentStep.outputs() == null || currentStep.outputs().isEmpty()) {
             return null;
         }
 
-        // Process all outputs
-        String nextGrpcStep = null;
-        for (Map.Entry<String, PipelineStepConfig.OutputTarget> entry : currentStep.outputs().entrySet()) {
-            PipelineStepConfig.OutputTarget output = entry.getValue();
-            
-            if (output.transportType() == TransportType.GRPC && 
-                output.grpcTransport() != null) {
-                // For gRPC, we'll return the target step for synchronous processing
-                if (nextGrpcStep == null) {
-                    nextGrpcStep = output.targetStepName();
-                }
-            } else if (output.transportType() == TransportType.KAFKA && 
-                       output.kafkaTransport() != null) {
-                // For Kafka, send asynchronously (fire and forget for now)
-                LOG.debug("Routing to Kafka for step: {}", output.targetStepName());
-                kafkaRouter.routeToModule(
-                    stream.getCurrentPipelineName(),
-                    output.targetStepName(),
-                    stream,
-                    currentStep
-                ).subscribe().with(
-                    success -> LOG.debug("Successfully routed to Kafka"),
-                    error -> LOG.error("Failed to route to Kafka", error)
-                );
-            }
-        }
-        
-        // Return the gRPC next step for synchronous processing
-        return nextGrpcStep;
+        // Route to all configured outputs using the event-driven router
+        router.routeStream(stream, currentStep)
+            .subscribe().with(
+                result -> {
+                    if (result.success()) {
+                        LOG.debug("Successfully routed to {} via {}", 
+                            result.targetStepName(), result.transportType());
+                    } else {
+                        LOG.error("Failed to route to {} via {}: {}", 
+                            result.targetStepName(), result.transportType(), result.message());
+                    }
+                },
+                error -> LOG.error("Error in routing stream", error)
+            );
+
+        // Find the next synchronous (gRPC) step to continue pipeline execution
+        return currentStep.outputs().values().stream()
+            .filter(output -> output.transportType() == TransportType.GRPC)
+            .map(PipelineStepConfig.OutputTarget::targetStepName)
+            .findFirst()
+            .orElse(null);
     }
 
     /**
