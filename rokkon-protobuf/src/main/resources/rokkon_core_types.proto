@@ -79,8 +79,9 @@ message PipeDoc {
   // Map for storing other named embeddings (e.g., whole document embeddings, image embeddings).
   // Key could be a descriptive name like "full_document_ada_002_embedding" or "header_image_clip_embedding".
   map<string, Embedding> named_embeddings = 14;
-
+  //binary data and associated metadata
   optional Blob blob = 15;
+  //optional metadata
   map<string,string> metadata = 16;
 }
 
@@ -133,6 +134,13 @@ message StepExecutionRecord {
 
 }
 
+
+enum ActionType {
+  CREATE = 0;
+  UPDATE = 1;
+  DELETE = 2;
+  NO_OP = 3;
+}
 // --- Pipeline Execution State ---
 
 message PipeStream {
@@ -152,4 +160,5 @@ message PipeStream {
   // state, possibly halting further processing unless handled by an error pipeline.
   map<string, string> context_params = 8;     // Optional. Key-value parameters for the entire run's context (e.g., tenant_id, user_id,
   // correlation_id).
+  ActionType action_type = 9;                 // REQUIRED
 }
