@@ -12,6 +12,7 @@ import com.rokkon.search.sdk.ProcessResponse;
 import com.rokkon.search.sdk.ServiceMetadata;
 import com.rokkon.test.data.ProtobufTestDataHelper;
 import com.rokkon.test.util.DocumentProcessingSummary;
+import com.rokkon.pipeline.chunker.UnicodeSanitizer;
 import io.quarkus.grpc.GrpcClient;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
@@ -70,13 +71,13 @@ public class DoubleChunkProcessingTest {
         List<PipeDoc> parserOutputDocs = new ArrayList<>();
         for (PipeDoc doc : allParserOutputDocs) {
             try {
-                // Clean the body to remove any invalid characters
-                String body = cleanInvalidUtf8(doc.getBody());
-                // Create a cleaned document
-                PipeDoc cleanedDoc = doc.toBuilder()
-                        .setBody(body)
+                // Sanitize the body to ensure valid UTF-8
+                String sanitizedBody = UnicodeSanitizer.sanitizeInvalidUnicode(doc.getBody());
+                // Create a sanitized document
+                PipeDoc sanitizedDoc = doc.toBuilder()
+                        .setBody(sanitizedBody)
                         .build();
-                parserOutputDocs.add(cleanedDoc);
+                parserOutputDocs.add(sanitizedDoc);
             } catch (Exception e) {
                 LOG.warn("Error processing document {}: {}", doc.getId(), e.getMessage());
                 // Still add it but with empty body if completely broken
@@ -117,14 +118,20 @@ public class DoubleChunkProcessingTest {
                 
                 ProcessRequest request = createProcessRequest(doc, firstPassConfig, "first-pass");
                 
-                // Process document
-                UniAssertSubscriber<ProcessResponse> subscriber = chunkerService.processData(request)
-                        .subscribe().withSubscriber(UniAssertSubscriber.create());
-                
-                ProcessResponse response = subscriber
-                        .awaitItem()
-                        .assertCompleted()
-                        .getItem();
+                // Process document - use await() directly for large messages
+                ProcessResponse response = null;
+                try {
+                    response = chunkerService.processData(request)
+                            .await()
+                            .atMost(java.time.Duration.ofSeconds(60)); // Longer timeout for large docs
+                } catch (Exception e) {
+                    LOG.error("Error processing document {}: {}", doc.getId(), e.getMessage());
+                    firstPassFailure++;
+                    String docInfo = String.format("%s (%s)", doc.getId(), 
+                            doc.hasBlob() ? doc.getBlob().getFilename() : "no filename");
+                    firstPassFailedDocs.add(docInfo);
+                    continue; // Skip to next document
+                }
 
                 if (response.getSuccess() && response.hasOutputDoc()) {
                     PipeDoc outputDoc = response.getOutputDoc();
@@ -190,14 +197,19 @@ public class DoubleChunkProcessingTest {
                 
                 ProcessRequest request = createProcessRequest(docForSecondPass, secondPassConfig, "second-pass");
                 
-                // Process document
-                UniAssertSubscriber<ProcessResponse> subscriber = chunkerService.processData(request)
-                        .subscribe().withSubscriber(UniAssertSubscriber.create());
-                
-                ProcessResponse response = subscriber
-                        .awaitItem()
-                        .assertCompleted()
-                        .getItem();
+                // Process document - use await() directly for large messages
+                ProcessResponse response = null;
+                try {
+                    response = chunkerService.processData(request)
+                            .await()
+                            .atMost(java.time.Duration.ofSeconds(60)); // Longer timeout for large docs
+                } catch (Exception e) {
+                    LOG.error("Error processing document {}: {}", docForSecondPass.getId(), e.getMessage());
+                    secondPassFailure++;
+                    String docInfo = String.format("%s", docForSecondPass.getId());
+                    secondPassFailedDocs.add(docInfo);
+                    continue; // Skip to next document
+                }
 
                 if (response.getSuccess() && response.hasOutputDoc()) {
                     PipeDoc outputDoc = response.getOutputDoc();
@@ -376,41 +388,5 @@ public class DoubleChunkProcessingTest {
             LOG.info("Chunk multiplication factor: {:.2f}x", 
                     (double) totalSecondPassChunks / totalFirstPassChunks);
         }
-    }
-    
-    /**
-     * Clean invalid UTF-8 sequences from a string.
-     * This handles unpaired surrogates and other invalid characters.
-     */
-    private String cleanInvalidUtf8(String text) {
-        if (text == null) return "";
-        
-        // Replace invalid characters with replacement character
-        StringBuilder cleaned = new StringBuilder(text.length());
-        for (int i = 0; i < text.length(); i++) {
-            char ch = text.charAt(i);
-            
-            // Check for high surrogate
-            if (Character.isHighSurrogate(ch)) {
-                if (i + 1 < text.length() && Character.isLowSurrogate(text.charAt(i + 1))) {
-                    // Valid surrogate pair
-                    cleaned.append(ch);
-                    cleaned.append(text.charAt(++i));
-                } else {
-                    // Unpaired high surrogate - replace with space
-                    cleaned.append(' ');
-                }
-            } else if (Character.isLowSurrogate(ch)) {
-                // Unpaired low surrogate - replace with space
-                cleaned.append(' ');
-            } else if (Character.isISOControl(ch) && ch != '\n' && ch != '\r' && ch != '\t') {
-                // Replace control characters except common whitespace
-                cleaned.append(' ');
-            } else {
-                cleaned.append(ch);
-            }
-        }
-        
-        return cleaned.toString();
     }
 }

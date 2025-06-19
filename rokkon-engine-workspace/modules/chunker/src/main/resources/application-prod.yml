@@ -1,0 +1,8 @@
+# Production-specific configuration
+quarkus:
+  grpc:
+    server:
+      port: 9090  # Fixed port for production
+  processing:
+    buffer:
+      enabled: false  # Disable buffer in production

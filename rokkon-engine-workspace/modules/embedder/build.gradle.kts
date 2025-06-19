@@ -19,7 +19,8 @@ dependencies {
     implementation("io.quarkus:quarkus-smallrye-health")
     implementation("io.quarkus:quarkus-logging-json")
     implementation("io.grpc:grpc-services")
-    implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
 
     // DJL (Deep Java Library) for ML inference
     implementation("ai.djl.huggingface:tokenizers:0.33.0")
@@ -57,6 +58,18 @@ quarkus {
     buildForkOptions {
         systemProperty("quarkus.grpc.codegen.type", "mutiny")
     }
+}
+
+// Extract proto files from jar for local stub generation
+val extractProtos = tasks.register<Copy>("extractProtos") {
+    from(zipTree(configurations.runtimeClasspath.get().filter { it.name.contains("rokkon-protobuf") }.singleFile))
+    include("**/*.proto")
+    into("src/main/proto")
+    includeEmptyDirs = false
+}
+
+tasks.named("quarkusGenerateCode") {
+    dependsOn(extractProtos)
 }
 
 publishing {

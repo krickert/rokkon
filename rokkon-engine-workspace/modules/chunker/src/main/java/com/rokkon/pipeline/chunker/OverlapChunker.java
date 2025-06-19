@@ -28,6 +28,7 @@ public class OverlapChunker {
 
     private static final Logger LOG = Logger.getLogger(OverlapChunker.class);
     private static final long MAX_TEXT_BYTES = 100 * 1024 * 1024; // 100MB limit
+    private static final int MAX_CHUNKS_PER_DOCUMENT = 1000; // Limit chunks to prevent gRPC message size issues
     private final Tokenizer tokenizer;
 
     private static final Pattern URL_PATTERN = Pattern.compile(
@@ -168,6 +169,9 @@ public class OverlapChunker {
             return new ChunkingResult(Collections.emptyList(), Collections.emptyMap()); // Return empty result
         }
         String originalText = textOptional.get();
+        
+        // Sanitize the text to ensure valid UTF-8 encoding before processing
+        originalText = UnicodeSanitizer.sanitizeInvalidUnicode(originalText);
 
         // Handle MAX_TEXT_BYTES before URL processing to avoid issues with placeholder lengths
         byte[] originalTextBytes = originalText.getBytes(StandardCharsets.UTF_8);

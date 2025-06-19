@@ -10,7 +10,6 @@ pluginManagement {
 rootProject.name = "rokkon-engine-workspace"
 
 includeBuild("proto-definitions") // This build uses its OWN settings.gradle.kts
-includeBuild("proto-definitions-deployment") // Only include this once
 includeBuild("test-utilities")
 includeBuild("engine-models")
 includeBuild("engine-validators")

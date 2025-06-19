@@ -108,8 +108,11 @@ public class ChunkerServiceImpl implements PipeStepProcessor {
 
                     int currentChunkNumber = 0;
                     for (Chunk chunkRecord : chunkRecords) {
+                        // Sanitize the chunk text to ensure valid UTF-8
+                        String sanitizedText = UnicodeSanitizer.sanitizeInvalidUnicode(chunkRecord.text());
+                        
                         ChunkEmbedding.Builder chunkEmbeddingBuilder = ChunkEmbedding.newBuilder()
-                                .setTextContent(chunkRecord.text())
+                                .setTextContent(sanitizedText)
                                 .setChunkId(chunkRecord.id())
                                 .setOriginalCharStartOffset(chunkRecord.originalIndexStart())
                                 .setOriginalCharEndOffset(chunkRecord.originalIndexEnd())
@@ -120,7 +123,7 @@ public class ChunkerServiceImpl implements PipeStepProcessor {
                                 placeholderToUrlMap.keySet().stream().anyMatch(ph -> chunkRecord.text().contains(ph));
 
                         Map<String, com.google.protobuf.Value> extractedMetadata = metadataExtractor.extractAllMetadata(
-                                chunkRecord.text(),
+                                sanitizedText,  // Use sanitized text for metadata extraction too
                                 currentChunkNumber,
                                 chunkRecords.size(),
                                 containsUrlPlaceholder

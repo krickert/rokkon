@@ -14,8 +14,6 @@ class ProtobufTestDataHelperIT extends ProtobufTestDataHelperTestBase {
             synchronized (ProtobufTestDataHelperIT.class) {
                 if (protobufTestDataHelper == null) {
                     protobufTestDataHelper = new ProtobufTestDataHelper();
-                    RokkonTestProtosLoader loader = new RokkonTestProtosLoader();
-                    protobufTestDataHelper.protos = loader;
                 }
             }
         }
