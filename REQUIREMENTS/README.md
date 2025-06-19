@@ -1,7 +1,7 @@
-# YAPPY Engine Quarkus Migration Requirements
+# Rokkon Engine Quarkus Migration Requirements
 
 ## Overview
-This directory contains comprehensive requirements for migrating the YAPPY Engine from Micronaut to Quarkus, focusing on operational effectiveness, scalability, and developer productivity.
+This directory contains comprehensive requirements for migrating the Rokkon Engine from Micronaut to Quarkus, focusing on operational effectiveness, scalability, and developer productivity.
 
 ## Requirements Documents
 

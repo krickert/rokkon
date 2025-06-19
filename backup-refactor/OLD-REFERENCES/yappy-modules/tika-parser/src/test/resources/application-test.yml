@@ -1,7 +1,0 @@
-micronaut:
-  server:
-    port: ${random.port}  # Random port for tests
-  
-grpc:
-  server:
-    port: ${random.port}  # Random port for gRPC tests

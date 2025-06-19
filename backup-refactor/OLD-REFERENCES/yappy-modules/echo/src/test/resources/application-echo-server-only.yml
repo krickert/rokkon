@@ -1,7 +1,0 @@
-# Configuration for running echo service standalone
-micronaut:
-  application:
-    name: echo-standalone
-grpc:
-  server:
-    port: ${random.port}

@@ -1,7 +1,7 @@
 # Core Architecture Requirements - Quarkus Migration
 
 ## Overview
-Migrate YAPPY Engine from Micronaut to Quarkus with a focus on reliability, ease of testing, and maintainability. Start with a monolithic approach to eliminate the multi-module brittleness experienced with Micronaut.
+Migrate Rokkon Engine from Micronaut to Quarkus with a focus on reliability, ease of testing, and maintainability. Start with a monolithic approach to eliminate the multi-module brittleness experienced with Micronaut.
 
 ## Architecture Principles
 - **Pure Orchestration Layer**: Engine contains no business logic, only routing and coordination
