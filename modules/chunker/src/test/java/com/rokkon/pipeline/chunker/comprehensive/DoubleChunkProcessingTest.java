@@ -11,7 +11,7 @@ import com.rokkon.search.sdk.ProcessRequest;
 import com.rokkon.search.sdk.ProcessResponse;
 import com.rokkon.search.sdk.ServiceMetadata;
 import com.rokkon.test.data.ProtobufTestDataHelper;
-import com.rokkon.test.util.DocumentProcessingSummary;
+// import com.rokkon.test.util.DocumentProcessingSummary; // TODO: Fix static method issue with Quarkus
 import com.rokkon.pipeline.chunker.UnicodeSanitizer;
 import io.quarkus.grpc.GrpcClient;
 import io.quarkus.test.junit.QuarkusTest;
@@ -241,14 +241,22 @@ public class DoubleChunkProcessingTest {
 
         // Generate summaries
         LOG.info("\n=== First Pass Summary ===");
-        DocumentProcessingSummary.generateSummary(
-                createBufferFromDocs(firstPassResults), 
-                firstPassFailure, 
-                firstPassFailedDocs
-        );
+        // TODO: Re-enable when DocumentProcessingSummary is made non-static for Quarkus
+        // DocumentProcessingSummary.generateSummary(
+        //         createBufferFromDocs(firstPassResults), 
+        //         firstPassFailure, 
+        //         firstPassFailedDocs
+        // );
+        LOG.info("Total documents processed: {}", firstPassResults.size() + firstPassFailure);
+        LOG.info("Successfully parsed: {}", firstPassResults.size());
+        LOG.info("Failed to parse: {}", firstPassFailure);
 
         LOG.info("\n=== Second Pass Summary ===");
-        DocumentProcessingSummary.generateSummary(outputBuffer, secondPassFailure, secondPassFailedDocs);
+        // TODO: Re-enable when DocumentProcessingSummary is made non-static for Quarkus
+        // DocumentProcessingSummary.generateSummary(outputBuffer, secondPassFailure, secondPassFailedDocs);
+        LOG.info("Total documents processed: {}", outputBuffer.size() + secondPassFailure);
+        LOG.info("Successfully parsed: {}", outputBuffer.size());
+        LOG.info("Failed to parse: {}", secondPassFailure);
 
         // Save second pass results (first pass was cleared from buffer)
         if (outputBuffer.size() > 0) {

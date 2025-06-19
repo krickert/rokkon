@@ -59,6 +59,51 @@ consul:
   host: ${CONSUL_HOST:localhost}
   port: ${CONSUL_PORT:8500}
 
+# Stork configuration for service discovery
+stork:
+  # Default service discovery for all services
+  default:
+    service-discovery:
+      type: consul
+      consul-host: ${consul.host:localhost}
+      consul-port: ${consul.port:8500}
+      refresh-period: 10s
+    load-balancer:
+      type: round-robin
+  
+  # Module-specific configurations
+  echo-service:
+    service-discovery:
+      type: consul
+      consul-host: ${consul.host:localhost}
+      consul-port: ${consul.port:8500}
+    load-balancer:
+      type: least-requests
+      
+  chunker-service:
+    service-discovery:
+      type: consul
+      consul-host: ${consul.host:localhost}
+      consul-port: ${consul.port:8500}
+    load-balancer:
+      type: least-response-time
+      
+  parser-service:
+    service-discovery:
+      type: consul
+      consul-host: ${consul.host:localhost}
+      consul-port: ${consul.port:8500}
+    load-balancer:
+      type: round-robin
+      
+  embedder-service:
+    service-discovery:
+      type: consul
+      consul-host: ${consul.host:localhost}
+      consul-port: ${consul.port:8500}
+    load-balancer:
+      type: least-requests
+
 grpc:
   client:
     max-inbound-message-size: ${GRPC_MAX_MESSAGE_SIZE:4194304}

@@ -9,7 +9,7 @@ import com.rokkon.search.sdk.ProcessRequest;
 import com.rokkon.search.sdk.ProcessResponse;
 import com.rokkon.search.sdk.ServiceMetadata;
 import com.rokkon.test.data.ProtobufTestDataHelper;
-import com.rokkon.test.util.DocumentProcessingSummary;
+// import com.rokkon.test.util.DocumentProcessingSummary; // TODO: Fix static method issue with Quarkus
 import io.quarkus.grpc.GrpcClient;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
@@ -139,7 +139,18 @@ public class SourceDocumentProcessingTest {
         LOG.info("Captured {} output documents in buffer", outputBuffer.size());
         
         // Generate metadata summary
-        DocumentProcessingSummary.generateSummary(outputBuffer, failureCount, failedDocuments);
+        // TODO: Re-enable when DocumentProcessingSummary is made non-static for Quarkus
+        // DocumentProcessingSummary.generateSummary(outputBuffer, failureCount, failedDocuments);
+        LOG.info("\n=== Document Processing Summary ===");
+        LOG.info("Total documents processed: {}", outputBuffer.size() + failureCount);
+        LOG.info("Successfully parsed: {}", outputBuffer.size());
+        LOG.info("Failed to parse: {}", failureCount);
+        if (failureCount > 0) {
+            LOG.info("\n--- Failed Documents ---");
+            for (String failedDoc : failedDocuments) {
+                LOG.info("  {}", failedDoc);
+            }
+        }
 
         // Save buffers to disk
         if (inputBuffer.size() > 0) {
