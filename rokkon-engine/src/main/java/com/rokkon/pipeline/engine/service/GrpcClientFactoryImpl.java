@@ -1,7 +1,7 @@
 package com.rokkon.pipeline.engine.service;
 
-import com.rokkon.search.sdk.MutinyPipeStepProcessorGrpc;
 import com.rokkon.search.sdk.PipeStepProcessor;
+import com.rokkon.search.sdk.PipeStepProcessorClient;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import jakarta.annotation.PreDestroy;
@@ -39,7 +39,7 @@ public class GrpcClientFactoryImpl implements GrpcClientFactory {
             
             channels.put(key, channel);
             
-            return MutinyPipeStepProcessorGrpc.newMutinyStub(channel);
+            return new PipeStepProcessorClient("PipeStepProcessor", channel, (name, stub) -> stub);
         });
     }
     

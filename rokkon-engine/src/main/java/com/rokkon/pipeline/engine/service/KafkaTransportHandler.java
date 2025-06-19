@@ -2,13 +2,11 @@ package com.rokkon.pipeline.engine.service;
 
 import com.rokkon.pipeline.config.model.KafkaTransportConfig;
 import com.rokkon.pipeline.config.model.PipelineStepConfig;
-import com.rokkon.pipeline.consul.service.ModuleWhitelistService;
 import com.rokkon.search.model.PipeStream;
 import com.rokkon.search.sdk.ProcessRequest;
 import com.rokkon.search.sdk.ProcessResponse;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -21,9 +19,7 @@ public class KafkaTransportHandler implements TransportHandler {
     
     private static final Logger LOG = LoggerFactory.getLogger(KafkaTransportHandler.class);
     
-    @Inject
-    ModuleWhitelistService whitelistService;
-    
+    // TODO: Inject ModuleWhitelistService when available
     // TODO: Inject actual Kafka producer when implemented
     
     @Override

@@ -21,7 +21,7 @@ public class ModuleRouterImpl implements ModuleRouter {
     private static final Logger LOG = LoggerFactory.getLogger(ModuleRouterImpl.class);
     
     @Inject
-    ServiceDiscoveryService serviceDiscoveryService;
+    ServiceDiscovery serviceDiscovery;
     
     @Inject
     GrpcClientFactory grpcClientFactory;
@@ -37,16 +37,14 @@ public class ModuleRouterImpl implements ModuleRouter {
         String serviceName = stepConfig.processorInfo().grpcServiceName();
         
         // Discover healthy service instance
-        return serviceDiscoveryService.discoverHealthyService(serviceName)
-            .onItem().ifNull().failWith(() -> 
-                new IllegalStateException("No healthy instances found for service: " + serviceName))
+        return serviceDiscovery.discoverService(serviceName)
             .flatMap(serviceInstance -> {
                 LOG.debug("Routing to module {} at {}:{}", 
-                    serviceName, serviceInstance.getAddress(), serviceInstance.getPort());
+                    serviceName, serviceInstance.getHost(), serviceInstance.getPort());
                 
                 // Get or create gRPC client for the service instance
                 PipeStepProcessor client = grpcClientFactory.getClient(
-                    serviceInstance.getAddress(), 
+                    serviceInstance.getHost(), 
                     serviceInstance.getPort()
                 );
                 

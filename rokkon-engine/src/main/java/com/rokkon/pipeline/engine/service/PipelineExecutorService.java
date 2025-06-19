@@ -2,6 +2,7 @@ package com.rokkon.pipeline.engine.service;
 
 import com.rokkon.pipeline.config.model.*;
 import com.rokkon.pipeline.consul.service.PipelineConfigService;
+import com.rokkon.pipeline.engine.util.JsonProtoConverter;
 import com.rokkon.search.engine.ProcessResponse;
 import com.rokkon.search.engine.ProcessStatus;
 import com.rokkon.search.model.*;
@@ -71,11 +72,13 @@ public class PipelineExecutorService {
 
         // Load pipeline configuration
         // TODO: Need to pass cluster name - for now use default
-        return pipelineConfigService.getPipeline("default", pipelineName)
-                .map(opt -> opt.orElse(null))
-                .onItem().ifNull().failWith(() -> 
-                    new IllegalArgumentException("Pipeline not found: " + pipelineName))
-                .flatMap(config -> {
+        return Uni.createFrom().completionStage(
+                pipelineConfigService.getPipeline("default", pipelineName)
+            )
+            .onItem().transform(opt -> opt.orElse(null))
+            .onItem().ifNull().failWith(() -> 
+                new IllegalArgumentException("Pipeline not found: " + pipelineName))
+            .flatMap(config -> {
                     // Find the initial step
                     String initialStepName = findInitialStep(config);
                     if (initialStepName == null) {
@@ -150,7 +153,7 @@ public class PipelineExecutorService {
                                                         PipelineStepConfig stepConfig) {
         LOG.debug("Executing PIPELINE step: {}", stepConfig.stepName());
 
-        ProcessorInfo processorInfo = stepConfig.processorInfo();
+        PipelineStepConfig.ProcessorInfo processorInfo = stepConfig.processorInfo();
         if (processorInfo == null || processorInfo.grpcServiceName() == null || processorInfo.grpcServiceName().isBlank()) {
             return Uni.createFrom().failure(
                 new IllegalStateException("No gRPC service configured for step: " + stepConfig.stepName()));
@@ -246,14 +249,13 @@ public class PipelineExecutorService {
         
         // Add custom JSON config if present
         if (stepConfig.customConfig() != null && stepConfig.customConfig().jsonConfig() != null) {
-            configBuilder.setCustomJsonConfig(stepConfig.customConfig().jsonConfig());
+            configBuilder.setCustomJsonConfig(
+                JsonProtoConverter.jsonNodeToStruct(stepConfig.customConfig().jsonConfig())
+            );
         }
 
         // Add config params
         Map<String, String> configParams = new HashMap<>();
-        if (stepConfig.commonParameters() != null) {
-            configParams.putAll(stepConfig.commonParameters());
-        }
         if (stepConfig.customConfig() != null && stepConfig.customConfig().configParams() != null) {
             configParams.putAll(stepConfig.customConfig().configParams());
         }

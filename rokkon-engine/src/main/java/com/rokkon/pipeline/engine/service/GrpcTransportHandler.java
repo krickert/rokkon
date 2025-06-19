@@ -21,7 +21,7 @@ public class GrpcTransportHandler implements TransportHandler {
     private static final Logger LOG = LoggerFactory.getLogger(GrpcTransportHandler.class);
     
     @Inject
-    ServiceDiscoveryService serviceDiscoveryService;
+    ServiceDiscovery serviceDiscovery;
     
     @Inject
     GrpcClientFactory grpcClientFactory;
@@ -36,15 +36,13 @@ public class GrpcTransportHandler implements TransportHandler {
         
         String serviceName = stepConfig.processorInfo().grpcServiceName();
         
-        return serviceDiscoveryService.discoverHealthyService(serviceName)
-            .onItem().ifNull().failWith(() -> 
-                new IllegalStateException("No healthy instances found for service: " + serviceName))
+        return serviceDiscovery.discoverService(serviceName)
             .flatMap(serviceInstance -> {
                 LOG.debug("Routing to gRPC service {} at {}:{}", 
-                    serviceName, serviceInstance.getAddress(), serviceInstance.getPort());
+                    serviceName, serviceInstance.getHost(), serviceInstance.getPort());
                 
                 PipeStepProcessor client = grpcClientFactory.getClient(
-                    serviceInstance.getAddress(), 
+                    serviceInstance.getHost(), 
                     serviceInstance.getPort()
                 );
                 

@@ -52,6 +52,7 @@ quarkus {
 
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
+    maxHeapSize = "2g"
 }
 
 // Exclude integration tests from the regular test task
