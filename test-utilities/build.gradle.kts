@@ -46,6 +46,12 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
+quarkus {
+    buildForkOptions {
+        systemProperty("quarkus.grpc.codegen.type", "mutiny")
+    }
+}
+
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
 }
@@ -62,8 +68,6 @@ tasks.test {
 }
 
 // Proto generation configured via application.properties
-
-// No proto extraction needed - we depend on proto-definitions for message classes
 
 publishing {
     publications {

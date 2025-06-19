@@ -1,4 +1,4 @@
-package com.rokkon.pipeline.consul.test;
+package com.rokkon.pipeline.test;
 
 import com.google.protobuf.Struct;
 import com.google.protobuf.Timestamp;

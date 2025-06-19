@@ -52,6 +52,13 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
+// Configure Quarkus to use Mutiny for gRPC code generation
+quarkus {
+    buildForkOptions {
+        systemProperty("quarkus.grpc.codegen.type", "mutiny")
+    }
+}
+
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
     useJUnitPlatform()
