@@ -1,8 +1,9 @@
 package com.rokkon.parser;
 
 import com.rokkon.search.model.PipeDoc;
-import com.rokkon.search.protobuf.utils.ProcessingBuffer;
-import com.rokkon.search.protobuf.utils.ProcessingBufferFactory;
+import com.rokkon.search.model.PipeStream;
+import com.rokkon.pipeline.utils.ProcessingBuffer;
+import com.rokkon.pipeline.utils.ProcessingBufferFactory;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
@@ -62,14 +63,15 @@ public class ProcessingBufferProducer {
 
     @Produces
     @Singleton
-    public ProcessingBuffer<PipeDoc> createPipeDocBuffer() {
+    @jakarta.inject.Named("outputBuffer")
+    public ProcessingBuffer<PipeDoc> createPipeDocOutputBuffer() {
         if (bufferEnabled) {
             return ProcessingBufferFactory.createBuffer(
                     true,
                     bufferCapacity,
                     PipeDoc.class,
                     bufferDirectory,
-                    bufferPrefix,
+                    bufferPrefix + "_output",
                     bufferPrecision
             );
         } else {
@@ -77,6 +79,28 @@ public class ProcessingBufferProducer {
                     false,
                     bufferCapacity,
                     PipeDoc.class
+            );
+        }
+    }
+    
+    @Produces
+    @Singleton
+    @jakarta.inject.Named("inputBuffer")
+    public ProcessingBuffer<PipeStream> createPipeStreamInputBuffer() {
+        if (bufferEnabled) {
+            return ProcessingBufferFactory.createBuffer(
+                    true,
+                    bufferCapacity,
+                    PipeStream.class,
+                    bufferDirectory,
+                    bufferPrefix + "_input",
+                    bufferPrecision
+            );
+        } else {
+            return ProcessingBufferFactory.createBuffer(
+                    false,
+                    bufferCapacity,
+                    PipeStream.class
             );
         }
     }

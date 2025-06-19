@@ -25,11 +25,17 @@ dependencies {
     testImplementation("org.junit.jupiter:junit-jupiter-engine")
     
     implementation("org.assertj:assertj-core:3.24.2")
-    implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+    // Use rokkon-protobuf for proto files
+    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
+    // Use rokkon-commons for utilities
+    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
     
     // Add dependencies for container testing
     implementation("io.quarkus:quarkus-test-common")
     implementation("org.testcontainers:testcontainers:1.19.8")
+    
+    // Apache Commons IO for file and resource operations
+    implementation("commons-io:commons-io:2.15.1")
 }
 
 group = "com.rokkon.pipeline"
@@ -48,12 +54,14 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-// Disable proto generation - we use classes from proto-definitions
-quarkus {
-    buildForkOptions {
-        systemProperty("quarkus.grpc.codegen.skip", "true")
-    }
+// Integration test configuration is already provided by Quarkus plugin
+
+// Exclude integration tests from regular test task
+tasks.test {
+    exclude("**/*IT.class")
 }
+
+// Proto generation configured via application.properties
 
 // No proto extraction needed - we depend on proto-definitions for message classes
 

@@ -1,6 +1,9 @@
 quarkus:
   application:
     name: parser-module
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
   grpc:
     server:
       port: 49091
@@ -24,9 +27,21 @@ quarkus:
     # QUARKUS_CONTAINER_IMAGE_USERNAME
     # QUARKUS_CONTAINER_IMAGE_PASSWORD
 
+# Processing buffer configuration
+processing:
+  buffer:
+    enabled: false  # Enable for test data generation
+    capacity: 200
+    directory: "build/test-data"
+    prefix: "parser"
+
 # Test profile configuration
 "%test":
   quarkus:
     grpc:
       server:
         port: 0  # Use random port for tests
+  processing:
+    buffer:
+      enabled: true  # Enable buffer in test mode
+      directory: "build/test-data"

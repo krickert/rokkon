@@ -16,8 +16,9 @@ dependencies {
     implementation("io.quarkus:quarkus-config-yaml")
     implementation("io.quarkus:quarkus-arc")
     
-    // Proto definitions from our proto project
-    implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+    // Proto definitions and utilities from new structure
+    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
     
     // Apache Tika dependencies - use standard package which includes most parsers
     implementation("org.apache.tika:tika-core:3.2.0")
@@ -30,8 +31,7 @@ dependencies {
     testImplementation(libs.assertj)
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("com.rokkon.pipeline:test-utilities:1.0.0-SNAPSHOT")
-    testRuntimeOnly("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
-    integrationTestImplementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+    testImplementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
     
     // Apache Commons IO for file operations
     testImplementation("commons-io:commons-io:2.15.1")
@@ -47,6 +47,8 @@ quarkus {
     }
 }
 
+// No need to extract protos - using scan-for-proto instead
+
 group = "com.rokkon.pipeline"
 version = "1.0.0-SNAPSHOT"
 
@@ -57,6 +59,7 @@ java {
 
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
+    maxHeapSize = "3g"
 }
 
 // Exclude integration tests from the regular test task

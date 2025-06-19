@@ -140,6 +140,14 @@ public class DocumentParser {
     
     /**
      * Creates the appropriate Tika parser based on configuration.
+     * 
+     * TODO: Fix EMF parser assertion errors - Currently some documents with embedded EMF images
+     * (particularly older PowerPoint files) can cause AssertionError in Apache POI's EMF parser.
+     * This is a known issue in POI/Tika. For now, we catch these errors in ParserServiceImpl
+     * and return graceful failures. In the future, we should:
+     * 1. Update to newer Tika version when the fix is available
+     * 2. Consider always disabling EMF parser for problematic document types
+     * 3. Implement custom EMF parser configuration based on document analysis
      */
     private static Parser createParser(Map<String, String> configMap, String filename) {
         boolean disableEmfParser = shouldDisableEmfParserForFile(configMap, filename);

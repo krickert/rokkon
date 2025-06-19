@@ -3,8 +3,8 @@ package com.rokkon.test.data;
 import com.google.common.collect.Maps;
 import com.rokkon.search.model.PipeDoc;
 import com.rokkon.search.model.PipeStream;
-import com.rokkon.test.protobuf.ProtobufUtils;
 
+import com.google.protobuf.ExtensionRegistryLite;
 import java.io.IOException;
 import java.io.InputStream;
 import java.nio.file.*;
@@ -12,67 +12,72 @@ import java.util.*;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 import io.quarkus.runtime.util.ClassPathUtils;
+import jakarta.inject.Singleton;
 
 /**
  * ProtobufTestDataHelper is a utility class that provides methods for retrieving protobuf test data.
  * It contains static fields and static methods for creating and retrieving test data.
  * This implementation uses lazy loading to improve performance and reduce memory usage.
  */
+@Singleton
 public class ProtobufTestDataHelper {
+    
+    // ExtensionRegistry for protobuf parsing
+    private static final ExtensionRegistryLite EXTENSION_REGISTRY = ExtensionRegistryLite.newInstance();
 
-    private static final String PIPE_DOC_DIRECTORY = "/test-data/pipe-docs";
-    private static final String PIPE_STREAM_DIRECTORY = "/test-data/pipe-streams";
-    private static final String TIKA_PIPE_DOC_DIRECTORY = "/test-data/tika-pipe-docs";
-    private static final String TIKA_PIPE_STREAM_DIRECTORY = "/test-data/tika-pipe-streams";
-    private static final String CHUNKER_PIPE_DOC_DIRECTORY = "/test-data/chunker-pipe-docs";
-    private static final String CHUNKER_PIPE_STREAM_DIRECTORY = "/test-data/chunker-pipe-streams";
-    private static final String SAMPLE_PIPE_DOC_DIRECTORY = "/test-data/sample-documents/pipe-docs";
-    private static final String SAMPLE_PIPE_STREAM_DIRECTORY = "/test-data/sample-documents/pipe-streams";
-    private static final String PIPELINE_GENERATED_DIRECTORY = "/test-data/pipeline-generated";
+    private final String PIPE_DOC_DIRECTORY = "test-data/pipe-docs";
+    private final String PIPE_STREAM_DIRECTORY = "test-data/pipe-streams";
+    private final String TIKA_PIPE_DOC_DIRECTORY = "test-data/tika-pipe-docs";
+    private final String TIKA_PIPE_STREAM_DIRECTORY = "test-data/tika-pipe-streams";
+    private final String CHUNKER_PIPE_DOC_DIRECTORY = "test-data/chunker-pipe-docs";
+    private final String CHUNKER_PIPE_STREAM_DIRECTORY = "test-data/chunker-pipe-streams";
+    private final String SAMPLE_PIPE_DOC_DIRECTORY = "test-data/sample-documents/pipe-docs";
+    private final String SAMPLE_PIPE_STREAM_DIRECTORY = "test-data/sample-documents/pipe-streams";
+    private final String PIPELINE_GENERATED_DIRECTORY = "test-data/pipeline-generated";
 
     // New generated test data directories
-    private static final String TIKA_REQUESTS_DIRECTORY = "/test-data/tika/requests";
-    private static final String TIKA_RESPONSES_DIRECTORY = "/test-data/tika/responses";
-    private static final String CHUNKER_INPUT_DIRECTORY = "/test-data/chunker/input";
-    private static final String CHUNKER_OUTPUT_DIRECTORY = "/test-data/chunker/output";
-    private static final String CHUNKER_OUTPUT_SMALL_DIRECTORY = "/test-data/chunker/output/small";
-    private static final String EMBEDDER_INPUT_DIRECTORY = "/test-data/embedder/input";
-    private static final String EMBEDDER_OUTPUT_DIRECTORY = "/test-data/embedder/output";
+    private final String TIKA_REQUESTS_DIRECTORY = "test-data/tika/requests";
+    private final String TIKA_RESPONSES_DIRECTORY = "test-data/tika/responses";
+    private final String CHUNKER_INPUT_DIRECTORY = "test-data/chunker/input";
+    private final String CHUNKER_OUTPUT_DIRECTORY = "test-data/chunker/output";
+    private final String CHUNKER_OUTPUT_SMALL_DIRECTORY = "test-data/chunker/output/small";
+    private final String EMBEDDER_INPUT_DIRECTORY = "test-data/embedder/input";
+    private final String EMBEDDER_OUTPUT_DIRECTORY = "test-data/embedder/output";
 
-    private static final String FILE_EXTENSION = ".bin";
+    private final String FILE_EXTENSION = "bin";
 
     // Lazy-loaded collections and maps
-    private static volatile Collection<PipeDoc> pipeDocuments;
-    private static volatile Collection<PipeStream> pipeStreams;
-    private static volatile Collection<PipeDoc> tikaPipeDocuments;
-    private static volatile Collection<PipeStream> tikaPipeStreams;
-    private static volatile Collection<PipeDoc> chunkerPipeDocuments;
-    private static volatile Collection<PipeStream> chunkerPipeStreams;
-    private static volatile Collection<PipeDoc> samplePipeDocuments;
-    private static volatile Collection<PipeStream> samplePipeStreams;
+    private volatile Collection<PipeDoc> pipeDocuments;
+    private volatile Collection<PipeStream> pipeStreams;
+    private volatile Collection<PipeDoc> tikaPipeDocuments;
+    private volatile Collection<PipeStream> tikaPipeStreams;
+    private volatile Collection<PipeDoc> chunkerPipeDocuments;
+    private volatile Collection<PipeStream> chunkerPipeStreams;
+    private volatile Collection<PipeDoc> samplePipeDocuments;
+    private volatile Collection<PipeStream> samplePipeStreams;
 
-    private static volatile Map<String, PipeDoc> pipeDocumentsMap;
-    private static volatile Map<String, PipeStream> pipeStreamsMap;
-    private static volatile Map<String, PipeDoc> tikaPipeDocumentsMap;
-    private static volatile Map<String, PipeStream> tikaPipeStreamsMap;
-    private static volatile Map<String, PipeDoc> chunkerPipeDocumentsMap;
-    private static volatile Map<String, PipeStream> chunkerPipeStreamsMap;
-    private static volatile Map<String, PipeDoc> samplePipeDocumentsMap;
-    private static volatile Map<String, PipeStream> samplePipeStreamsMap;
+    private volatile Map<String, PipeDoc> pipeDocumentsMap;
+    private volatile Map<String, PipeStream> pipeStreamsMap;
+    private volatile Map<String, PipeDoc> tikaPipeDocumentsMap;
+    private volatile Map<String, PipeStream> tikaPipeStreamsMap;
+    private volatile Map<String, PipeDoc> chunkerPipeDocumentsMap;
+    private volatile Map<String, PipeStream> chunkerPipeStreamsMap;
+    private volatile Map<String, PipeDoc> samplePipeDocumentsMap;
+    private volatile Map<String, PipeStream> samplePipeStreamsMap;
 
     // Lazy-loaded ordered lists for sample documents
-    private static volatile List<PipeDoc> orderedSamplePipeDocs;
-    private static volatile List<PipeStream> orderedSamplePipeStreams;
+    private volatile List<PipeDoc> orderedSamplePipeDocs;
+    private volatile List<PipeStream> orderedSamplePipeStreams;
 
     // Pipeline generated data
-    private static volatile Map<String, Collection<PipeDoc>> pipelineGeneratedDocs;
+    private volatile Map<String, Collection<PipeDoc>> pipelineGeneratedDocs;
 
     /**
      * Retrieves a collection of PipeDoc objects.
      *
      * @return A collection of PipeDoc objects.
      */
-    public static Collection<PipeDoc> getPipeDocuments() {
+    public Collection<PipeDoc> getPipeDocuments() {
         if (pipeDocuments == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (pipeDocuments == null) {
@@ -88,7 +93,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects.
      */
-    public static Collection<PipeStream> getPipeStreams() {
+    public Collection<PipeStream> getPipeStreams() {
         if (pipeStreams == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (pipeStreams == null) {
@@ -104,7 +109,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects from Tika parser.
      */
-    public static Collection<PipeDoc> getTikaPipeDocuments() {
+    public Collection<PipeDoc> getTikaPipeDocuments() {
         if (tikaPipeDocuments == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (tikaPipeDocuments == null) {
@@ -120,7 +125,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects from Tika parser.
      */
-    public static Collection<PipeStream> getTikaPipeStreams() {
+    public Collection<PipeStream> getTikaPipeStreams() {
         if (tikaPipeStreams == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (tikaPipeStreams == null) {
@@ -136,7 +141,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects from Chunker.
      */
-    public static Collection<PipeDoc> getChunkerPipeDocuments() {
+    public Collection<PipeDoc> getChunkerPipeDocuments() {
         if (chunkerPipeDocuments == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (chunkerPipeDocuments == null) {
@@ -152,7 +157,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects from Chunker.
      */
-    public static Collection<PipeStream> getChunkerPipeStreams() {
+    public Collection<PipeStream> getChunkerPipeStreams() {
         if (chunkerPipeStreams == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (chunkerPipeStreams == null) {
@@ -168,7 +173,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects from Sample Documents.
      */
-    public static Collection<PipeDoc> getSamplePipeDocuments() {
+    public Collection<PipeDoc> getSamplePipeDocuments() {
         if (samplePipeDocuments == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (samplePipeDocuments == null) {
@@ -184,7 +189,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects from Sample Documents.
      */
-    public static Collection<PipeStream> getSamplePipeStreams() {
+    public Collection<PipeStream> getSamplePipeStreams() {
         if (samplePipeStreams == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (samplePipeStreams == null) {
@@ -200,7 +205,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of PipeDoc objects by ID.
      */
-    public static Map<String, PipeDoc> getPipeDocumentsMap() {
+    public Map<String, PipeDoc> getPipeDocumentsMap() {
         if (pipeDocumentsMap == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (pipeDocumentsMap == null) {
@@ -216,7 +221,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of PipeStream objects by stream ID.
      */
-    public static Map<String, PipeStream> getPipeStreamsMap() {
+    public Map<String, PipeStream> getPipeStreamsMap() {
         if (pipeStreamsMap == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (pipeStreamsMap == null) {
@@ -232,7 +237,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Tika PipeDoc objects by ID.
      */
-    public static Map<String, PipeDoc> getTikaPipeDocumentsMap() {
+    public Map<String, PipeDoc> getTikaPipeDocumentsMap() {
         if (tikaPipeDocumentsMap == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (tikaPipeDocumentsMap == null) {
@@ -248,7 +253,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Tika PipeStream objects by stream ID.
      */
-    public static Map<String, PipeStream> getTikaPipeStreamsMap() {
+    public Map<String, PipeStream> getTikaPipeStreamsMap() {
         if (tikaPipeStreamsMap == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (tikaPipeStreamsMap == null) {
@@ -264,7 +269,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Chunker PipeDoc objects by ID.
      */
-    public static Map<String, PipeDoc> getChunkerPipeDocumentsMap() {
+    public Map<String, PipeDoc> getChunkerPipeDocumentsMap() {
         if (chunkerPipeDocumentsMap == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (chunkerPipeDocumentsMap == null) {
@@ -280,7 +285,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Chunker PipeStream objects by stream ID.
      */
-    public static Map<String, PipeStream> getChunkerPipeStreamsMap() {
+    public Map<String, PipeStream> getChunkerPipeStreamsMap() {
         if (chunkerPipeStreamsMap == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (chunkerPipeStreamsMap == null) {
@@ -296,7 +301,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Sample PipeDoc objects by ID.
      */
-    public static Map<String, PipeDoc> getSamplePipeDocumentsMap() {
+    public Map<String, PipeDoc> getSamplePipeDocumentsMap() {
         if (samplePipeDocumentsMap == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (samplePipeDocumentsMap == null) {
@@ -312,7 +317,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Sample PipeStream objects by stream ID.
      */
-    public static Map<String, PipeStream> getSamplePipeStreamsMap() {
+    public Map<String, PipeStream> getSamplePipeStreamsMap() {
         if (samplePipeStreamsMap == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (samplePipeStreamsMap == null) {
@@ -328,7 +333,7 @@ public class ProtobufTestDataHelper {
      *
      * @return An ordered list of PipeDoc objects from the Sample Documents.
      */
-    public static List<PipeDoc> getOrderedSamplePipeDocuments() {
+    public List<PipeDoc> getOrderedSamplePipeDocuments() {
         if (orderedSamplePipeDocs == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (orderedSamplePipeDocs == null) {
@@ -351,7 +356,7 @@ public class ProtobufTestDataHelper {
      *
      * @return An ordered list of PipeStream objects from the Sample Documents.
      */
-    public static List<PipeStream> getOrderedSamplePipeStreams() {
+    public List<PipeStream> getOrderedSamplePipeStreams() {
         if (orderedSamplePipeStreams == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (orderedSamplePipeStreams == null) {
@@ -376,7 +381,7 @@ public class ProtobufTestDataHelper {
      * @return The PipeDoc object at the specified index, or null if not found.
      * @throws IndexOutOfBoundsException if the index is out of range
      */
-    public static PipeDoc getSamplePipeDocByIndex(int index) {
+    public PipeDoc getSamplePipeDocByIndex(int index) {
         List<PipeDoc> orderedDocs = getOrderedSamplePipeDocuments();
         if (index < 0 || index >= orderedDocs.size()) {
             throw new IndexOutOfBoundsException("Index must be between 0 and " + (orderedDocs.size() - 1) + ", inclusive. Actual size: " + orderedDocs.size());
@@ -391,7 +396,7 @@ public class ProtobufTestDataHelper {
      * @param stage The pipeline stage to retrieve documents from
      * @return A collection of PipeDoc objects from that stage
      */
-    public static Collection<PipeDoc> getPipelineGeneratedDocuments(String stage) {
+    public Collection<PipeDoc> getPipelineGeneratedDocuments(String stage) {
         if (pipelineGeneratedDocs == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (pipelineGeneratedDocs == null) {
@@ -407,7 +412,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects for Tika input testing
      */
-    public static Collection<PipeStream> getTikaRequestStreams() {
+    public Collection<PipeStream> getTikaRequestStreams() {
         try {
             return loadPipeStreamsFromDirectory(TIKA_REQUESTS_DIRECTORY);
         } catch (Exception e) {
@@ -420,7 +425,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects for Tika output testing
      */
-    public static Collection<PipeDoc> getTikaResponseDocuments() {
+    public Collection<PipeDoc> getTikaResponseDocuments() {
         try {
             return loadPipeDocsFromDirectory(TIKA_RESPONSES_DIRECTORY);
         } catch (Exception e) {
@@ -434,7 +439,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects for Tika input testing
      */
-    public static Collection<PipeDoc> getTikaRequestDocuments() {
+    public Collection<PipeDoc> getTikaRequestDocuments() {
         return getTikaRequestStreams().stream()
             .map(PipeStream::getDocument)
             .collect(Collectors.toList());
@@ -445,7 +450,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects for chunker input testing
      */
-    public static Collection<PipeDoc> getChunkerInputDocuments() {
+    public Collection<PipeDoc> getChunkerInputDocuments() {
         try {
             return loadPipeDocsFromDirectory(CHUNKER_INPUT_DIRECTORY);
         } catch (Exception e) {
@@ -458,7 +463,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects for chunker output testing
      */
-    public static Collection<PipeStream> getChunkerOutputStreams() {
+    public Collection<PipeStream> getChunkerOutputStreams() {
         try {
             return loadPipeStreamsFromDirectory(CHUNKER_OUTPUT_DIRECTORY);
         } catch (Exception e) {
@@ -472,7 +477,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects for chunker output testing with small chunks
      */
-    public static Collection<PipeStream> getChunkerOutputStreamsSmall() {
+    public Collection<PipeStream> getChunkerOutputStreamsSmall() {
         try {
             return loadPipeStreamsFromDirectory(CHUNKER_OUTPUT_SMALL_DIRECTORY);
         } catch (Exception e) {
@@ -486,7 +491,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects for all chunker output testing
      */
-    public static Collection<PipeStream> getAllChunkerOutputStreams() {
+    public Collection<PipeStream> getAllChunkerOutputStreams() {
         Collection<PipeStream> result = new ArrayList<>();
         result.addAll(getChunkerOutputStreams());
         result.addAll(getChunkerOutputStreamsSmall());
@@ -498,7 +503,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects for embedder input testing
      */
-    public static Collection<PipeDoc> getEmbedderInputDocuments() {
+    public Collection<PipeDoc> getEmbedderInputDocuments() {
         try {
             return loadPipeDocsFromDirectory(EMBEDDER_INPUT_DIRECTORY);
         } catch (Exception e) {
@@ -511,7 +516,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects for embedder output testing
      */
-    public static Collection<PipeDoc> getEmbedderOutputDocuments() {
+    public Collection<PipeDoc> getEmbedderOutputDocuments() {
         try {
             return loadPipeDocsFromDirectory(EMBEDDER_OUTPUT_DIRECTORY);
         } catch (Exception e) {
@@ -524,7 +529,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A set of stage names
      */
-    public static Set<String> getPipelineStages() {
+    public Set<String> getPipelineStages() {
         if (pipelineGeneratedDocs == null) {
             synchronized (ProtobufTestDataHelper.class) {
                 if (pipelineGeneratedDocs == null) {
@@ -542,7 +547,7 @@ public class ProtobufTestDataHelper {
      * @return The PipeStream object at the specified index, or null if not found.
      * @throws IndexOutOfBoundsException if the index is out of range
      */
-    public static PipeStream getSamplePipeStreamByIndex(int index) {
+    public PipeStream getSamplePipeStreamByIndex(int index) {
         List<PipeStream> orderedStreams = getOrderedSamplePipeStreams();
         if (index < 0 || index >= orderedStreams.size()) {
             throw new IndexOutOfBoundsException("Index must be between 0 and " + (orderedStreams.size() - 1) + ", inclusive. Actual size: " + orderedStreams.size());
@@ -555,7 +560,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of PipeDoc objects by ID.
      */
-    private static Map<String, PipeDoc> createPipeDocumentMapById() {
+    private Map<String, PipeDoc> createPipeDocumentMapById() {
         Collection<PipeDoc> docs = getPipeDocuments();
         Map<String, PipeDoc> returnVal = Maps.newHashMapWithExpectedSize(docs.size());
         docs.forEach((doc) -> returnVal.put(doc.getId(), doc));
@@ -567,7 +572,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of PipeStream objects by stream ID.
      */
-    private static Map<String, PipeStream> createPipeStreamMapById() {
+    private Map<String, PipeStream> createPipeStreamMapById() {
         Collection<PipeStream> streams = getPipeStreams();
         Map<String, PipeStream> returnVal = Maps.newHashMapWithExpectedSize(streams.size());
         streams.forEach((stream) -> returnVal.put(stream.getStreamId(), stream));
@@ -579,7 +584,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Tika PipeDoc objects by ID.
      */
-    private static Map<String, PipeDoc> createTikaPipeDocumentMapById() {
+    private Map<String, PipeDoc> createTikaPipeDocumentMapById() {
         Collection<PipeDoc> docs = getTikaPipeDocuments();
         Map<String, PipeDoc> returnVal = Maps.newHashMapWithExpectedSize(docs.size());
         docs.forEach((doc) -> returnVal.put(doc.getId(), doc));
@@ -591,7 +596,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Tika PipeStream objects by stream ID.
      */
-    private static Map<String, PipeStream> createTikaPipeStreamMapById() {
+    private Map<String, PipeStream> createTikaPipeStreamMapById() {
         Collection<PipeStream> streams = getTikaPipeStreams();
         Map<String, PipeStream> returnVal = Maps.newHashMapWithExpectedSize(streams.size());
         streams.forEach((stream) -> returnVal.put(stream.getStreamId(), stream));
@@ -603,7 +608,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Chunker PipeDoc objects by ID.
      */
-    private static Map<String, PipeDoc> createChunkerPipeDocumentMapById() {
+    private Map<String, PipeDoc> createChunkerPipeDocumentMapById() {
         Collection<PipeDoc> docs = getChunkerPipeDocuments();
         Map<String, PipeDoc> returnVal = Maps.newHashMapWithExpectedSize(docs.size());
         docs.forEach((doc) -> returnVal.put(doc.getId(), doc));
@@ -615,7 +620,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Chunker PipeStream objects by stream ID.
      */
-    private static Map<String, PipeStream> createChunkerPipeStreamMapById() {
+    private Map<String, PipeStream> createChunkerPipeStreamMapById() {
         Collection<PipeStream> streams = getChunkerPipeStreams();
         Map<String, PipeStream> returnVal = Maps.newHashMapWithExpectedSize(streams.size());
         streams.forEach((stream) -> returnVal.put(stream.getStreamId(), stream));
@@ -627,7 +632,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Sample PipeDoc objects by ID.
      */
-    private static Map<String, PipeDoc> createSamplePipeDocumentMapById() {
+    private Map<String, PipeDoc> createSamplePipeDocumentMapById() {
         Collection<PipeDoc> docs = getSamplePipeDocuments();
         Map<String, PipeDoc> returnVal = Maps.newHashMapWithExpectedSize(docs.size());
         docs.forEach((doc) -> returnVal.put(doc.getId(), doc));
@@ -639,7 +644,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of Sample PipeStream objects by stream ID.
      */
-    private static Map<String, PipeStream> createSamplePipeStreamMapById() {
+    private Map<String, PipeStream> createSamplePipeStreamMapById() {
         Collection<PipeStream> streams = getSamplePipeStreams();
         Map<String, PipeStream> returnVal = Maps.newHashMapWithExpectedSize(streams.size());
         streams.forEach((stream) -> returnVal.put(stream.getStreamId(), stream));
@@ -651,7 +656,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects from the specified directory.
      */
-    private static Collection<PipeDoc> createPipeDocuments() {
+    private Collection<PipeDoc> createPipeDocuments() {
         try {
             return loadPipeDocsFromDirectory(PIPE_DOC_DIRECTORY);
         } catch (Exception e) {
@@ -664,7 +669,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects from the specified directory.
      */
-    private static Collection<PipeStream> createPipeStreams() {
+    private Collection<PipeStream> createPipeStreams() {
         try {
             return loadPipeStreamsFromDirectory(PIPE_STREAM_DIRECTORY);
         } catch (Exception e) {
@@ -677,7 +682,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects from the Tika parser directory.
      */
-    private static Collection<PipeDoc> createTikaPipeDocuments() {
+    private Collection<PipeDoc> createTikaPipeDocuments() {
         try {
             return loadPipeDocsFromDirectory(TIKA_PIPE_DOC_DIRECTORY);
         } catch (Exception e) {
@@ -690,7 +695,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects from the Tika parser directory.
      */
-    private static Collection<PipeStream> createTikaPipeStreams() {
+    private Collection<PipeStream> createTikaPipeStreams() {
         try {
             return loadPipeStreamsFromDirectory(TIKA_PIPE_STREAM_DIRECTORY);
         } catch (Exception e) {
@@ -703,7 +708,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects from the Chunker directory.
      */
-    private static Collection<PipeDoc> createChunkerPipeDocuments() {
+    private Collection<PipeDoc> createChunkerPipeDocuments() {
         try {
             return loadPipeDocsFromDirectory(CHUNKER_PIPE_DOC_DIRECTORY);
         } catch (Exception e) {
@@ -716,7 +721,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects from the Chunker directory.
      */
-    private static Collection<PipeStream> createChunkerPipeStreams() {
+    private Collection<PipeStream> createChunkerPipeStreams() {
         try {
             return loadPipeStreamsFromDirectory(CHUNKER_PIPE_STREAM_DIRECTORY);
         } catch (Exception e) {
@@ -729,7 +734,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeDoc objects from the Sample Documents.
      */
-    private static Collection<PipeDoc> createSamplePipeDocuments() {
+    private Collection<PipeDoc> createSamplePipeDocuments() {
         try {
             return loadPipeDocsFromDirectory(SAMPLE_PIPE_DOC_DIRECTORY);
         } catch (Exception e) {
@@ -742,7 +747,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A collection of PipeStream objects from the Sample Documents.
      */
-    private static Collection<PipeStream> createSamplePipeStreams() {
+    private Collection<PipeStream> createSamplePipeStreams() {
         try {
             return loadPipeStreamsFromDirectory(SAMPLE_PIPE_STREAM_DIRECTORY);
         } catch (Exception e) {
@@ -757,8 +762,18 @@ public class ProtobufTestDataHelper {
      * @return A collection of PipeDoc objects.
      * @throws IOException If an I/O error occurs.
      */
-    private static Collection<PipeDoc> loadPipeDocsFromDirectory(String directory) throws IOException {
-        return UnifiedDocumentLoader.loadPipeDocsFromDirectory(directory, FILE_EXTENSION);
+    private Collection<PipeDoc> loadPipeDocsFromDirectory(String directory) throws IOException {
+        try {
+            // Force load the class using the current thread's context classloader
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            Class<?> pipeDocClass = cl.loadClass("com.rokkon.search.model.PipeDoc");
+            // Get the parser method via reflection
+            var parserMethod = pipeDocClass.getMethod("parser");
+            var parser = (com.google.protobuf.Parser<PipeDoc>) parserMethod.invoke(null);
+            return loadProtobufMessages(directory, FILE_EXTENSION, parser);
+        } catch (ReflectiveOperationException e) {
+            throw new IOException("Failed to load PipeDoc class or parser", e);
+        }
     }
 
     /**
@@ -768,8 +783,164 @@ public class ProtobufTestDataHelper {
      * @return A collection of PipeStream objects.
      * @throws IOException If an I/O error occurs.
      */
-    private static Collection<PipeStream> loadPipeStreamsFromDirectory(String directory) throws IOException {
-        return UnifiedDocumentLoader.loadPipeStreamsFromDirectory(directory, FILE_EXTENSION);
+    private Collection<PipeStream> loadPipeStreamsFromDirectory(String directory) throws IOException {
+        try {
+            // Force load the class using the current thread's context classloader
+            ClassLoader cl = Thread.currentThread().getContextClassLoader();
+            Class<?> pipeStreamClass = cl.loadClass("com.rokkon.search.model.PipeStream");
+            // Get the parser method via reflection
+            var parserMethod = pipeStreamClass.getMethod("parser");
+            var parser = (com.google.protobuf.Parser<PipeStream>) parserMethod.invoke(null);
+            return loadProtobufMessages(directory, FILE_EXTENSION, parser);
+        } catch (ReflectiveOperationException e) {
+            throw new IOException("Failed to load PipeStream class or parser", e);
+        }
+    }
+    
+    /**
+     * Generic method to load Protobuf messages from a directory.
+     * This method handles loading from both filesystem and classpath (JAR files).
+     *
+     * @param directory The path to the directory containing the Protobuf binary files.
+     * @param fileExtension The file extension of the Protobuf binary files (e.g., "bin", "pb").
+     * @param parser The Protobuf parser for the specific message type (e.g., PipeDoc.parser()).
+     * @param <T> The type of the Protobuf message.
+     * @return A collection of parsed Protobuf messages.
+     */
+    private <T extends com.google.protobuf.MessageLite> Collection<T> loadProtobufMessages(
+            String directory, String fileExtension, com.google.protobuf.Parser<T> parser) {
+        
+        final List<T> messages = new ArrayList<>();
+        
+        // Normalize the directory path - remove leading slash for resource loading
+        String resourceDir = directory.startsWith("/") ? directory.substring(1) : directory;
+        
+        // In Quarkus, we should be able to load resources directly
+        // Since we can't list files in a JAR, we use known naming patterns
+        messages.addAll(loadFromClasspathDirectory(resourceDir, fileExtension, parser));
+        
+        // If no messages loaded from classpath, try filesystem (development mode)
+        if (messages.isEmpty()) {
+            // Try multiple possible paths
+            Path[] possiblePaths = {
+                Paths.get("src/main/resources" + directory),
+                Paths.get("../test-utilities/src/main/resources" + directory),
+                Paths.get("test-utilities/src/main/resources" + directory)
+            };
+            
+            Path dirPath = null;
+            for (Path path : possiblePaths) {
+                if (Files.isDirectory(path)) {
+                    dirPath = path;
+                    break;
+                }
+            }
+            
+            if (dirPath != null && Files.isDirectory(dirPath)) {
+                try (Stream<Path> paths = Files.walk(dirPath)) {
+                    List<T> fsMessages = paths
+                            .filter(Files::isRegularFile)
+                            .filter(p -> p.toString().endsWith("." + fileExtension))
+                            .map(filePath -> loadProtobufFromPath(filePath, parser))
+                            .filter(java.util.Objects::nonNull)
+                            .collect(Collectors.toList());
+                    messages.addAll(fsMessages);
+                } catch (IOException e) {
+                    System.err.println("Error walking filesystem directory " + dirPath + ": " + e.getMessage());
+                }
+            }
+        }
+        
+        return messages;
+    }
+    
+    /**
+     * Load protobuf files from classpath directory by trying to load resources.
+     * This works by attempting to load files with a naming pattern.
+     */
+    private <T extends com.google.protobuf.MessageLite> Collection<T> loadFromClasspathDirectory(
+            String directory, String fileExtension, com.google.protobuf.Parser<T> parser) {
+        
+        List<T> messages = new ArrayList<>();
+        
+        // For known directories, we can try specific patterns
+        // This is a workaround for the fact that you can't list files in a JAR
+        if (directory.contains("tika/requests")) {
+            // Try to load tika request files with known naming pattern
+            for (int i = 0; i < 200; i++) {
+                String filename = String.format("tika_request_%03d.%s", i, fileExtension);
+                T message = loadFromClasspath(directory + "/" + filename, parser);
+                if (message != null) {
+                    messages.add(message);
+                } else {
+                    // If we fail to load a file in sequence, try a few more before giving up
+                    if (i > 10 && messages.isEmpty()) {
+                        break;
+                    }
+                }
+            }
+        } else if (directory.contains("tika/responses")) {
+            // Try to load tika response files with known naming pattern
+            for (int i = 0; i < 100; i++) {
+                String filename = String.format("tika_response_%02d.%s", i, fileExtension);
+                T message = loadFromClasspath(directory + "/" + filename, parser);
+                if (message != null) {
+                    messages.add(message);
+                }
+            }
+        } else if (directory.contains("chunker/input")) {
+            // Try both naming patterns for chunker input
+            for (int i = 0; i < 20; i++) {
+                String filename1 = String.format("chunker_input_%d.%s", i, fileExtension);
+                T message = loadFromClasspath(directory + "/" + filename1, parser);
+                if (message != null) {
+                    messages.add(message);
+                }
+                
+                String filename2 = String.format("chunker_input_%02d.%s", i, fileExtension);
+                message = loadFromClasspath(directory + "/" + filename2, parser);
+                if (message != null) {
+                    messages.add(message);
+                }
+            }
+        }
+        // Add more patterns as needed for other directories
+        
+        return messages;
+    }
+    
+    /**
+     * Load a single protobuf file from classpath.
+     */
+    private <T extends com.google.protobuf.MessageLite> T loadFromClasspath(
+            String resourcePath, com.google.protobuf.Parser<T> parser) {
+        // Ensure no leading slash
+        String normalizedPath = resourcePath.startsWith("/") ? resourcePath.substring(1) : resourcePath;
+        
+        try (InputStream is = Thread.currentThread().getContextClassLoader()
+                .getResourceAsStream(normalizedPath)) {
+            if (is != null) {
+                System.out.println("Successfully loaded resource: " + normalizedPath);
+                return parser.parseFrom(is, EXTENSION_REGISTRY);
+            }
+        } catch (IOException e) {
+            System.err.println("Error loading resource " + normalizedPath + ": " + e.getMessage());
+        }
+        return null;
+    }
+    
+    /**
+     * Helper method to load a single protobuf message from a Path.
+     */
+    private <T extends com.google.protobuf.MessageLite> T loadProtobufFromPath(
+            Path filePath, com.google.protobuf.Parser<T> parser) {
+        try {
+            byte[] data = Files.readAllBytes(filePath);
+            return parser.parseFrom(data, EXTENSION_REGISTRY);
+        } catch (IOException e) {
+            System.err.println("Error reading file " + filePath + ": " + e.getMessage());
+            return null;
+        }
     }
 
     /**
@@ -777,7 +948,7 @@ public class ProtobufTestDataHelper {
      *
      * @return A map of stage name to collection of PipeDoc objects
      */
-    private static Map<String, Collection<PipeDoc>> loadPipelineGeneratedDocuments() {
+    private  Map<String, Collection<PipeDoc>> loadPipelineGeneratedDocuments() {
         Map<String, Collection<PipeDoc>> result = new HashMap<>();
 
         try {

@@ -1,2 +1,7 @@
 greeting:
   message: "hello"
+
+quarkus:
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf

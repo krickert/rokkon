@@ -4,7 +4,7 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
 import com.rokkon.search.model.*;
-import com.rokkon.search.protobuf.utils.ProcessingBuffer;
+import com.rokkon.pipeline.utils.ProcessingBuffer;
 import com.rokkon.search.sdk.*;
 import com.rokkon.parser.util.DocumentParser;
 import io.quarkus.grpc.GrpcService;
@@ -23,6 +23,7 @@ public class ParserServiceImpl implements PipeStepProcessor {
     private static final Logger LOG = Logger.getLogger(ParserServiceImpl.class);
 
     @Inject
+    @jakarta.inject.Named("outputBuffer")
     ProcessingBuffer<PipeDoc> outputBuffer;
 
     @Override
@@ -100,6 +101,22 @@ public class ParserServiceImpl implements PipeStepProcessor {
                         .setSuccess(false)
                         .addProcessorLogs("Parser service failed to process document: " + e.getMessage())
                         .addProcessorLogs("Error type: " + e.getClass().getSimpleName())
+                        .build();
+            } catch (AssertionError e) {
+                LOG.error("Assertion error parsing document: " + e.getMessage(), e);
+
+                return ProcessResponse.newBuilder()
+                        .setSuccess(false)
+                        .addProcessorLogs("Parser service failed with assertion error: " + e.getMessage())
+                        .addProcessorLogs("This may be a Tika internal issue with the document format")
+                        .build();
+            } catch (Throwable t) {
+                LOG.error("Unexpected error parsing document: " + t.getMessage(), t);
+
+                return ProcessResponse.newBuilder()
+                        .setSuccess(false)
+                        .addProcessorLogs("Parser service failed with unexpected error: " + t.getMessage())
+                        .addProcessorLogs("Error type: " + t.getClass().getSimpleName())
                         .build();
             }
         });

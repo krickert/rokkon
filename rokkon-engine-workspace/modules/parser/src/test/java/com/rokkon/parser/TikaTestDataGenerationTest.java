@@ -2,13 +2,13 @@ package com.rokkon.parser;
 
 import com.rokkon.search.model.PipeDoc;
 import com.rokkon.search.model.PipeStream;
-import com.rokkon.search.protobuf.utils.ProcessingBuffer;
+import com.rokkon.pipeline.utils.ProcessingBuffer;
 import com.rokkon.search.sdk.PipeStepProcessor;
 import com.rokkon.search.sdk.ProcessConfiguration;
 import com.rokkon.search.sdk.ProcessRequest;
 import com.rokkon.search.sdk.ProcessResponse;
 import com.rokkon.search.sdk.ServiceMetadata;
-import com.rokkon.test.data.TestDocumentLoader;
+import com.rokkon.test.data.ProtobufTestDataHelper;
 import io.quarkus.grpc.GrpcClient;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
@@ -20,6 +20,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
 
@@ -42,8 +43,13 @@ public class TikaTestDataGenerationTest {
     @Inject
     ProcessingBuffer<PipeDoc> outputBuffer;
 
+    private ProtobufTestDataHelper testDataHelper;
+
     @Test
     public void generateTikaTestData() throws Exception {
+        // Initialize test data helper
+        testDataHelper = new ProtobufTestDataHelper();
+        
         // Check if buffer is enabled
         if (outputBuffer.size() == 0 && !isBufferEnabled()) {
             LOG.warn("Processing buffer is disabled. Enable it with -Dprocessing.buffer.enabled=true");
@@ -51,7 +57,12 @@ public class TikaTestDataGenerationTest {
         }
 
         // Load all Tika request documents
-        List<PipeDoc> requestDocs = TestDocumentLoader.loadTikaRequestsAsPipeDoc();
+        List<PipeDoc> requestDocs = new ArrayList<>();
+        testDataHelper.getTikaRequestStreams().forEach(stream -> {
+            if (stream.hasDocument()) {
+                requestDocs.add(stream.getDocument());
+            }
+        });
         LOG.info("Loaded {} Tika request documents", requestDocs.size());
 
         // Create output directory if it doesn't exist
@@ -118,7 +129,7 @@ public class TikaTestDataGenerationTest {
         // Create configuration
         ProcessConfiguration config = ProcessConfiguration.newBuilder()
                 .putConfigParams("extractMetadata", "true")
-                .putConfigParams("maxContentLength", "1000000")
+                .putConfigParams("maxContentLength", "10000000")  // 10MB limit
                 .build();
 
         // Create request
