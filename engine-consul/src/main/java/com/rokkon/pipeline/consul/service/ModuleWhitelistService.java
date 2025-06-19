@@ -7,6 +7,7 @@ import com.rokkon.pipeline.consul.model.ModuleWhitelistResponse;
 import com.rokkon.pipeline.validation.CompositeValidator;
 import com.rokkon.pipeline.validation.ValidationResult;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -19,7 +20,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
-import java.util.concurrent.CompletionStage;
 import java.util.stream.Collectors;
 
 /**
@@ -252,36 +252,35 @@ public class ModuleWhitelistService {
      * Verifies that a module exists in Consul (has been registered at least once).
      */
     private Uni<Boolean> verifyModuleExistsInConsul(String grpcServiceName) {
-        String url = String.format("http://%s:%s/v1/catalog/service/%s", 
-                                  consulHost, consulPort, grpcServiceName);
-        
-        return Uni.createFrom().completionStage(() -> {
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .GET()
-                .build();
-            
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
-        })
-        .map(response -> {
-            // If we get a 200, check if the array has any services
-            if (response.statusCode() == 200) {
-                String body = response.body();
-                // Check if the response is an empty array "[]" or null
-                if (body == null || body.equals("null") || body.equals("[]")) {
-                    return false;
-                }
-                // Parse the JSON to check if there are any services
-                try {
+        return Uni.createFrom().item(() -> {
+            try {
+                String url = String.format("http://%s:%s/v1/catalog/service/%s", 
+                                          consulHost, consulPort, grpcServiceName);
+                
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .build();
+                
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                
+                // If we get a 200, check if the array has any services
+                if (response.statusCode() == 200) {
+                    String body = response.body();
+                    // Check if the response is an empty array "[]" or null
+                    if (body == null || body.equals("null") || body.equals("[]")) {
+                        return false;
+                    }
+                    // Parse the JSON to check if there are any services
                     return body.trim().length() > 2; // More than just "[]"
-                } catch (Exception e) {
-                    LOG.warn("Failed to parse Consul response: {}", body, e);
-                    return false;
                 }
+                return false;
+            } catch (Exception e) {
+                LOG.warn("Failed to verify module in Consul: {}", grpcServiceName, e);
+                return false;
             }
-            return false;
         })
-        .onFailure().recoverWithItem(false);
+        .runSubscriptionOn(Infrastructure.getDefaultExecutor());
     }
     
     /**
@@ -370,39 +369,39 @@ public class ModuleWhitelistService {
      * Loads cluster configuration from Consul.
      */
     private Uni<PipelineClusterConfig> loadClusterConfig(String clusterName) {
-        String key = String.format("%s/%s/config", KV_PREFIX, clusterName);
-        String url = String.format("http://%s:%s/v1/kv/%s?raw", consulHost, consulPort, key);
-        
-        return Uni.createFrom().completionStage(() -> {
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .GET()
-                .build();
-            
-            return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
-        })
-        .map(response -> {
-            if (response.statusCode() == 200) {
-                try {
+        return Uni.createFrom().item(() -> {
+            try {
+                String key = String.format("%s/%s/config", KV_PREFIX, clusterName);
+                String url = String.format("http://%s:%s/v1/kv/%s?raw", consulHost, consulPort, key);
+                
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .build();
+                
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                
+                if (response.statusCode() == 200) {
                     return objectMapper.readValue(response.body(), PipelineClusterConfig.class);
-                } catch (Exception e) {
-                    LOG.error("Failed to deserialize cluster config", e);
-                    return null;
                 }
+                return null;
+            } catch (Exception e) {
+                LOG.error("Failed to load cluster config", e);
+                return null;
             }
-            return null;
-        });
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultExecutor());
     }
     
     /**
      * Saves cluster configuration to Consul.
      */
     private Uni<Boolean> saveClusterConfig(String clusterName, PipelineClusterConfig config) {
-        String key = String.format("%s/%s/config", KV_PREFIX, clusterName);
-        String url = String.format("http://%s:%s/v1/kv/%s", consulHost, consulPort, key);
-        
-        return Uni.createFrom().completionStage(() -> {
+        return Uni.createFrom().item(() -> {
             try {
+                String key = String.format("%s/%s/config", KV_PREFIX, clusterName);
+                String url = String.format("http://%s:%s/v1/kv/%s", consulHost, consulPort, key);
+                
                 String json = objectMapper.writeValueAsString(config);
                 HttpRequest request = HttpRequest.newBuilder()
                     .uri(URI.create(url))
@@ -410,12 +409,14 @@ public class ModuleWhitelistService {
                     .PUT(HttpRequest.BodyPublishers.ofString(json))
                     .build();
                 
-                return httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString());
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                
+                return response.statusCode() == 200;
             } catch (Exception e) {
-                throw new RuntimeException("Failed to serialize cluster config", e);
+                LOG.error("Failed to save cluster config", e);
+                return false;
             }
         })
-        .map(response -> response.statusCode() == 200)
-        .onFailure().recoverWithItem(false);
+        .runSubscriptionOn(Infrastructure.getDefaultExecutor());
     }
 }

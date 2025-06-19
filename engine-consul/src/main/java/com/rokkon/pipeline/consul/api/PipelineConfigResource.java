@@ -80,9 +80,8 @@ public class PipelineConfigResource {
         
         LOG.info("Creating pipeline '{}' in cluster '{}'", pipelineId, clusterName);
         
-        return Uni.createFrom().completionStage(
-            pipelineConfigService.createPipeline(clusterName, pipelineId, config)
-        ).map(result -> {
+        return pipelineConfigService.createPipeline(clusterName, pipelineId, config)
+            .map(result -> {
             if (result.valid()) {
                 return Response.status(Status.CREATED)
                         .entity(new ApiResponse(true, "Pipeline created successfully", null, null))
@@ -126,9 +125,8 @@ public class PipelineConfigResource {
         
         LOG.info("Updating pipeline '{}' in cluster '{}'", pipelineId, clusterName);
         
-        return Uni.createFrom().completionStage(
-            pipelineConfigService.updatePipeline(clusterName, pipelineId, config)
-        ).map(result -> {
+        return pipelineConfigService.updatePipeline(clusterName, pipelineId, config)
+            .map(result -> {
             if (result.valid()) {
                 return Response.ok(new ApiResponse(true, "Pipeline updated successfully", null, null))
                         .build();
@@ -166,9 +164,8 @@ public class PipelineConfigResource {
         
         LOG.info("Deleting pipeline '{}' from cluster '{}'", pipelineId, clusterName);
         
-        return Uni.createFrom().completionStage(
-            pipelineConfigService.deletePipeline(clusterName, pipelineId)
-        ).map(result -> {
+        return pipelineConfigService.deletePipeline(clusterName, pipelineId)
+            .map(result -> {
             if (result.valid()) {
                 return Response.noContent().build();
             } else {
@@ -205,9 +202,8 @@ public class PipelineConfigResource {
         
         LOG.debug("Getting pipeline '{}' from cluster '{}'", pipelineId, clusterName);
         
-        return Uni.createFrom().completionStage(
-            pipelineConfigService.getPipeline(clusterName, pipelineId)
-        ).map(optional -> {
+        return pipelineConfigService.getPipeline(clusterName, pipelineId)
+            .map(optional -> {
             if (optional.isPresent()) {
                 return Response.ok(optional.get()).build();
             } else {
@@ -240,9 +236,7 @@ public class PipelineConfigResource {
         
         LOG.debug("Listing pipelines in cluster '{}'", clusterName);
         
-        return Uni.createFrom().completionStage(
-            pipelineConfigService.listPipelines(clusterName)
-        );
+        return pipelineConfigService.listPipelines(clusterName);
     }
     
     /**

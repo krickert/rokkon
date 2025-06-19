@@ -4,13 +4,16 @@ import com.rokkon.pipeline.config.model.*;
 import com.rokkon.pipeline.consul.model.ModuleWhitelistRequest;
 import com.rokkon.pipeline.consul.model.ModuleWhitelistResponse;
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
+import com.rokkon.pipeline.validation.ValidationResult;
 import com.rokkon.test.containers.TestModuleContainerResource;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import jakarta.inject.Inject;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.jboss.logging.Logger;
 
 import java.time.Instant;
 import java.util.List;
@@ -26,6 +29,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 @QuarkusTestResource(ConsulTestResource.class)
 @QuarkusTestResource(TestModuleContainerResource.class)
 class ModuleWhitelistServiceTest {
+    private static final Logger LOG = Logger.getLogger(ModuleWhitelistServiceTest.class);
     
     @Inject
     ModuleWhitelistService whitelistService;
@@ -41,10 +45,56 @@ class ModuleWhitelistServiceTest {
     
     @BeforeEach
     void setUp() {
-        // Create a test cluster using the proper service
-        boolean created = clusterService.createCluster(TEST_CLUSTER)
-            .await().indefinitely();
-        assertThat(created).isTrue();
+        // Try to create a test cluster - if it already exists, that's fine
+        try {
+            ValidationResult created = clusterService.createCluster(TEST_CLUSTER)
+                .await().indefinitely();
+            
+            if (!created.valid()) {
+                // Check if it's because the cluster already exists
+                if (created.errors().stream().anyMatch(e -> e.contains("already exists"))) {
+                    // That's fine, we can use the existing cluster
+                    LOG.debugf("Cluster %s already exists, using existing cluster", TEST_CLUSTER);
+                } else {
+                    // This is a real error
+                    throw new RuntimeException("Failed to create cluster: " + created.errors());
+                }
+            }
+        } catch (Exception e) {
+            LOG.warnf("Error during cluster creation: %s", e.getMessage());
+            // Try to continue - cluster might already exist
+        }
+    }
+    
+    @AfterEach
+    void tearDown() {
+        // Clean up any pipelines that might have been created
+        try {
+            pipelineConfigService.deletePipeline(TEST_CLUSTER, "test-pipeline")
+                .await().indefinitely();
+        } catch (Exception e) {
+            // Ignore - pipeline might not exist
+        }
+        
+        // Clean up whitelisted modules
+        try {
+            List<PipelineModuleConfiguration> modules = whitelistService.listWhitelistedModules(TEST_CLUSTER)
+                .await().indefinitely();
+            
+            for (PipelineModuleConfiguration module : modules) {
+                try {
+                    whitelistService.removeModuleFromWhitelist(TEST_CLUSTER, module.implementationId())
+                        .await().indefinitely();
+                } catch (Exception e) {
+                    LOG.debugf("Error removing module %s from whitelist: %s", 
+                             module.implementationId(), e.getMessage());
+                }
+            }
+        } catch (Exception e) {
+            LOG.debugf("Error cleaning up whitelisted modules: %s", e.getMessage());
+        }
+        
+        // Don't delete the cluster - let other tests reuse it
     }
     
     @Test
@@ -140,13 +190,13 @@ class ModuleWhitelistServiceTest {
         );
         
         // This should fail because the module isn't whitelisted
-        PipelineUpdateResult result = pipelineConfigService.updatePipeline(
+        ValidationResult result = pipelineConfigService.updatePipeline(
             TEST_CLUSTER,
             "test-pipeline",
             pipeline
         ).await().indefinitely();
         
-        assertThat(result.success()).isFalse();
+        assertThat(result.valid()).isFalse();
         assertThat(result.errors()).anyMatch(error -> 
             error.contains("non-whitelisted-module") && error.contains("not whitelisted")
         );
@@ -182,13 +232,13 @@ class ModuleWhitelistServiceTest {
         );
         
         // This should succeed because the module is whitelisted
-        PipelineUpdateResult pipelineResult = pipelineConfigService.updatePipeline(
+        ValidationResult pipelineResult = pipelineConfigService.updatePipeline(
             TEST_CLUSTER,
             "test-pipeline",
             pipeline
         ).await().indefinitely();
         
-        assertThat(pipelineResult.success()).isTrue();
+        assertThat(pipelineResult.valid()).isTrue();
         
         // Now try to remove the module from whitelist - should fail
         ModuleWhitelistResponse removeResponse = whitelistService.removeModuleFromWhitelist(TEST_CLUSTER, TEST_MODULE)

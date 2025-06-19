@@ -38,8 +38,8 @@ public class ProtobufTestDataHelper {
     // New generated test data directories
     private final String TIKA_REQUESTS_DIRECTORY = "test-data/tika/requests";
     private final String TIKA_RESPONSES_DIRECTORY = "test-data/tika/responses";
-    private final String CHUNKER_INPUT_DIRECTORY = "test-data/chunker/input";
-    private final String CHUNKER_OUTPUT_DIRECTORY = "test-data/chunker/output";
+    private final String CHUNKER_INPUT_DIRECTORY = "test-data/parser/output"; // Parser output becomes chunker input
+    private final String CHUNKER_OUTPUT_DIRECTORY = "test-data/chunker-pipe-docs"; // Actual chunker output location
     private final String CHUNKER_OUTPUT_SMALL_DIRECTORY = "test-data/chunker/output/small";
     private final String EMBEDDER_INPUT_DIRECTORY = "test-data/embedder/input";
     private final String EMBEDDER_OUTPUT_DIRECTORY = "test-data/embedder/output";
@@ -778,7 +778,11 @@ public class ProtobufTestDataHelper {
      */
     private Collection<PipeDoc> loadPipeDocsFromDirectory(String directory) throws IOException {
         try {
+            // !!!! CRITICAL - DO NOT DELETE THIS FORCE LOADING !!!!
             // Force load the class using the current thread's context classloader
+            // This is REQUIRED due to Quarkus classloading timing issues in tests
+            // Without this, the class will NOT be found and tests will fail
+            // DO NOT SIMPLIFY TO DIRECT CLASS REFERENCE - IT WILL NOT WORK!
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             Class<?> pipeDocClass = cl.loadClass("com.rokkon.search.model.PipeDoc");
             // Get the parser method via reflection
@@ -799,7 +803,11 @@ public class ProtobufTestDataHelper {
      */
     private Collection<PipeStream> loadPipeStreamsFromDirectory(String directory) throws IOException {
         try {
+            // !!!! CRITICAL - DO NOT DELETE THIS FORCE LOADING !!!!
             // Force load the class using the current thread's context classloader
+            // This is REQUIRED due to Quarkus classloading timing issues in tests
+            // Without this, the class will NOT be found and tests will fail
+            // DO NOT SIMPLIFY TO DIRECT CLASS REFERENCE - IT WILL NOT WORK!
             ClassLoader cl = Thread.currentThread().getContextClassLoader();
             Class<?> pipeStreamClass = cl.loadClass("com.rokkon.search.model.PipeStream");
             // Get the parser method via reflection

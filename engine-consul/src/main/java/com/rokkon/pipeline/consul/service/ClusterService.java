@@ -5,6 +5,7 @@ import com.rokkon.pipeline.consul.model.Cluster;
 import com.rokkon.pipeline.consul.model.ClusterMetadata;
 import com.rokkon.pipeline.validation.ValidationResult;
 import io.smallrye.mutiny.Uni;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -15,6 +16,8 @@ import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.Optional;
 
@@ -74,34 +77,35 @@ public class ClusterService {
     }
     
     public Uni<Optional<ClusterMetadata>> getCluster(String clusterName) {
-        String key = buildClusterKey(clusterName) + "/metadata";
-        String url = getConsulUrl() + "/v1/kv/" + key + "?raw";
-        
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .GET()
-            .build();
-            
-        return Uni.createFrom().completionStage(
-            httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-        ).map(response -> {
-            if (response.statusCode() == 404) {
-                return Optional.<ClusterMetadata>empty();
-            }
-            
-            if (response.statusCode() != 200) {
-                LOG.errorf("Failed to get cluster: %d - %s", response.statusCode(), response.body());
-                return Optional.<ClusterMetadata>empty();
-            }
-            
+        return Uni.createFrom().item(() -> {
             try {
+                String key = buildClusterKey(clusterName) + "/metadata";
+                String url = getConsulUrl() + "/v1/kv/" + key + "?raw";
+                
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .build();
+                    
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                
+                if (response.statusCode() == 404) {
+                    return Optional.<ClusterMetadata>empty();
+                }
+                
+                if (response.statusCode() != 200) {
+                    LOG.errorf("Failed to get cluster: %d - %s", response.statusCode(), response.body());
+                    return Optional.<ClusterMetadata>empty();
+                }
+                
                 ClusterMetadata metadata = objectMapper.readValue(response.body(), ClusterMetadata.class);
                 return Optional.of(metadata);
             } catch (Exception e) {
-                LOG.error("Failed to parse cluster metadata", e);
+                LOG.error("Failed to get cluster metadata", e);
                 return Optional.<ClusterMetadata>empty();
             }
-        });
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultExecutor());
     }
     
     public Uni<Boolean> clusterExists(String clusterName) {
@@ -109,53 +113,116 @@ public class ClusterService {
     }
     
     public Uni<ValidationResult> deleteCluster(String clusterName) {
-        String key = buildClusterKey(clusterName);
-        String url = getConsulUrl() + "/v1/kv/" + key + "?recurse";
-        
-        HttpRequest request = HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .DELETE()
-            .build();
-            
-        return Uni.createFrom().completionStage(
-            httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-        ).map(response -> {
-            if (response.statusCode() == 200) {
-                LOG.infof("Deleted cluster: %s", clusterName);
-                return ValidationResult.success();
-            } else {
-                return ValidationResult.failure("Failed to delete cluster: " + response.statusCode());
+        return Uni.createFrom().item(() -> {
+            try {
+                String key = buildClusterKey(clusterName);
+                String url = getConsulUrl() + "/v1/kv/" + key + "?recurse";
+                
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .DELETE()
+                    .build();
+                    
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                
+                if (response.statusCode() == 200) {
+                    LOG.infof("Deleted cluster: %s", clusterName);
+                    return ValidationResult.success();
+                } else {
+                    return ValidationResult.failure("Failed to delete cluster: " + response.statusCode());
+                }
+            } catch (Exception e) {
+                LOG.error("Failed to delete cluster", e);
+                return ValidationResult.failure("Failed to delete cluster: " + e.getMessage());
             }
-        });
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultExecutor());
+    }
+    
+    public Uni<List<Cluster>> listClusters() {
+        return Uni.createFrom().item(() -> {
+            try {
+                String url = getConsulUrl() + "/v1/kv/" + CLUSTERS_PREFIX + "/?keys";
+                
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .GET()
+                    .build();
+                    
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                
+                if (response.statusCode() == 404) {
+                    // No clusters exist yet
+                    return new ArrayList<Cluster>();
+                }
+                
+                if (response.statusCode() != 200) {
+                    LOG.errorf("Failed to list clusters: %d - %s", response.statusCode(), response.body());
+                    return new ArrayList<Cluster>();
+                }
+                
+                // Parse the JSON array of keys
+                List<String> keys = objectMapper.readValue(response.body(), 
+                    objectMapper.getTypeFactory().constructCollectionType(List.class, String.class));
+                
+                List<Cluster> clusters = new ArrayList<>();
+                
+                // Extract cluster names from keys
+                for (String key : keys) {
+                    // Keys are in format: rokkon-clusters/{cluster-name}/...
+                    String[] parts = key.split("/");
+                    if (parts.length >= 2 && !clusters.stream().anyMatch(c -> c.name().equals(parts[1]))) {
+                        // Get the cluster metadata
+                        Optional<ClusterMetadata> metadata = getCluster(parts[1]).await().indefinitely();
+                        if (metadata.isPresent()) {
+                            // Convert Map<String, Object> to Map<String, String>
+                            Map<String, String> metadataStrings = new java.util.HashMap<>();
+                            metadata.get().metadata().forEach((k, v) -> metadataStrings.put(k, String.valueOf(v)));
+                            
+                            clusters.add(new Cluster(
+                                parts[1],
+                                metadata.get().createdAt().toString(),
+                                new com.rokkon.pipeline.consul.model.ClusterMetadata(metadataStrings)
+                            ));
+                        }
+                    }
+                }
+                
+                return clusters;
+            } catch (Exception e) {
+                LOG.error("Failed to list clusters", e);
+                return new ArrayList<Cluster>();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultExecutor());
     }
     
     private Uni<ValidationResult> storeClusterMetadata(String clusterName, ClusterMetadata metadata) {
-        try {
-            String json = objectMapper.writeValueAsString(metadata);
-            String key = buildClusterKey(clusterName) + "/metadata";
-            String url = getConsulUrl() + "/v1/kv/" + key;
-            
-            HttpRequest request = HttpRequest.newBuilder()
-                .uri(URI.create(url))
-                .PUT(HttpRequest.BodyPublishers.ofString(json))
-                .build();
+        return Uni.createFrom().item(() -> {
+            try {
+                String json = objectMapper.writeValueAsString(metadata);
+                String key = buildClusterKey(clusterName) + "/metadata";
+                String url = getConsulUrl() + "/v1/kv/" + key;
                 
-            return Uni.createFrom().completionStage(
-                httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
-            ).map(response -> {
+                HttpRequest request = HttpRequest.newBuilder()
+                    .uri(URI.create(url))
+                    .PUT(HttpRequest.BodyPublishers.ofString(json))
+                    .build();
+                    
+                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
+                
                 if (response.statusCode() == 200) {
                     LOG.infof("Created cluster: %s", clusterName);
                     return ValidationResult.success();
                 } else {
                     return ValidationResult.failure("Failed to create cluster: " + response.statusCode());
                 }
-            });
-        } catch (Exception e) {
-            LOG.error("Failed to serialize cluster metadata", e);
-            return Uni.createFrom().item(
-                ValidationResult.failure("Failed to serialize cluster metadata: " + e.getMessage())
-            );
-        }
+            } catch (Exception e) {
+                LOG.error("Failed to store cluster metadata", e);
+                return ValidationResult.failure("Failed to store cluster metadata: " + e.getMessage());
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultExecutor());
     }
     
     private String buildClusterKey(String clusterName) {
