@@ -523,6 +523,20 @@ public class ProtobufTestDataHelper {
             return Collections.emptyList();
         }
     }
+    
+    /**
+     * Get parser output documents from test-data/parser/output
+     * These are parsed documents that can be used as input for chunking tests
+     * @return Collection of parsed PipeDoc instances
+     */
+    public Collection<PipeDoc> getParserOutputDocs() {
+        try {
+            return loadPipeDocsFromDirectory("test-data/parser/output");
+        } catch (IOException e) {
+            System.err.println("Failed to load parser output documents: " + e.getMessage());
+            return List.of();
+        }
+    }
 
     /**
      * Retrieves all pipeline stages available.
@@ -901,6 +915,20 @@ public class ProtobufTestDataHelper {
                 message = loadFromClasspath(directory + "/" + filename2, parser);
                 if (message != null) {
                     messages.add(message);
+                }
+            }
+        } else if (directory.contains("parser/output")) {
+            // Try to load parser output files with known naming pattern
+            for (int i = 0; i < 200; i++) {
+                String filename = String.format("parser_output-%03d.%s", i, fileExtension);
+                T message = loadFromClasspath(directory + "/" + filename, parser);
+                if (message != null) {
+                    messages.add(message);
+                } else {
+                    // If we fail to load a file in sequence, try a few more before giving up
+                    if (i > 10 && messages.isEmpty()) {
+                        break;
+                    }
                 }
             }
         }

@@ -6,8 +6,11 @@ quarkus:
       port: 49092
       host: 0.0.0.0
       enable-reflection-service: true
+      max-inbound-message-size: 1073741824  # 1GB - it's 2025!
     clients:
       # Add gRPC client configurations here if needed
+      chunkerService:
+        max-inbound-message-size: 1073741824  # 1GB
   log:
     level: INFO
     category:

@@ -55,7 +55,7 @@ public class DocumentProcessingSummary {
         int documentsWithTitle = 0;
         int documentsWithMetadata = 0;
         
-        for (PipeDoc doc : outputBuffer.getItems()) {
+        for (PipeDoc doc : outputBuffer.snapshot()) {
             // Body length
             totalBodyLength += doc.getBody().length();
             

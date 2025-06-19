@@ -3,6 +3,7 @@ package com.rokkon.pipeline.utils;
 import com.google.protobuf.Message;
 
 import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Interface for a buffer that stores protobuf messages and can save them to disk.
@@ -55,4 +56,14 @@ public interface ProcessingBuffer<T extends Message> {
      * Clears all messages from the buffer.
      */
     void clear();
+    
+    /**
+     * Returns a snapshot of all items currently in the buffer.
+     * This method creates a new list to prevent external modification of the buffer.
+     * The returned list represents the buffer contents at the moment of the call.
+     * This is useful for analysis and reporting.
+     * 
+     * @return a new list containing a snapshot of all messages in the buffer
+     */
+    List<T> snapshot();
 }

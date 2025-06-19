@@ -17,8 +17,9 @@ dependencies {
     implementation("io.quarkus:quarkus-config-yaml")
     implementation("io.quarkus:quarkus-arc")
 
-    // Proto definitions from our proto project
-    implementation("com.rokkon.pipeline:proto-definitions:1.0.0-SNAPSHOT")
+    // Updated dependencies for new protobuf structure
+    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
 
     // OpenNLP dependencies for chunking and NLP analysis
     implementation("org.apache.opennlp:opennlp-tools:2.3.0")
@@ -40,6 +41,13 @@ version = "1.0.0-SNAPSHOT"
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
+}
+
+// Configure Quarkus to use Mutiny for gRPC code generation
+quarkus {
+    buildForkOptions {
+        systemProperty("quarkus.grpc.codegen.type", "mutiny")
+    }
 }
 
 tasks.withType<Test> {

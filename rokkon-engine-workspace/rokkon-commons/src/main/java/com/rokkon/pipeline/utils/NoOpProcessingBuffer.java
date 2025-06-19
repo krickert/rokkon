@@ -4,6 +4,8 @@ import com.google.protobuf.Message;
 import jakarta.annotation.PreDestroy;
 
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * A no-op implementation of the ProcessingBuffer interface.
@@ -74,5 +76,15 @@ public class NoOpProcessingBuffer<T extends Message> implements ProcessingBuffer
     @PreDestroy
     public void saveOnShutdown() {
         // No-op
+    }
+    
+    /**
+     * Always returns an empty list since this is a no-op buffer.
+     *
+     * @return an empty list
+     */
+    @Override
+    public List<T> snapshot() {
+        return Collections.emptyList();
     }
 }

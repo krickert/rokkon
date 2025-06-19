@@ -219,4 +219,15 @@ public class ProcessingBufferImpl<T extends Message> implements ProcessingBuffer
             lock.writeLock().unlock();
         }
     }
+    
+    @Override
+    public List<T> snapshot() {
+        lock.readLock().lock();
+        try {
+            // Create a snapshot of the buffer contents at this moment
+            return new ArrayList<>(buffer);
+        } finally {
+            lock.readLock().unlock();
+        }
+    }
 }

@@ -8,6 +8,10 @@ import io.quarkus.test.junit.QuarkusIntegrationTest;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
+/**
+ * Integration test for ChunkerService running in prod mode.
+ * Uses external gRPC client to connect to the running service.
+ */
 @QuarkusIntegrationTest
 public class ChunkerServiceIT extends ChunkerServiceTestBase {
 
@@ -16,14 +20,12 @@ public class ChunkerServiceIT extends ChunkerServiceTestBase {
 
     @BeforeEach
     void setup() {
-        // For integration tests, the gRPC server runs on the configured port (9090 by default)
+        // In integration tests, the service runs on the actual configured port
         int port = 9090;
-        
         channel = ManagedChannelBuilder
                 .forAddress("localhost", port)
                 .usePlaintext()
                 .build();
-        
         pipeStepProcessor = new PipeStepProcessorClient("pipeStepProcessor", channel, (name, stub) -> stub);
     }
 
