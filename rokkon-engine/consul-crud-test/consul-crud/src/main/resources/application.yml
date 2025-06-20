@@ -1,0 +1,21 @@
+quarkus:
+  application:
+    name: consul-crud-test
+  
+  http:
+    port: 8080
+    
+  # REST client for Consul API - this is how we write to Consul
+  rest-client:
+    consul-api:
+      url: http://${consul.host:localhost}:${consul.port:8500}
+      
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+        
+consul:
+  host: ${CONSUL_HOST:localhost}
+  port: ${CONSUL_PORT:8500}

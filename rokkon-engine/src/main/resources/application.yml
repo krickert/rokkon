@@ -1,41 +1,43 @@
 quarkus:
   application:
     name: rokkon-engine
-  
+
   http:
     port: 8081
     host: 0.0.0.0
-  
+
   grpc:
     server:
       port: 9000
       host: 0.0.0.0
       enable-reflection-service: true
-      max-inbound-message-size: 4MB
+      max-inbound-message-size: 4194304
       health:
         enabled: true
-    
+
     # gRPC client defaults
     clients:
       default:
-        max-inbound-message-size: 4MB
+        max-inbound-message-size: 4194304
         keepalive-time: 30s
         keepalive-timeout: 10s
-  
+
   # Consul configuration
   consul-config:
-    enabled: true
+    enabled: false
     agent:
       host-port: ${consul.host:localhost}:${consul.port:8500}
     properties-value-keys: rokkon-clusters/${CLUSTER_NAME:default}/config
-    fail-fast: false
-      
+
   # Index external dependencies for CDI discovery
   index-dependency:
     engine-consul:
       group-id: com.rokkon.pipeline
       artifact-id: engine-consul
-      
+    engine-models:
+      group-id: com.rokkon.pipeline
+      artifact-id: engine-models
+
   # Health check configuration
   health:
     extensions:
@@ -44,7 +46,7 @@ quarkus:
       enabled: true
     liveness:
       enabled: true
-      
+
   # Logging
   log:
     level: INFO
@@ -70,7 +72,7 @@ stork:
       refresh-period: 10s
     load-balancer:
       type: round-robin
-  
+
   # Module-specific configurations
   echo-service:
     service-discovery:
@@ -79,7 +81,7 @@ stork:
       consul-port: ${consul.port:8500}
     load-balancer:
       type: least-requests
-      
+
   chunker-service:
     service-discovery:
       type: consul
@@ -87,7 +89,7 @@ stork:
       consul-port: ${consul.port:8500}
     load-balancer:
       type: least-response-time
-      
+
   parser-service:
     service-discovery:
       type: consul
@@ -95,7 +97,7 @@ stork:
       consul-port: ${consul.port:8500}
     load-balancer:
       type: round-robin
-      
+
   embedder-service:
     service-discovery:
       type: consul
@@ -109,7 +111,7 @@ grpc:
     max-inbound-message-size: ${GRPC_MAX_MESSAGE_SIZE:4194304}
     keepalive-time-seconds: ${GRPC_KEEPALIVE_TIME:30}
     keepalive-timeout-seconds: ${GRPC_KEEPALIVE_TIMEOUT:10}
-    
+
 # Dev profile
 "%dev":
   quarkus:
@@ -120,6 +122,13 @@ grpc:
       category:
         "com.rokkon.pipeline":
           level: DEBUG
+        "org.testcontainers":
+          level: INFO
+  # Enable auto-start of Consul container in dev mode
+  rokkon:
+    dev:
+      consul:
+        auto-start: true
 
 # Test profile  
 "%test":

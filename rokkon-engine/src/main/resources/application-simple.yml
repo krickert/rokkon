@@ -1,0 +1,12 @@
+quarkus:
+  application:
+    name: rokkon-engine
+  
+  http:
+    port: 8081
+    host: 0.0.0.0
+  
+  log:
+    level: INFO
+    console:
+      enable: true

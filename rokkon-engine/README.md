@@ -27,11 +27,19 @@ The engine serves multiple roles:
 - Handles failures with Dead Letter Queues (DLQ) per step
 - Monitors pipeline execution status
 
-### REST API Endpoints (TODO)
-- `/api/v1/pipelines` - Pipeline CRUD operations
-- `/api/v1/modules` - List registered modules
-- `/api/v1/execute` - Execute pipeline with document
-- `/ws/status` - WebSocket for real-time status updates
+### REST API Endpoints
+- `/api/v1/modules/register` - Register a new module
+- `/ping` - Simple health check endpoint
+- `/api/v1/pipelines` - Pipeline CRUD operations (TODO)
+- `/api/v1/modules` - List registered modules (TODO)
+- `/api/v1/execute` - Execute pipeline with document (TODO)
+- `/ws/status` - WebSocket for real-time status updates (TODO)
+
+### Web Dashboard
+The engine includes a web dashboard accessible at the root URL (`/`). The dashboard provides:
+- Engine status monitoring
+- Module registration interface
+- List of registered modules
 
 ## Configuration
 

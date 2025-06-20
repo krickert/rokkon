@@ -23,6 +23,28 @@ public class ClusterResource {
     @Inject
     ClusterService clusterService;
     
+    @GET
+    @Operation(summary = "List all clusters")
+    @APIResponses({
+        @APIResponse(responseCode = "200", description = "List of clusters returned successfully"),
+        @APIResponse(responseCode = "500", description = "Failed to retrieve clusters from Consul")
+    })
+    public Uni<Response> listClusters() {
+        LOG.info("REST API: Listing all clusters");
+        
+        return clusterService.listClusters()
+            .map(clusters -> Response.ok(clusters).build())
+            .onFailure().recoverWithItem(throwable -> {
+                LOG.errorf(throwable, "Failed to list clusters");
+                ValidationResult error = ValidationResult.failure(
+                    "Failed to retrieve clusters: " + throwable.getMessage()
+                );
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(error)
+                    .build();
+            });
+    }
+    
     @POST
     @Path("/{clusterName}")
     @Operation(summary = "Create a new cluster")

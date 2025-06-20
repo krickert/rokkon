@@ -13,6 +13,7 @@ import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -36,6 +37,9 @@ import java.util.concurrent.ConcurrentHashMap;
 public class PipelineExecutorService {
 
     private static final Logger LOG = LoggerFactory.getLogger(PipelineExecutorService.class);
+
+    @ConfigProperty(name = "rokkon.cluster.name", defaultValue = "default-cluster")
+    String clusterName;
 
     @Inject
     PipelineConfigService pipelineConfigService;
@@ -70,11 +74,8 @@ public class PipelineExecutorService {
 
         PipeStream initialStream = streamBuilder.build();
 
-        // Load pipeline configuration
-        // TODO: Need to pass cluster name - for now use default
-        return Uni.createFrom().completionStage(
-                pipelineConfigService.getPipeline("default", pipelineName)
-            )
+        // Load pipeline configuration using configured cluster name
+        return pipelineConfigService.getPipeline(clusterName, pipelineName)
             .onItem().transform(opt -> opt.orElse(null))
             .onItem().ifNull().failWith(() -> 
                 new IllegalArgumentException("Pipeline not found: " + pipelineName))
