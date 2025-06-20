@@ -212,4 +212,38 @@ public class TestProcessorServiceImpl implements PipeStepProcessor {
         
         return Uni.createFrom().item(registration);
     }
+    
+    @Override
+    public Uni<ProcessResponse> registrationCheck(ProcessRequest request) {
+        LOG.debugf("TestProcessor registration check requested");
+        
+        // Create a simple test response to verify the module is functioning
+        ProcessResponse.Builder responseBuilder = ProcessResponse.newBuilder()
+                .setSuccess(true)
+                .addProcessorLogs("TestProcessor: Registration check successful");
+        
+        // If a test document is provided, echo it back with modifications
+        if (request.hasDocument()) {
+            PipeDoc doc = request.getDocument();
+            
+            // Add a marker to show this went through registration check
+            Struct.Builder customDataBuilder = doc.hasCustomData() 
+                ? doc.getCustomData().toBuilder() 
+                : Struct.newBuilder();
+            
+            customDataBuilder.putFields("registration_check", 
+                Value.newBuilder().setStringValue("passed").build());
+            customDataBuilder.putFields("module_name", 
+                Value.newBuilder().setStringValue(processorName).build());
+            
+            PipeDoc modifiedDoc = doc.toBuilder()
+                .setCustomData(customDataBuilder.build())
+                .build();
+            
+            responseBuilder.setOutputDoc(modifiedDoc);
+            responseBuilder.addProcessorLogs("TestProcessor: Test document processed in registration check");
+        }
+        
+        return Uni.createFrom().item(responseBuilder.build());
+    }
 }

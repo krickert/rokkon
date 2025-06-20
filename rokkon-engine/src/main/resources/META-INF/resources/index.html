@@ -83,6 +83,7 @@
                             <span id="consulStatus">Checking...</span>
                         </div>
                         <button id="refreshStatus" class="btn btn-primary">Refresh Status</button>
+                        <button id="changeConsulConnection" class="btn btn-secondary ms-2">Change Consul Connection</button>
                         
                         <!-- Consul Configuration Section -->
                         <div id="consulConfig" class="mt-3" style="display: none;">
@@ -228,6 +229,27 @@
                                     </select>
                                 </div>
                             </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="useEngineConnection" onclick="toggleEngineConnection()">
+                                    <label class="form-check-label" for="useEngineConnection">
+                                        Use different connection for engine validation (optional)
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div id="engineConnectionFields" style="display: none;" class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="engineHost" class="form-label">Engine Connection Host</label>
+                                    <input type="text" class="form-control" id="engineHost" placeholder="e.g., localhost">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="enginePort" class="form-label">Engine Connection Port</label>
+                                    <input type="number" class="form-control" id="enginePort" placeholder="e.g., 49090">
+                                </div>
+                            </div>
+                            
                             <button type="submit" class="btn btn-success">Register Module</button>
                         </form>
                     </div>
@@ -244,6 +266,17 @@
             // Set up refresh button
             document.getElementById('refreshStatus').addEventListener('click', function() {
                 checkEngineStatus();
+            });
+            
+            // Set up change consul connection button
+            document.getElementById('changeConsulConnection').addEventListener('click', function() {
+                const configSection = document.getElementById('consulConfig');
+                if (configSection.style.display === 'none') {
+                    configSection.style.display = 'block';
+                    document.getElementById('consulHost').focus();
+                } else {
+                    configSection.style.display = 'none';
+                }
             });
             
             // Set up create cluster button
@@ -320,7 +353,8 @@
                             statusElement.textContent = 'Connected';
                             statusElement.className = 'text-success';
                         }
-                        configSection.style.display = 'block';
+                        // Don't automatically show form when connected - user must click button
+                        configSection.style.display = 'none';
                     } else if (data.status === 'STARTING') {
                         statusElement.textContent = 'Starting dev container...';
                         statusElement.className = 'text-info';
@@ -331,10 +365,12 @@
                         const errorMsg = data.error ? ` (${data.error})` : '';
                         statusElement.textContent = 'Down' + errorMsg;
                         statusElement.className = 'text-danger';
+                        // Show form automatically when Consul is down
                         configSection.style.display = 'block';
                     } else {
                         statusElement.textContent = 'Unknown';
                         statusElement.className = 'text-warning';
+                        // Show form automatically when status is unknown
                         configSection.style.display = 'block';
                     }
                     
@@ -510,6 +546,18 @@
             document.getElementById('newClusterForm').style.display = 'none';
             document.getElementById('createClusterForm').reset();
         }
+        
+        function toggleEngineConnection() {
+            const checkbox = document.getElementById('useEngineConnection');
+            const fields = document.getElementById('engineConnectionFields');
+            fields.style.display = checkbox.checked ? 'block' : 'none';
+            
+            // Clear fields when hidden
+            if (!checkbox.checked) {
+                document.getElementById('engineHost').value = '';
+                document.getElementById('enginePort').value = '';
+            }
+        }
 
         function registerModule() {
             const moduleName = document.getElementById('moduleName').value;
@@ -518,20 +566,30 @@
             const moduleType = document.getElementById('moduleType').value;
             const moduleVersion = document.getElementById('moduleVersion').value;
             const clusterName = document.getElementById('clusterName').value;
+            
+            const useEngineConnection = document.getElementById('useEngineConnection').checked;
+            const engineHost = document.getElementById('engineHost').value;
+            const enginePort = document.getElementById('enginePort').value;
 
             const moduleData = {
                 moduleName: moduleName,
+                implementationId: moduleName + '-impl',
                 host: moduleHost,
                 port: parseInt(modulePort),
-                clusterName: clusterName,
-                serviceData: {
-                    type: moduleType,
-                    version: moduleVersion
-                },
+                serviceType: moduleType,
+                version: moduleVersion,
                 metadata: {}
             };
+            
+            // Add engine connection if specified
+            if (useEngineConnection && engineHost && enginePort) {
+                moduleData.engineConnection = {
+                    host: engineHost,
+                    port: parseInt(enginePort)
+                };
+            }
 
-            fetch('/api/v1/modules/register', {
+            fetch('/api/v1/global-modules/register', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -730,74 +788,103 @@
         }
         
         function loadAllServices() {
-            fetch('/api/v1/modules/all-services')
-                .then(response => {
-                    if (!response.ok) {
-                        throw new Error('Failed to fetch services');
+            // First fetch all services, then check which ones are whitelisted
+            Promise.all([
+                fetch('/api/v1/modules/all-services').then(r => r.json()),
+                fetch('/api/v1/global-modules').then(r => r.json()).catch(() => [])
+            ])
+            .then(([services, globalModules]) => {
+                const servicesList = document.getElementById('allServicesList');
+                
+                if (!services || services.length === 0) {
+                    servicesList.innerHTML = '<p class="text-muted">No services registered in Consul.</p>';
+                    return;
+                }
+                
+                // Create a set of whitelisted module names for quick lookup
+                const whitelistedModules = new Set(globalModules.map(m => m.moduleName));
+                
+                // Build services table
+                let html = `
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Service Name</th>
+                                    <th>Status</th>
+                                    <th>Address</th>
+                                    <th>Port</th>
+                                    <th>Tags</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                services.forEach(service => {
+                    const statusBadge = service.healthy ? 
+                        '<span class="badge bg-success">Healthy</span>' : 
+                        '<span class="badge bg-danger">Unhealthy</span>';
+                    
+                    const tags = service.tags && service.tags.length > 0 ? 
+                        service.tags.join(', ') : 
+                        '<span class="text-muted">None</span>';
+                    
+                    // Check if this is a module service
+                    const isModuleService = service.name.startsWith('module-');
+                    const moduleName = isModuleService ? service.name.substring(7) : service.name;
+                    
+                    // Action buttons for module services
+                    let actionButtons = '';
+                    if (isModuleService && service.healthy) {
+                        if (whitelistedModules.has(moduleName)) {
+                            // Module is already whitelisted
+                            actionButtons = `
+                                <button class="btn btn-sm btn-success" disabled>
+                                    <i class="bi bi-check-circle-fill"></i> Whitelisted for Clusters
+                                </button>
+                            `;
+                        } else {
+                            // Module can be whitelisted
+                            actionButtons = `
+                                <button class="btn btn-sm btn-outline-primary" 
+                                        onclick="whitelistModule('${moduleName}', '${service.address}', ${service.port}); return false;"
+                                        title="Enable this module for clusters">
+                                    <i class="bi bi-plus-circle"></i> Whitelist for Clusters
+                                </button>
+                            `;
+                        }
                     }
-                    return response.json();
-                })
-                .then(services => {
-                    const servicesList = document.getElementById('allServicesList');
-                    
-                    if (!services || services.length === 0) {
-                        servicesList.innerHTML = '<p class="text-muted">No services registered in Consul.</p>';
-                        return;
-                    }
-                    
-                    // Build services table
-                    let html = `
-                        <div class="table-responsive">
-                            <table class="table table-hover">
-                                <thead>
-                                    <tr>
-                                        <th>Service Name</th>
-                                        <th>Status</th>
-                                        <th>Address</th>
-                                        <th>Port</th>
-                                        <th>Tags</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                    `;
-                    
-                    services.forEach(service => {
-                        const statusBadge = service.healthy ? 
-                            '<span class="badge bg-success">Healthy</span>' : 
-                            '<span class="badge bg-danger">Unhealthy</span>';
-                        
-                        const tags = service.tags && service.tags.length > 0 ? 
-                            service.tags.join(', ') : 
-                            '<span class="text-muted">None</span>';
-                        
-                        html += `
-                            <tr>
-                                <td>
-                                    <a href="#" onclick="showModuleDetails('${service.name}'); return false;">
-                                        ${service.name}
-                                    </a>
-                                </td>
-                                <td>${statusBadge}</td>
-                                <td>${service.address || 'N/A'}</td>
-                                <td>${service.port || 'N/A'}</td>
-                                <td><small>${tags}</small></td>
-                            </tr>
-                        `;
-                    });
                     
                     html += `
-                                </tbody>
-                            </table>
-                        </div>
+                        <tr>
+                            <td>
+                                <a href="#" onclick="showModuleDetails('${service.name}'); return false;">
+                                    ${service.name}
+                                </a>
+                            </td>
+                            <td>${statusBadge}</td>
+                            <td>${service.address || 'N/A'}</td>
+                            <td>${service.port || 'N/A'}</td>
+                            <td><small>${tags}</small></td>
+                            <td>${actionButtons}</td>
+                        </tr>
                     `;
-                    
-                    servicesList.innerHTML = html;
-                })
-                .catch(error => {
-                    console.error('Error loading all services:', error);
-                    document.getElementById('allServicesList').innerHTML = 
-                        '<p class="text-danger">Failed to load services. Check Consul connection.</p>';
                 });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                servicesList.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error loading all services:', error);
+                document.getElementById('allServicesList').innerHTML = 
+                    '<p class="text-danger">Failed to load services. Check Consul connection.</p>';
+            });
         }
         
         function updateConsulConnection() {
@@ -846,6 +933,68 @@
             .catch(error => {
                 console.error('Error disconnecting from Consul:', error);
                 alert('Failed to disconnect');
+            });
+        }
+        
+        function whitelistModule(moduleName, address, port) {
+            // Extract module metadata from the service tags if available
+            const serviceType = 'PIPELINE'; // Default, could be extracted from tags
+            const version = '1.0.0'; // Default, could be extracted from tags
+            
+            const registrationData = {
+                moduleName: moduleName,
+                implementationId: moduleName + '-impl', // Default implementation ID
+                host: address,
+                port: port,
+                serviceType: serviceType,
+                version: version,
+                metadata: {},
+                // For now, we'll use the same host/port for engine connection
+                // This could be expanded to allow user to specify different values
+                engineConnection: null
+            };
+            
+            // Show confirmation dialog
+            if (!confirm(`Do you want to whitelist the module "${moduleName}" at ${address}:${port}?`)) {
+                return;
+            }
+            
+            // Register the module globally
+            fetch('/api/v1/global-modules/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(registrationData)
+            })
+            .then(response => {
+                return response.json().then(data => {
+                    // Include the status code in the data
+                    data.statusCode = response.status;
+                    return data;
+                });
+            })
+            .then(data => {
+                if (data.success) {
+                    alert(`Module "${moduleName}" has been whitelisted successfully!`);
+                    // Refresh the services list
+                    loadAllServices();
+                    // Also refresh the modules graph
+                    loadModulesGraph();
+                } else {
+                    // Check if it's a conflict (already registered)
+                    if (data.statusCode === 409) {
+                        alert(`Module "${moduleName}" is already whitelisted.`);
+                    } else {
+                        alert('Failed to whitelist module: ' + data.message);
+                    }
+                    // Refresh the UI anyway to show the current state
+                    loadAllServices();
+                }
+            })
+            .catch(error => {
+                console.error('Error whitelisting module:', error);
+                alert('Failed to whitelist module: ' + error.message);
             });
         }
     </script>
