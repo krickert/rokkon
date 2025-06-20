@@ -1,6 +1,9 @@
 quarkus:
   application:
     name: echo-module
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
   smallrye-openapi:
     path: /q/openapi
     info-title: Echo Module API

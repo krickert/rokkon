@@ -31,7 +31,7 @@ class TestHarnessServiceIT {
     @BeforeEach
     void setup() {
         // In integration tests, the service runs on the configured port
-        int port = 49094; // Port configured in application.yml
+        int port = 49095; // Standardized port for test-module
         channel = ManagedChannelBuilder
                 .forAddress("localhost", port)
                 .usePlaintext()

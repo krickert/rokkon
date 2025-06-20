@@ -57,6 +57,12 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
+quarkus {
+    buildForkOptions {
+        systemProperty("quarkus.grpc.codegen.type", "mutiny")
+    }
+}
+
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
     maxHeapSize = "3g"

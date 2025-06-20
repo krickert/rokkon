@@ -19,7 +19,7 @@ public class TestProcessorIT extends TestProcessorTestBase {
 
     @BeforeEach
     void setup() {
-        int port = 49093; // Default gRPC port from application.yml
+        int port = 49095; // Standardized port for test-module
         channel = ManagedChannelBuilder
                 .forAddress("localhost", port)
                 .usePlaintext()
