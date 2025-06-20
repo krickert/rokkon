@@ -1,9 +1,11 @@
 package com.rokkon.pipeline.engine.service;
 
+import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
 import com.rokkon.pipeline.engine.event.ConsulStatusEvent;
 import io.quarkus.runtime.LaunchMode;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
+import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import java.time.Instant;
 
@@ -44,6 +46,9 @@ public class ConsulHealthService {
     @Inject
     Event<ConsulStatusEvent> statusEvent;
     
+    @Inject
+    ConsulConnectionManager connectionManager;
+    
     private volatile ConsulHealthStatus currentStatus = 
         new ConsulHealthStatus(ConsulStatus.UNKNOWN, Instant.now(), null);
     
@@ -64,5 +69,14 @@ public class ConsulHealthService {
     
     public boolean isHealthy() {
         return currentStatus.status == ConsulStatus.UP;
+    }
+    
+    // Listen for connection events from ConsulConnectionManager
+    void onConsulConnectionEvent(@Observes com.rokkon.pipeline.consul.connection.ConsulConnectionManager.ConsulConnectionEvent event) {
+        switch (event.getType()) {
+            case CONNECTED -> updateStatus(ConsulStatus.UP, null);
+            case DISCONNECTED -> updateStatus(ConsulStatus.DOWN, "Disconnected");
+            case FAILED -> updateStatus(ConsulStatus.DOWN, event.getMessage());
+        }
     }
 }

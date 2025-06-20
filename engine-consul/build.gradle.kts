@@ -2,6 +2,7 @@ plugins {
     java
     id("io.quarkus")
     `maven-publish`
+    idea
 }
 
 repositories {
@@ -22,17 +23,20 @@ dependencies {
     implementation("io.quarkus:quarkus-config-yaml")
     implementation("io.quarkus:quarkus-arc")
     implementation("io.quarkus:quarkus-rest")
-    
+
     // Stork for Consul service discovery
     implementation("io.smallrye.stork:stork-service-discovery-consul:2.6.3")
-    
+
     // Vertx Consul client for service registration
     implementation("io.smallrye.reactive:smallrye-mutiny-vertx-consul-client")
     
+    // YAML processing for config persistence
+    implementation("org.yaml:snakeyaml:2.2")
+
     // Our models and validators
     implementation("com.rokkon.pipeline:engine-models:1.0.0-SNAPSHOT")
     implementation("com.rokkon.pipeline:engine-validators:1.0.0-SNAPSHOT")
-    
+
     // Test dependencies
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.rest-assured:rest-assured")
@@ -50,6 +54,8 @@ version = "1.0.0-SNAPSHOT"
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
+    withSourcesJar()
+    withJavadocJar()
 }
 
 // Configure Quarkus to use Mutiny for gRPC code generation
@@ -86,4 +92,12 @@ publishing {
 // Suppress the enforced platform validation
 tasks.withType<GenerateModuleMetadata> {
     suppressedValidationErrors.add("enforced-platform")
+}
+
+// Configure idea to download sources and javadocs
+idea {
+    module {
+        isDownloadJavadoc = true
+        isDownloadSources = true
+    }
 }

@@ -165,9 +165,9 @@ public class EchoResource {
             @QueryParam("sample") @DefaultValue("1") int sampleNumber) {
         
         try {
-            // Load the sample PipeDoc
+            // Load the sample PipeDoc from ProcessResponse (tika response)
             String filename = "sample-pipestream-" + sampleNumber + ".bin";
-            PipeDoc sampleDoc = SampleDataLoader.loadSamplePipeDoc(filename);
+            PipeDoc sampleDoc = SampleDataLoader.loadSamplePipeDocFromResponse(filename);
             
             if (sampleDoc == null) {
                 return Uni.createFrom().item(

@@ -10,7 +10,6 @@ import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
@@ -28,22 +27,13 @@ public class ModuleDiscoveryResource {
     @Inject
     Vertx vertx;
     
-    @ConfigProperty(name = "consul.host", defaultValue = "localhost")
-    String consulHost;
-    
-    @ConfigProperty(name = "consul.port", defaultValue = "8500")
-    int consulPort;
-    
-    private ConsulClient consulClient;
+    @Inject
+    com.rokkon.pipeline.consul.connection.ConsulConnectionManager connectionManager;
     
     private ConsulClient getConsulClient() {
-        if (consulClient == null) {
-            io.vertx.ext.consul.ConsulClientOptions options = new io.vertx.ext.consul.ConsulClientOptions()
-                .setHost(consulHost)
-                .setPort(consulPort);
-            consulClient = ConsulClient.create(vertx, options);
-        }
-        return consulClient;
+        return connectionManager.getClient().orElseThrow(() -> 
+            new WebApplicationException("Consul not connected", Response.Status.SERVICE_UNAVAILABLE)
+        );
     }
     
     @GET
@@ -137,19 +127,19 @@ public class ModuleDiscoveryResource {
         LOG.info("Fetching all services from Consul");
         
         return UniHelper.toUni(getConsulClient().catalogServices())
-            .onItem().transformToUni(servicesMap -> {
+            .onItem().transformToUni(serviceList -> {
                 // Get details for each service
-                List<Uni<ServiceInfo>> serviceUnis = servicesMap.entrySet().stream()
-                    .map(entry -> {
-                        String serviceName = entry.getKey();
-                        List<String> tags = entry.getValue();
+                List<Uni<ServiceInfo>> serviceUnis = serviceList.getList().stream()
+                    .map(service -> {
+                        String serviceName = service.getName();
+                        List<String> tags = service.getTags();
                         
                         // Get health status for each service
-                        return UniHelper.toUni(getConsulClient().healthServiceNodes(serviceName, false))
+                        return UniHelper.toUni(getConsulClient().healthServiceNodes(serviceName, true))
                             .map(healthEntries -> {
-                                boolean healthy = healthEntries.getList().stream()
-                                    .anyMatch(he -> he.getChecks().stream()
-                                        .allMatch(check -> "passing".equals(check.getStatus())));
+                                // Service is healthy if we got any healthy nodes back
+                                // (passing=true parameter filters to only healthy nodes)
+                                boolean healthy = !healthEntries.getList().isEmpty();
                                 
                                 String address = "";
                                 int port = 0;
@@ -167,7 +157,7 @@ public class ModuleDiscoveryResource {
                     .toList();
                 
                 return Uni.combine().all().unis(serviceUnis)
-                    .combinedWith(list -> {
+                    .with(list -> {
                         @SuppressWarnings("unchecked")
                         List<ServiceInfo> services = (List<ServiceInfo>) list;
                         return Response.ok(services).build();
