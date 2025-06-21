@@ -11,6 +11,27 @@ import "google/protobuf/struct.proto";
 
 // --- Core Document Representation ---
 
+// Information about a batch operation
+message BatchInfo {
+  // Unique identifier for this batch
+  string batch_id = 1;
+
+  // Total number of items in the batch
+  int64 total_items = 2;
+
+  // This item's position in the batch (1-based)
+  int64 current_item_number = 3;
+
+  // Human-readable name/description of the batch
+  string batch_name = 4;
+
+  // When this batch started processing
+  google.protobuf.Timestamp started_at = 5;
+
+  // Source of the batch (e.g., "pg_catalog.csv", "wikipedia-20240101.json")
+  optional string source_reference = 6;
+}
+
 // Represents a single named vector embedding, typically for a whole document or a non-chunk segment.
 message Embedding {
   // Optional: Name or identifier for the model that generated this embedding.

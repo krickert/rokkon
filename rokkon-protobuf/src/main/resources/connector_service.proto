@@ -11,22 +11,33 @@ import "rokkon_core_types.proto"; // This should define com.rokkon.search.model.
 
 // --- Messages for the Connector RPC ---
 message ConnectorRequest {
-  // REQUIRED. An identifier for the connector or data source submitting this data.
-  // The engine will use this ID to look up the pre-configured target pipeline and initial step.
-  // Example: "s3-landing-bucket-connector", "customer-api-ingest-v1".
-  string source_identifier = 1;
-
-  // REQUIRED. The initial document data to be processed.
+  // REQUIRED. Identifies which connector type is sending this
+  // Examples: "gutenberg", "wikipedia", "arxiv", "gdelt"
+  // The engine uses this to determine pipeline routing
+  string connector_type = 1;
+  
+  // REQUIRED. The document to be processed
   com.rokkon.search.model.PipeDoc document = 2;
-
-  // Optional. Key-value parameters to be included in the PipeStream's context_params.
-  // Useful for passing global run context like tenant_id, user_id, correlation_id from the connector.
-  map<string, string> initial_context_params = 3;
-
-  // Optional. If the connector wants to suggest a stream_id.
-  // If empty, the engine MUST generate a unique one.
-  // If provided, the engine MAY use it or generate its own if there's a conflict or policy.
-  optional string suggested_stream_id = 4;
+  
+  // RECOMMENDED. Tags for categorization, filtering, and routing
+  // Examples: ["english", "public-domain", "2024", "literature", "fiction"]
+  repeated string tags = 3;
+  
+  // Optional. If this document is part of a batch operation
+  optional com.rokkon.search.model.BatchInfo batch_info = 4;
+  
+  // Optional. Additional context that will be passed through the pipeline
+  // Replaces initial_context_params
+  map<string, string> context_params = 5;
+  
+  // Optional. Connector can suggest a stream_id (engine may override)
+  optional string suggested_stream_id = 6;
+  
+  // Optional. Processing priority: 0=low, 1=normal (default), 2=high
+  optional int32 priority = 7;
+  
+  // Optional. Version of the connector sending this request
+  optional string connector_version = 8;
 }
 
 message ConnectorResponse {
