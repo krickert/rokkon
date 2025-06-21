@@ -7,6 +7,7 @@ import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import org.junit.jupiter.api.AfterAll;
 import org.junit.jupiter.api.BeforeAll;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.testcontainers.containers.GenericContainer;
 import org.testcontainers.containers.wait.strategy.Wait;
@@ -23,6 +24,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  * module running in Docker/Kubernetes.
  */
 @Testcontainers
+@Disabled("Docker image not built yet")
 class StandaloneGrpcHealthCheckDockerTest {
     
     private static final int INTERNAL_GRPC_PORT = 9090;

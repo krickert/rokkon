@@ -21,7 +21,7 @@ public class GrpcHealthCheckIT extends GrpcHealthCheckTestBase {
     @BeforeEach
     void setup() {
         // Connect to the JAR's gRPC port
-        int port = 9090;
+        int port = 49095;
         channel = ManagedChannelBuilder
                 .forAddress("localhost", port)
                 .usePlaintext()

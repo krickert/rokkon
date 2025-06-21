@@ -1,9 +1,14 @@
 quarkus:
   application:
     name: embedder-module
+  http:
+    port: 39093
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
   grpc:
     server:
-      port: 49091  # Different port from echo module
+      port: 49093  # Different port from parser (49091) and chunker (49092)
       host: 0.0.0.0
       enable-reflection-service: true
       max-inbound-message-size: 1073741824  # 1GB

@@ -9,6 +9,8 @@ Migrate Rokkon Engine from Micronaut to Quarkus with a focus on reliability, eas
 - **Configuration-Driven Routing**: All message routing from pipeline configuration
 - **Explicit Module Registration**: CI/CD driven module registration via CLI
 - **Infrastructure Abstraction**: Modules remain unaware of Consul, Kafka, orchestration
+- **Distributed by Design**: Multiple engines coordinate through Consul for HA and scalability
+- **Shared Module Pool**: All engines can use all registered modules
 
 ## Monolithic Package Structure
 
@@ -42,6 +44,8 @@ src/main/java/com/rokkon/engine/
 - **Future Preparation**: Structure code for eventual native compilation
 - **No Native Testing**: Don't test native mode initially
 - **Focus**: Single deployment artifact, fast startup in JVM mode
+- **Distributed Deployment**: Support multiple engine instances from day one
+- **Self-Registration**: Engines register themselves in Consul on startup
 
 ### 2. Service Discovery & Configuration  
 - **Consul Integration**: Maintain current Consul-based service discovery
@@ -98,6 +102,16 @@ service ModuleService {
 4. Complete transport abstraction
 
 ## Success Criteria
+1. Reliable module registration and discovery
+2. Stable pipeline execution with proper error handling
+3. Easy-to-run integration tests
+4. Clear separation of concerns
+5. Support for distributed deployment
+
+## Related Documents
+- [Distributed Engine Architecture](07-distributed-engine-architecture.md) - Details on multi-engine coordination
+- [Integration Requirements](03-integration-requirements.md) - Consul, Kafka, and gRPC integration
+- [Testing Strategy](04-testing-strategy.md) - Comprehensive testing approach
 - **Reliability**: No more 2-3 hour debugging sessions for Consul integration
 - **Testing**: Easy integration testing with random ports
 - **Maintainability**: Clear separation of concerns

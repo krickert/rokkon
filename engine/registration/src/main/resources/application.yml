@@ -1,0 +1,28 @@
+quarkus:
+  application:
+    name: engine-registration
+  http:
+    port: 38094
+    host: 0.0.0.0
+  grpc:
+    server:
+      port: 49094
+      host: 0.0.0.0
+      enable-reflection-service: true
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+
+# Consul configuration
+consul:
+  host: ${CONSUL_HOST:localhost}
+  port: ${CONSUL_PORT:8500}
+
+# Test profile configuration
+"%test":
+  quarkus:
+    grpc:
+      server:
+        port: 0  # Use random port for tests

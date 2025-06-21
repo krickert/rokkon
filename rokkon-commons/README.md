@@ -1,66 +1,178 @@
-# rokkon-commons
+# Rokkon Commons
 
-This project uses Quarkus, the Supersonic Subatomic Java Framework.
+## Overview
+Rokkon Commons is a shared utility library that provides common functionality used across all Rokkon Engine components and modules. It contains reusable code for gRPC utilities, test helpers, configuration models, and other cross-cutting concerns.
 
-If you want to learn more about Quarkus, please visit its website: <https://quarkus.io/>.
+## Purpose
 
-## Running the application in dev mode
+This library exists to:
+- Reduce code duplication across modules
+- Provide consistent implementations of common patterns
+- Share test utilities and helpers
+- Maintain a single source of truth for common functionality
 
-You can run your application in dev mode that enables live coding using:
+## Key Components
 
-```shell script
-./gradlew quarkusDev
+### 1. gRPC Utilities
+- **ProtobufHelpers**: Utilities for working with Protocol Buffer messages
+- **GrpcExceptionHandler**: Consistent error handling for gRPC services
+- **MetadataUtils**: Helper methods for gRPC metadata manipulation
+
+### 2. Test Utilities
+- **ProtobufTestDataHelper**: Loads test protobuf messages from resources
+- **TestDocumentGenerator**: Creates sample documents for testing
+- **GrpcTestHelpers**: Utilities for testing gRPC services
+
+### 3. Configuration Helpers
+- **ConfigValidators**: Common validation logic for configurations
+- **EnvironmentUtils**: Environment variable and property helpers
+- **JsonSchemaValidator**: JSON Schema validation utilities
+
+### 4. Common Models
+- **ServiceHealthStatus**: Shared health check models
+- **PipelineMetrics**: Common metrics structures
+- **ErrorCategories**: Standardized error categorization
+
+## Usage
+
+### Adding to Your Project
+
+```kotlin
+dependencies {
+    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
+}
 ```
 
-> **_NOTE:_**  Quarkus now ships with a Dev UI, which is available in dev mode only at <http://localhost:8080/q/dev/>.
+### Example: Using ProtobufTestDataHelper
 
-## Packaging and running the application
+```java
+import com.rokkon.test.data.ProtobufTestDataHelper;
 
-The application can be packaged using:
+// Load test documents from resources
+List<Document> testDocs = ProtobufTestDataHelper.loadFromDirectory(
+    "test-documents/raw", 
+    Document::parseFrom
+);
 
-```shell script
+// Load chunker output
+List<PipeDoc> chunks = ProtobufTestDataHelper.loadFromDirectory(
+    "test-documents/chunker-pipe-docs",
+    PipeDoc::parseFrom
+);
+```
+
+### Example: Using GrpcExceptionHandler
+
+```java
+import com.rokkon.grpc.GrpcExceptionHandler;
+
+@GrpcService
+public class MyServiceImpl implements MyService {
+    
+    @Override
+    public Uni<Response> processRequest(Request request) {
+        return doProcessing(request)
+            .onFailure().transform(GrpcExceptionHandler::handleException);
+    }
+}
+```
+
+## Project Structure
+
+```
+rokkon-commons/
+├── src/
+│   ├── main/
+│   │   ├── java/
+│   │   │   └── com/rokkon/
+│   │   │       ├── grpc/         # gRPC utilities
+│   │   │       ├── config/       # Configuration helpers
+│   │   │       ├── test/         # Test utilities
+│   │   │       └── util/         # General utilities
+│   │   └── resources/
+│   └── test/
+│       ├── java/                  # Unit tests
+│       └── resources/             # Test resources
+├── build.gradle.kts
+└── README.md
+```
+
+## Development
+
+### Building
+
+```bash
+# Build the library
 ./gradlew build
+
+# Publish to Maven Local
+./gradlew publishToMavenLocal
+
+# Run tests
+./gradlew test
 ```
 
-It produces the `quarkus-run.jar` file in the `build/quarkus-app/` directory.
-Be aware that it’s not an _über-jar_ as the dependencies are copied into the `build/quarkus-app/lib/` directory.
+### Adding New Utilities
 
-The application is now runnable using `java -jar build/quarkus-app/quarkus-run.jar`.
+When adding new utilities:
+1. Consider if it's truly reusable across multiple modules
+2. Add comprehensive unit tests
+3. Document the utility with JavaDoc
+4. Update this README if adding a new category
 
-If you want to build an _über-jar_, execute the following command:
+### Best Practices
 
-```shell script
-./gradlew build -Dquarkus.package.jar.type=uber-jar
+1. **Keep it Simple**: Only add utilities that are used by multiple modules
+2. **Avoid Dependencies**: Minimize external dependencies to reduce conflicts
+3. **Backward Compatibility**: Changes should not break existing modules
+4. **Clear Documentation**: Every public API should have JavaDoc
+
+## Dependencies
+
+Minimal dependencies to avoid conflicts:
+- Quarkus Arc (CDI)
+- Protocol Buffers
+- JUnit 5 (test scope)
+- AssertJ (test scope)
+
+## Testing
+
+All utilities should have comprehensive unit tests:
+
+```java
+@Test
+void testProtobufHelper() {
+    // Given
+    String testDir = "test-documents/raw";
+    
+    // When
+    List<Document> docs = ProtobufTestDataHelper.loadFromDirectory(
+        testDir, Document::parseFrom
+    );
+    
+    // Then
+    assertThat(docs).isNotEmpty();
+    assertThat(docs.get(0).getId()).isNotBlank();
+}
 ```
 
-The application, packaged as an _über-jar_, is now runnable using `java -jar build/*-runner.jar`.
+## Version Management
 
-## Creating a native executable
+This library follows the same versioning as the main Rokkon Engine:
+- Current version: 1.0.0-SNAPSHOT
+- Released versions will follow semantic versioning
 
-You can create a native executable using:
+## Contributing
 
-```shell script
-./gradlew build -Dquarkus.native.enabled=true
-```
+When contributing to rokkon-commons:
+1. Ensure the utility is genuinely reusable
+2. Add unit tests with >80% coverage
+3. Update documentation
+4. Consider backward compatibility
 
-Or, if you don't have GraalVM installed, you can run the native executable build in a container using:
+## Common Pitfalls
 
-```shell script
-./gradlew build -Dquarkus.native.enabled=true -Dquarkus.native.container-build=true
-```
-
-You can then execute your native executable with: `./build/rokkon-commons-1.0.0-SNAPSHOT-runner`
-
-If you want to learn more about building native executables, please consult <https://quarkus.io/guides/gradle-tooling>.
-
-## Related Guides
-
-- ArC ([guide](https://quarkus.io/guides/cdi-reference)): Build time CDI dependency injection
-
-## Provided Code
-
-### gRPC
-
-Create your first gRPC service
-
-[Related guide section...](https://quarkus.io/guides/grpc-getting-started)
+1. **Don't add module-specific code**: This is for shared utilities only
+2. **Avoid heavy dependencies**: Keep the library lightweight
+3. **Don't break existing APIs**: Use deprecation for changes
+4. **Test thoroughly**: Bugs here affect all modules

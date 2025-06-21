@@ -1,0 +1,529 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Chunker Module Test UI</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            max-width: 1200px;
+        }
+        pre {
+            background-color: #2d2d2d;
+            padding: 15px;
+            border-radius: 5px;
+            white-space: pre-wrap;
+            color: #cccccc;
+        }
+        .status-badge {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        .json-editor {
+            font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+            font-size: 13px;
+        }
+        .config-section {
+            border-left: 3px solid #007bff;
+            padding-left: 15px;
+            margin-bottom: 20px;
+        }
+        .schema-property {
+            margin-bottom: 15px;
+            padding: 10px;
+            background-color: #f8f9fa;
+            border-radius: 5px;
+        }
+        .property-name {
+            font-weight: bold;
+            color: #495057;
+        }
+        .property-type {
+            color: #6c757d;
+            font-size: 0.9em;
+        }
+        .property-description {
+            color: #6c757d;
+            font-style: italic;
+        }
+        .collapsible-json {
+            max-height: 400px;
+            overflow-y: auto;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="status-badge">
+            <span id="status" class="badge bg-secondary">Checking...</span>
+        </div>
+        
+        <h1 class="mb-4">Chunker Module Test UI</h1>
+        
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Module Information</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="moduleInfo">Loading...</div>
+                    </div>
+                </div>
+                
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">Configuration Schema</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="configSchema">Loading schema...</div>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Test Chunker Service</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="chunkerForm">
+                            <div class="mb-3">
+                                <label for="docId" class="form-label">Document ID</label>
+                                <input type="text" class="form-control" id="docId" 
+                                       value="test-doc-1" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="docType" class="form-label">Document Type</label>
+                                <input type="text" class="form-control" id="docType" 
+                                       value="text/plain" required>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="content" class="form-label">Content to Chunk</label>
+                                <textarea class="form-control" id="content" rows="6" required>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</textarea>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <label for="metadata" class="form-label">Metadata (JSON)</label>
+                                <textarea class="form-control json-editor" id="metadata" rows="3">{
+  "source": "Web Test UI",
+  "timestamp": "${new Date().toISOString()}"
+}</textarea>
+                            </div>
+                            
+                            <div class="config-section">
+                                <h6>Custom Configuration</h6>
+                                <div id="configForm" class="mb-3">
+                                    <!-- Dynamic form fields will be rendered here based on schema -->
+                                    <div class="text-muted">Loading configuration options...</div>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="customConfig" class="form-label">
+                                        <span>Raw JSON Configuration</span>
+                                        <button type="button" class="btn btn-sm btn-link" onclick="toggleConfigView()">Toggle View</button>
+                                    </label>
+                                    <textarea class="form-control json-editor" id="customConfig" rows="6" style="display: none;">{}</textarea>
+                                    <div class="form-text">Configuration is validated against the schema</div>
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-primary">Send to Chunker Service</button>
+                            <button type="button" class="btn btn-secondary ms-2" onclick="loadSampleConfig()">Load Sample Config</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="card mt-4" id="responseCard" style="display: none;">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Response</h5>
+                <div>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleResponseFormat()">Toggle Format</button>
+                    <button class="btn btn-sm btn-outline-secondary" onclick="copyResponse()">Copy</button>
+                </div>
+            </div>
+            <div class="card-body">
+                <div id="responseStats" class="mb-3"></div>
+                <pre id="response" class="collapsible-json language-json"></pre>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/prism.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/components/prism-json.min.js"></script>
+    <script>
+        let currentResponse = null;
+        let moduleSchema = null;
+        
+        // Check module status
+        function checkStatus() {
+            fetch('api/chunker/health')
+                .then(response => response.json())
+                .then(data => {
+                    const statusEl = document.getElementById('status');
+                    if (data.status === 'UP') {
+                        statusEl.textContent = 'Connected';
+                        statusEl.className = 'badge bg-success';
+                    } else {
+                        statusEl.textContent = 'Down';
+                        statusEl.className = 'badge bg-danger';
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('status').textContent = 'Error';
+                    document.getElementById('status').className = 'badge bg-danger';
+                });
+        }
+        
+        // Get module info and schema
+        function loadModuleInfo() {
+            fetch('api/chunker/info')
+                .then(response => response.json())
+                .then(data => {
+                    document.getElementById('moduleInfo').innerHTML = `
+                        <strong>Module Name:</strong> ${data.moduleName}<br>
+                        <strong>Has Schema:</strong> ${data.hasSchema ? 'Yes' : 'No'}
+                    `;
+                    
+                    if (data.schema) {
+                        moduleSchema = data.schema;
+                        renderSchema(data.schema);
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('moduleInfo').innerHTML = 
+                        '<span class="text-danger">Failed to load module info</span>';
+                });
+        }
+        
+        // Render configuration schema
+        function renderSchema(schema) {
+            const schemaEl = document.getElementById('configSchema');
+            
+            if (!schema || !schema.properties) {
+                schemaEl.innerHTML = '<em>No schema available</em>';
+                return;
+            }
+            
+            let html = `<h6>${schema.title || 'Configuration Options'}</h6>`;
+            
+            for (const [key, prop] of Object.entries(schema.properties)) {
+                html += `
+                    <div class="schema-property">
+                        <div class="property-name">${key}</div>
+                        <div class="property-type">Type: ${prop.type}${prop.default !== undefined ? ` (default: ${prop.default})` : ''}</div>
+                        ${prop.description ? `<div class="property-description">${prop.description}</div>` : ''}
+                        ${prop.minimum !== undefined ? `<div class="property-constraint">Min: ${prop.minimum}</div>` : ''}
+                        ${prop.maximum !== undefined ? `<div class="property-constraint">Max: ${prop.maximum}</div>` : ''}
+                    </div>
+                `;
+            }
+            
+            schemaEl.innerHTML = html;
+            
+            // Also render the dynamic form
+            renderConfigForm(schema);
+        }
+        
+        // Render dynamic configuration form based on schema
+        function renderConfigForm(schema) {
+            const formEl = document.getElementById('configForm');
+            
+            if (!schema || !schema.properties) {
+                formEl.innerHTML = '<em>No configuration options available</em>';
+                return;
+            }
+            
+            let html = '';
+            
+            for (const [key, prop] of Object.entries(schema.properties)) {
+                const inputId = `config_${key}`;
+                
+                if (prop.type === 'boolean') {
+                    html += `
+                        <div class="mb-3 form-check">
+                            <input type="checkbox" class="form-check-input" id="${inputId}" 
+                                   ${prop.default ? 'checked' : ''}
+                                   onchange="updateConfigJson()">
+                            <label class="form-check-label" for="${inputId}">
+                                <strong>${key}</strong>
+                                ${prop.description ? `<br><small class="text-muted">${prop.description}</small>` : ''}
+                            </label>
+                        </div>
+                    `;
+                } else if (prop.type === 'integer' || prop.type === 'number') {
+                    html += `
+                        <div class="mb-3">
+                            <label for="${inputId}" class="form-label">
+                                <strong>${key}</strong>
+                                ${prop.description ? `<br><small class="text-muted">${prop.description}</small>` : ''}
+                            </label>
+                            <input type="number" class="form-control" id="${inputId}" 
+                                   value="${prop.default || ''}"
+                                   ${prop.minimum !== undefined ? `min="${prop.minimum}"` : ''}
+                                   ${prop.maximum !== undefined ? `max="${prop.maximum}"` : ''}
+                                   onchange="updateConfigJson()">
+                        </div>
+                    `;
+                } else if (prop.type === 'string' && prop.enum) {
+                    html += `
+                        <div class="mb-3">
+                            <label for="${inputId}" class="form-label">
+                                <strong>${key}</strong>
+                                ${prop.description ? `<br><small class="text-muted">${prop.description}</small>` : ''}
+                            </label>
+                            <select class="form-select" id="${inputId}" onchange="updateConfigJson()">
+                                ${prop.enum.map(val => 
+                                    `<option value="${val}" ${prop.default === val ? 'selected' : ''}>${val}</option>`
+                                ).join('')}
+                            </select>
+                        </div>
+                    `;
+                } else if (prop.type === 'string') {
+                    html += `
+                        <div class="mb-3">
+                            <label for="${inputId}" class="form-label">
+                                <strong>${key}</strong>
+                                ${prop.description ? `<br><small class="text-muted">${prop.description}</small>` : ''}
+                            </label>
+                            <input type="text" class="form-control" id="${inputId}" 
+                                   value="${prop.default || ''}"
+                                   onchange="updateConfigJson()">
+                        </div>
+                    `;
+                }
+            }
+            
+            formEl.innerHTML = html;
+            
+            // Initialize the JSON textarea with current values
+            updateConfigJson();
+        }
+        
+        // Update JSON configuration based on form inputs
+        function updateConfigJson() {
+            if (!moduleSchema || !moduleSchema.properties) return;
+            
+            const config = {};
+            
+            for (const [key, prop] of Object.entries(moduleSchema.properties)) {
+                const inputId = `config_${key}`;
+                const element = document.getElementById(inputId);
+                
+                if (!element) continue;
+                
+                if (prop.type === 'boolean') {
+                    config[key] = element.checked;
+                } else if (prop.type === 'integer') {
+                    const val = parseInt(element.value);
+                    if (!isNaN(val)) config[key] = val;
+                } else if (prop.type === 'number') {
+                    const val = parseFloat(element.value);
+                    if (!isNaN(val)) config[key] = val;
+                } else if (element.value) {
+                    config[key] = element.value;
+                }
+            }
+            
+            document.getElementById('customConfig').value = JSON.stringify(config, null, 2);
+        }
+        
+        // Toggle between form view and JSON view
+        function toggleConfigView() {
+            const jsonTextarea = document.getElementById('customConfig');
+            const formDiv = document.getElementById('configForm');
+            
+            if (jsonTextarea.style.display === 'none') {
+                jsonTextarea.style.display = 'block';
+                formDiv.style.display = 'none';
+            } else {
+                jsonTextarea.style.display = 'none';
+                formDiv.style.display = 'block';
+                
+                // Try to parse JSON and update form
+                try {
+                    const config = JSON.parse(jsonTextarea.value);
+                    updateFormFromJson(config);
+                } catch (e) {
+                    console.warn('Invalid JSON in textarea', e);
+                }
+            }
+        }
+        
+        // Update form fields from JSON
+        function updateFormFromJson(config) {
+            if (!moduleSchema || !moduleSchema.properties) return;
+            
+            for (const [key, value] of Object.entries(config)) {
+                const inputId = `config_${key}`;
+                const element = document.getElementById(inputId);
+                
+                if (!element) continue;
+                
+                const prop = moduleSchema.properties[key];
+                if (prop.type === 'boolean') {
+                    element.checked = value;
+                } else {
+                    element.value = value;
+                }
+            }
+        }
+        
+        // Load sample configuration
+        function loadSampleConfig() {
+            const sampleConfig = {
+                chunkSize: 300,
+                overlap: 75,
+                minChunkSize: 100,
+                maxChunkSize: 500,
+                chunkingStrategy: "sentence",
+                preserveWhitespace: false
+            };
+            
+            // Update form fields
+            updateFormFromJson(sampleConfig);
+            
+            // Update JSON textarea
+            document.getElementById('customConfig').value = JSON.stringify(sampleConfig, null, 2);
+        }
+        
+        // Handle form submission
+        document.getElementById('chunkerForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const metadata = document.getElementById('metadata').value;
+            const customConfig = document.getElementById('customConfig').value;
+            let metadataObj = {};
+            let configObj = {};
+            
+            // Parse metadata
+            try {
+                if (metadata.trim()) {
+                    metadataObj = JSON.parse(metadata);
+                }
+            } catch (err) {
+                alert('Invalid JSON in metadata field: ' + err.message);
+                return;
+            }
+            
+            // Parse custom config
+            try {
+                if (customConfig.trim()) {
+                    configObj = JSON.parse(customConfig);
+                }
+            } catch (err) {
+                alert('Invalid JSON in custom configuration field: ' + err.message);
+                return;
+            }
+            
+            const payload = {
+                id: document.getElementById('docId').value,
+                type: document.getElementById('docType').value,
+                content: document.getElementById('content').value,
+                metadata: metadataObj,
+                customConfig: configObj
+            };
+            
+            try {
+                const response = await fetch('api/chunker/process', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(payload)
+                });
+                
+                const responseText = await response.text();
+                
+                // Try to parse and pretty print JSON
+                try {
+                    currentResponse = JSON.parse(responseText);
+                    displayResponse(currentResponse);
+                    
+                    if (!response.ok) {
+                        document.getElementById('response').className = 'text-danger language-json';
+                    } else {
+                        document.getElementById('response').className = 'language-json';
+                    }
+                } catch (e) {
+                    currentResponse = null;
+                    document.getElementById('response').textContent = responseText;
+                    document.getElementById('responseStats').innerHTML = '';
+                }
+                
+                document.getElementById('responseCard').style.display = 'block';
+                
+            } catch (error) {
+                document.getElementById('response').textContent = 'Error: ' + error.message;
+                document.getElementById('response').className = 'text-danger';
+                document.getElementById('responseCard').style.display = 'block';
+                document.getElementById('responseStats').innerHTML = '';
+            }
+        });
+        
+        // Display response with statistics
+        function displayResponse(response) {
+            // Extract statistics
+            let stats = '';
+            if (response.success && response.outputDoc) {
+                const chunks = response.outputDoc.chunks || [];
+                stats = `
+                    <div class="alert alert-info mb-2">
+                        <strong>Processing Results:</strong><br>
+                        Total Chunks: ${chunks.length}<br>
+                        ${chunks.length > 0 ? `First Chunk Size: ${chunks[0].content?.length || 0} chars` : ''}
+                    </div>
+                `;
+            }
+            
+            document.getElementById('responseStats').innerHTML = stats;
+            document.getElementById('response').textContent = JSON.stringify(response, null, 2);
+            
+            // Re-highlight syntax
+            Prism.highlightElement(document.getElementById('response'));
+        }
+        
+        // Toggle response format
+        function toggleResponseFormat() {
+            if (!currentResponse) return;
+            
+            const responseEl = document.getElementById('response');
+            if (responseEl.style.maxHeight === 'none') {
+                responseEl.style.maxHeight = '400px';
+            } else {
+                responseEl.style.maxHeight = 'none';
+            }
+        }
+        
+        // Copy response to clipboard
+        function copyResponse() {
+            const responseText = document.getElementById('response').textContent;
+            navigator.clipboard.writeText(responseText).then(() => {
+                alert('Response copied to clipboard!');
+            });
+        }
+        
+        // Initialize
+        checkStatus();
+        loadModuleInfo();
+        setInterval(checkStatus, 5000);
+        
+        // Set current timestamp in metadata
+        document.getElementById('metadata').value = document.getElementById('metadata').value.replace(
+            '${new Date().toISOString()}',
+            new Date().toISOString()
+        );
+    </script>
+</body>
+</html>

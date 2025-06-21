@@ -9,16 +9,24 @@ pluginManagement {
 
 rootProject.name = "rokkon-engine-workspace"
 
-includeBuild("proto-definitions") // This build uses its OWN settings.gradle.kts
-includeBuild("test-utilities")
-includeBuild("engine-models")
-includeBuild("engine-validators")
-includeBuild("engine-registration")
-includeBuild("engine-consul")
-includeBuild("modules/echo")
-includeBuild("modules/chunker")
-includeBuild("modules/parser")
-includeBuild("modules/embedder")
-includeBuild("modules/test-module")
-includeBuild("rokkon-engine")
+// Core libraries (at root level)
+include("rokkon-protobuf")
+include("rokkon-commons")
+include("test-utilities")
+
+// Main engine application (at root level)
+include("rokkon-engine")
+
+// Engine components
+include("engine:models")
+include("engine:validators")
+include("engine:registration")
+include("engine:consul")
+
+// Modules
+include("modules:echo")
+include("modules:chunker")
+include("modules:parser")
+include("modules:embedder")
+include("modules:test-module")
     

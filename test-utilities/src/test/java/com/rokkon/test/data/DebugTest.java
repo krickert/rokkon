@@ -2,11 +2,13 @@ package com.rokkon.test.data;
 
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
+import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 @QuarkusTest
+@Disabled("Debug test - only enable when debugging test data loading issues")
 class DebugTest {
 
     @Inject

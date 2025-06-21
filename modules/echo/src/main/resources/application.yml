@@ -1,13 +1,31 @@
 quarkus:
   application:
     name: echo-module
+  http:
+    port: 39090
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+  smallrye-openapi:
+    path: /q/openapi
+    info-title: Echo Module API
+    info-version: 1.0.0
+    info-description: REST API for the Echo gRPC Module
+  swagger-ui:
+    always-include: true
+    path: /q/swagger-ui
   grpc:
     server:
       port: 49090
       host: 0.0.0.0
       enable-reflection-service: true
+      max-inbound-message-size: 1073741824  # 1GB
+      max-outbound-message-size: 1073741824  # 1GB for responses
     clients:
-      # Add gRPC client configurations here if needed
+      echoService:
+        host: localhost
+        port: 49090
+        max-inbound-message-size: 1073741824  # 1GB
   log:
     level: INFO
     category:
@@ -30,3 +48,16 @@ quarkus:
     grpc:
       server:
         port: 0  # Use random port for tests
+        max-inbound-message-size: 1073741824  # 1GB for tests
+      clients:
+        echoService:
+          max-inbound-message-size: 1073741824  # 1GB
+
+# Dev profile - easy local Docker builds
+"%dev":
+  quarkus:
+    container-image:
+      build: true    # Auto-build image in dev mode
+      push: false    # Don't push to registry
+      image: "rokkon/echo-module:dev"
+      registry: ""   # Use local Docker

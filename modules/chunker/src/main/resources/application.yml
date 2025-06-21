@@ -1,6 +1,11 @@
 quarkus:
   application:
     name: chunker-module
+  http:
+    port: 39092
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
   grpc:
     server:
       port: 49092
@@ -33,6 +38,6 @@ processing:
   buffer:
     enabled: ${PROCESSING_BUFFER_ENABLED:false}
     capacity: ${PROCESSING_BUFFER_CAPACITY:100}
-    directory: ${PROCESSING_BUFFER_DIRECTORY:}
+    directory: ${PROCESSING_BUFFER_DIRECTORY:build/chunker-output}
     prefix: ${PROCESSING_BUFFER_PREFIX:chunker_output}
 
