@@ -168,7 +168,7 @@
         
         // Check module status
         function checkStatus() {
-            fetch('/api/chunker/health')
+            fetch('api/chunker/health')
                 .then(response => response.json())
                 .then(data => {
                     const statusEl = document.getElementById('status');
@@ -188,7 +188,7 @@
         
         // Get module info and schema
         function loadModuleInfo() {
-            fetch('/api/chunker/info')
+            fetch('api/chunker/info')
                 .then(response => response.json())
                 .then(data => {
                     document.getElementById('moduleInfo').innerHTML = `
@@ -436,7 +436,7 @@
             };
             
             try {
-                const response = await fetch('/api/chunker/process', {
+                const response = await fetch('api/chunker/process', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
