@@ -4,7 +4,7 @@ quarkus:
 
   # HTTP configuration
   http:
-    port: 8090
+    port: 38091
     host: 0.0.0.0
 
   # Swagger UI

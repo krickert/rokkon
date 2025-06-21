@@ -36,7 +36,8 @@ public class ConsulModuleRegistry {
         List<String> Tags,
         String Address,
         int Port,
-        ConsulHealthCheck Check
+        ConsulHealthCheck Check,
+        Map<String, String> Meta
     ) {}
     
     public record ConsulHealthCheck(
@@ -53,6 +54,10 @@ public class ConsulModuleRegistry {
             try {
                 String consulServiceId = "grpc-" + moduleInfo.getServiceId();
                 
+                // Create metadata including schema if present
+                Map<String, String> metadata = new java.util.HashMap<>(moduleInfo.getMetadataMap());
+                metadata.put("registeredAt", java.time.Instant.now().toString());
+                
                 // Create Consul service registration with gRPC health check
                 ConsulServiceRegistration registration = new ConsulServiceRegistration(
                     consulServiceId,
@@ -64,7 +69,8 @@ public class ConsulModuleRegistry {
                         moduleInfo.getHost() + ":" + moduleInfo.getPort(),
                         "10s",
                         "5s"
-                    )
+                    ),
+                    metadata
                 );
                 
                 String json = objectMapper.writeValueAsString(registration);
@@ -173,5 +179,74 @@ public class ConsulModuleRegistry {
     
     private String getConsulUrl() {
         return "http://" + consulHost + ":" + consulPort;
+    }
+    
+    /**
+     * Get existing module registration from Consul
+     * Returns Optional.empty() if module is not registered
+     */
+    public Uni<java.util.Optional<ModuleInfo>> getExistingModule(String moduleName) {
+        String consulUrl = getConsulUrl() + "/v1/catalog/service/" + moduleName;
+        
+        HttpRequest request = HttpRequest.newBuilder()
+            .uri(URI.create(consulUrl))
+            .GET()
+            .build();
+            
+        return Uni.createFrom().completionStage(() -> 
+            httpClient.sendAsync(request, HttpResponse.BodyHandlers.ofString())
+        ).map(response -> {
+            if (response.statusCode() == 200) {
+                try {
+                    // Parse the service nodes from Consul
+                    List<Map<String, Object>> services = objectMapper.readValue(
+                        response.body(), 
+                        objectMapper.getTypeFactory().constructCollectionType(List.class, Map.class)
+                    );
+                    
+                    if (services.isEmpty()) {
+                        LOG.debugf("Module %s not found in Consul", moduleName);
+                        return java.util.Optional.<ModuleInfo>empty();
+                    }
+                    
+                    // Get the first service instance
+                    Map<String, Object> service = services.get(0);
+                    
+                    // Check for schema in service metadata/tags
+                    String schemaDefinition = null;
+                    if (service.containsKey("ServiceMeta")) {
+                        Map<String, String> meta = (Map<String, String>) service.get("ServiceMeta");
+                        schemaDefinition = meta.get("schema");
+                    }
+                    
+                    // Reconstruct ModuleInfo from Consul data
+                    ModuleInfo.Builder builder = ModuleInfo.newBuilder()
+                        .setServiceName(moduleName)
+                        .setServiceId((String) service.get("ServiceID"))
+                        .setHost((String) service.get("ServiceAddress"))
+                        .setPort((Integer) service.get("ServicePort"));
+                        
+                    if (schemaDefinition != null) {
+                        builder.putMetadata("schema", schemaDefinition);
+                    }
+                    
+                    return java.util.Optional.of(builder.build());
+                    
+                } catch (Exception e) {
+                    LOG.errorf(e, "Failed to parse existing module data from Consul");
+                    return java.util.Optional.<ModuleInfo>empty();
+                }
+            } else if (response.statusCode() == 404) {
+                LOG.debugf("Module %s not found in Consul (404)", moduleName);
+                return java.util.Optional.<ModuleInfo>empty();
+            } else {
+                LOG.errorf("Failed to check existing module: %d - %s", 
+                         response.statusCode(), response.body());
+                return java.util.Optional.<ModuleInfo>empty();
+            }
+        }).onFailure().recoverWithItem(throwable -> {
+            LOG.errorf(throwable, "Error checking existing module in Consul");
+            return java.util.Optional.empty();
+        });
     }
 }

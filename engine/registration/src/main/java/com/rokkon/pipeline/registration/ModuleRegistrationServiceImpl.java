@@ -28,14 +28,48 @@ public class ModuleRegistrationServiceImpl implements ModuleRegistration {
     @Inject
     ConsulModuleRegistry consulRegistry;
     
+    /**
+     * Result of module authentication
+     */
+    private static class AuthenticationResult {
+        private final boolean authenticated;
+        private final String reason;
+        
+        private AuthenticationResult(boolean authenticated, String reason) {
+            this.authenticated = authenticated;
+            this.reason = reason;
+        }
+        
+        static AuthenticationResult success() {
+            return new AuthenticationResult(true, null);
+        }
+        
+        static AuthenticationResult failure(String reason) {
+            return new AuthenticationResult(false, reason);
+        }
+        
+        boolean isAuthenticated() { return authenticated; }
+        String getReason() { return reason; }
+    }
+    
     @Override
     public Uni<RegistrationStatus> registerModule(ModuleInfo request) {
         LOG.infof("📥 Module registration request: %s at %s:%d", 
                 request.getServiceName(), request.getHost(), request.getPort());
         
-        // Register with Consul first, then handle success/failure
-        return consulRegistry.registerService(request)
-            .onItem().transform(consulServiceId -> {
+        // First authenticate the module
+        return authenticateModule(request)
+            .onItem().transformToUni(authResult -> {
+                if (!authResult.isAuthenticated()) {
+                    LOG.warnf("❌ Module authentication failed for %s: %s", 
+                            request.getServiceName(), authResult.getReason());
+                    return Uni.createFrom().item(createFailureStatus(
+                            "Authentication failed: " + authResult.getReason()));
+                }
+                
+                // If authenticated, register with Consul
+                return consulRegistry.registerService(request)
+                    .onItem().transform(consulServiceId -> {
                 try {
                     // Store the module info only after successful Consul registration
                     registeredModules.put(request.getServiceId(), request);
@@ -47,11 +81,12 @@ public class ModuleRegistrationServiceImpl implements ModuleRegistration {
                         .setNanos(now.getNano())
                         .build();
                     
+                    String consulServiceIdStr = consulServiceId.toString();
                     RegistrationStatus response = RegistrationStatus.newBuilder()
                         .setSuccess(true)
                         .setMessage(String.format("Module '%s' successfully registered with Consul", request.getServiceName()))
                         .setRegisteredAt(timestamp)
-                        .setConsulServiceId(consulServiceId)
+                        .setConsulServiceId(consulServiceIdStr)
                         .build();
                     
                     // Fire registration event  
@@ -59,11 +94,11 @@ public class ModuleRegistrationServiceImpl implements ModuleRegistration {
                         "REGISTERED", 
                         request.getServiceName(),
                         request.getServiceId(), 
-                        consulServiceId
+                        consulServiceIdStr
                     ));
                     
                     LOG.infof("✅ Module registration successful: %s -> %s", 
-                            request.getServiceName(), consulServiceId);
+                            request.getServiceName(), consulServiceIdStr);
                             
                     return response;
                     
@@ -71,6 +106,7 @@ public class ModuleRegistrationServiceImpl implements ModuleRegistration {
                     LOG.errorf(e, "❌ Module registration failed after Consul success: %s", request.getServiceName());
                     throw new RuntimeException("Post-registration processing failed", e);
                 }
+            });
             })
             .onFailure().recoverWithItem(failure -> {
                 LOG.errorf(failure, "❌ Module registration failed: %s", request.getServiceName());
@@ -227,5 +263,102 @@ public class ModuleRegistrationServiceImpl implements ModuleRegistration {
                 .setAsOf(timestamp)
                 .build();
         });
+    }
+    
+    /**
+     * Authenticate a module before registration.
+     * Validates: 1) Module is in whitelist, 2) Schema consistency if already registered
+     */
+    private Uni<AuthenticationResult> authenticateModule(ModuleInfo request) {
+        LOG.debugf("🔐 Authenticating module: %s", request.getServiceName());
+        
+        // First check whitelist (registeredModules acts as our whitelist)
+        // TODO: This should probably come from configuration, not runtime state
+        boolean isWhitelisted = registeredModules.containsKey(request.getServiceId()) ||
+                               isModuleTypeAllowed(request.getServiceName());
+        
+        if (!isWhitelisted) {
+            LOG.warnf("❌ Module %s is not in the whitelist", request.getServiceName());
+            return Uni.createFrom().item(AuthenticationResult.failure(
+                String.format("Module %s is not allowed. Please contact administrators to whitelist this module type.",
+                             request.getServiceName())
+            ));
+        }
+        
+        // Module is whitelisted, now check if it's already registered in Consul
+        return consulRegistry.getExistingModule(request.getServiceName())
+            .map(existingModuleOpt -> {
+                if (existingModuleOpt.isEmpty()) {
+                    // First time registration - no schema to compare
+                    LOG.debugf("✅ Module %s is whitelisted and new, authentication passed", request.getServiceName());
+                    return AuthenticationResult.success();
+                }
+                
+                ModuleInfo existingModule = existingModuleOpt.get();
+                
+                // Module already exists in Consul - compare schemas
+                String existingSchema = existingModule.getMetadataOrDefault("schema", "");
+                String newSchema = request.getMetadataOrDefault("schema", "");
+                
+                // If both are empty or both are the same, it's ok
+                if (existingSchema.isEmpty() && newSchema.isEmpty()) {
+                    LOG.debugf("✅ Module %s re-registering with no schema changes (both empty)", request.getServiceName());
+                    return AuthenticationResult.success();
+                }
+                
+                if (existingSchema.equals(newSchema)) {
+                    LOG.debugf("✅ Module %s re-registering with matching schema", request.getServiceName());
+                    return AuthenticationResult.success();
+                }
+                
+                // Schema mismatch - this is the incompatible version case
+                LOG.warnf("❌ Module %s schema mismatch. Existing: %s, New: %s", 
+                        request.getServiceName(), existingSchema, newSchema);
+                
+                return AuthenticationResult.failure(
+                    String.format("Schema mismatch for module %s. The existing registration has a different schema. " +
+                                 "This could break existing pipelines. To update the schema, please coordinate " +
+                                 "with pipeline owners and update pipeline configurations.",
+                                 request.getServiceName())
+                );
+            })
+            .onFailure().recoverWithItem(throwable -> {
+                LOG.errorf(throwable, "Failed to check existing module registration");
+                // On error checking existing module, fail safe by rejecting
+                return AuthenticationResult.failure("Failed to verify module: " + throwable.getMessage());
+            });
+    }
+    
+    /**
+     * Check if a module type is in our allowed list
+     * TODO: Move this to configuration
+     */
+    private boolean isModuleTypeAllowed(String moduleName) {
+        // These are the known module types we allow
+        return moduleName != null && (
+            moduleName.equals("echo") ||
+            moduleName.equals("chunker") ||
+            moduleName.equals("parser") ||
+            moduleName.equals("embedder") ||
+            moduleName.equals("opensearch-sink") ||
+            moduleName.equals("test-module")
+        );
+    }
+    
+    /**
+     * Create a failure status with proper timestamp
+     */
+    private RegistrationStatus createFailureStatus(String message) {
+        Instant now = Instant.now();
+        Timestamp timestamp = Timestamp.newBuilder()
+            .setSeconds(now.getEpochSecond())
+            .setNanos(now.getNano())
+            .build();
+            
+        return RegistrationStatus.newBuilder()
+            .setSuccess(false)
+            .setMessage(message)
+            .setRegisteredAt(timestamp)
+            .build();
     }
 }

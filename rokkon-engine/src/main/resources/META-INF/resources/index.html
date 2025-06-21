@@ -419,13 +419,32 @@
                 const pipelineName = document.getElementById('pipelineName').value.trim();
                 const pipelineDescription = document.getElementById('pipelineDescription').value.trim();
                 
-                const pipelineConfig = {
-                    pipelineName: pipelineName,
-                    pipelineDescription: pipelineDescription,
-                    pipelineSteps: {} // Empty initially - steps can be added later
-                };
-                
-                createPipelineFromConfig(pipelineId, pipelineConfig);
+                // Use the UI-specific endpoint
+                fetch('/api/v1/ui/pipelines/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        pipelineId: pipelineId,
+                        pipelineName: pipelineName,
+                        pipelineDescription: pipelineDescription
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        alert(`Pipeline "${pipelineName}" created successfully!`);
+                        hideCreatePipelineForm();
+                        loadPipelines();
+                    } else {
+                        alert('Failed to create pipeline: ' + result.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error creating pipeline:', error);
+                    alert('Failed to create pipeline: ' + error.message);
+                });
             });
             
             // Set up JSON form submission
@@ -1330,13 +1349,20 @@
             fetch(`/api/v1/pipelines/definitions/${pipelineId}`, {
                 method: 'DELETE'
             })
-            .then(response => response.json())
-            .then(result => {
-                if (result.success) {
+            .then(response => {
+                if (response.ok) {
+                    // Success! The backend returns 204 No Content on successful delete
                     alert('Pipeline deleted successfully!');
-                    loadPipelines();
+                    loadPipelines(); // Refresh the list
+                } else if (response.status === 404) {
+                    alert('Pipeline not found');
+                } else if (response.status === 409) {
+                    alert('Cannot delete pipeline: It has active instances');
                 } else {
-                    alert('Failed to delete pipeline: ' + result.message);
+                    // Try to get error message from response
+                    return response.text().then(text => {
+                        throw new Error(text || `HTTP error! status: ${response.status}`);
+                    });
                 }
             })
             .catch(error => {
@@ -1477,5 +1503,8 @@
             });
         }
     </script>
+    
+    <!-- Bootstrap JS Bundle (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

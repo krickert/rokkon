@@ -56,4 +56,20 @@ public class MockConsulModuleRegistry extends ConsulModuleRegistry {
         
         return Uni.createFrom().item(isHealthy);
     }
+    
+    @Override
+    public Uni<java.util.Optional<ModuleInfo>> getExistingModule(String moduleName) {
+        LOG.debugf("🧪 Mock checking for existing module: %s", moduleName);
+        
+        // Find the module by name in our mock storage
+        for (ModuleInfo module : consulServices.values()) {
+            if (module.getServiceName().equals(moduleName)) {
+                LOG.debugf("🧪 Mock found existing module: %s", moduleName);
+                return Uni.createFrom().item(java.util.Optional.of(module));
+            }
+        }
+        
+        LOG.debugf("🧪 Mock module not found: %s", moduleName);
+        return Uni.createFrom().item(java.util.Optional.empty());
+    }
 }

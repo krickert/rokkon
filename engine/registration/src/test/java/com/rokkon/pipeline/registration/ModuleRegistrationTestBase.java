@@ -24,8 +24,8 @@ public abstract class ModuleRegistrationTestBase {
         LOG.info("Testing module registration");
         
         ModuleInfo moduleInfo = ModuleInfo.newBuilder()
-            .setServiceName("test-processor")
-            .setServiceId("test-processor-123")
+            .setServiceName("parser")  // Using whitelisted module name
+            .setServiceId("parser-123")
             .setHost("localhost")
             .setPort(49093)
             .setHealthEndpoint("/health")
@@ -48,7 +48,7 @@ public abstract class ModuleRegistrationTestBase {
             .await().indefinitely();
         
         assertThat(response.getSuccess()).isTrue();
-        assertThat(response.getMessage()).contains("test-processor");
+        assertThat(response.getMessage()).contains("parser");
         assertThat(response.getMessage()).contains("successfully registered");
         // In unit tests with MockConsul, this might be empty
         // In integration tests with real Consul, this should have a value
@@ -60,8 +60,8 @@ public abstract class ModuleRegistrationTestBase {
         
         // Empty host - protobuf allows empty strings
         ModuleInfo moduleWithEmptyHost = ModuleInfo.newBuilder()
-            .setServiceName("empty-host-service")
-            .setServiceId("empty-host-123")
+            .setServiceName("echo")  // Using whitelisted module name
+            .setServiceId("echo-empty-host-123")
             .setHost("") // Empty string
             .setPort(8080)
             .build();
@@ -82,8 +82,8 @@ public abstract class ModuleRegistrationTestBase {
         
         // First register a module
         ModuleInfo moduleInfo = ModuleInfo.newBuilder()
-            .setServiceName("list-test-service")
-            .setServiceId("list-test-456")
+            .setServiceName("chunker")  // Using whitelisted module name
+            .setServiceId("chunker-list-test-456")
             .setHost("localhost")
             .setPort(8080)
             .setHealthEndpoint("/health")
@@ -101,7 +101,7 @@ public abstract class ModuleRegistrationTestBase {
         assertThat(moduleList.getModulesCount()).isGreaterThanOrEqualTo(1);
         
         boolean found = moduleList.getModulesList().stream()
-            .anyMatch(m -> m.getServiceId().equals("list-test-456"));
+            .anyMatch(m -> m.getServiceId().equals("chunker-list-test-456"));
         assertThat(found).isTrue();
     }
     
@@ -111,8 +111,8 @@ public abstract class ModuleRegistrationTestBase {
         
         // First register
         ModuleInfo moduleInfo = ModuleInfo.newBuilder()
-            .setServiceName("unregister-test")
-            .setServiceId("unregister-789")
+            .setServiceName("embedder")  // Using whitelisted module name
+            .setServiceId("embedder-unregister-789")
             .setHost("localhost")
             .setPort(7070)
             .setHealthEndpoint("/health")
@@ -126,7 +126,7 @@ public abstract class ModuleRegistrationTestBase {
         
         // Now unregister
         ModuleId moduleId = ModuleId.newBuilder()
-            .setServiceId("unregister-789")
+            .setServiceId("embedder-unregister-789")
             .build();
             
         UnregistrationStatus unregResponse = getModuleRegistrationService()
@@ -143,8 +143,8 @@ public abstract class ModuleRegistrationTestBase {
         
         // First register a module
         ModuleInfo moduleInfo = ModuleInfo.newBuilder()
-            .setServiceName("health-test")
-            .setServiceId("health-test-999")
+            .setServiceName("opensearch-sink")  // Using whitelisted module name
+            .setServiceId("opensearch-health-test-999")
             .setHost("localhost")
             .setPort(5050)
             .setHealthEndpoint("/health")
@@ -156,15 +156,15 @@ public abstract class ModuleRegistrationTestBase {
         
         // Check its health
         ModuleId moduleId = ModuleId.newBuilder()
-            .setServiceId("health-test-999")
+            .setServiceId("opensearch-health-test-999")
             .build();
             
         ModuleHealthStatus health = getModuleRegistrationService()
             .getModuleHealth(moduleId)
             .await().indefinitely();
             
-        assertThat(health.getServiceId()).isEqualTo("health-test-999");
-        assertThat(health.getServiceName()).isEqualTo("health-test");
+        assertThat(health.getServiceId()).isEqualTo("opensearch-health-test-999");
+        assertThat(health.getServiceName()).isEqualTo("opensearch-sink");
         // Health status depends on whether Consul can actually reach the service
     }
     
@@ -174,8 +174,8 @@ public abstract class ModuleRegistrationTestBase {
         
         // Register a module first
         ModuleInfo moduleInfo = ModuleInfo.newBuilder()
-            .setServiceName("heartbeat-test")
-            .setServiceId("heartbeat-101")
+            .setServiceName("test-module")  // Using whitelisted module name
+            .setServiceId("test-module-heartbeat-101")
             .setHost("localhost")
             .setPort(6060)
             .setHealthEndpoint("/health")
@@ -187,7 +187,7 @@ public abstract class ModuleRegistrationTestBase {
         
         // Send heartbeat
         ModuleHeartbeat heartbeat = ModuleHeartbeat.newBuilder()
-            .setServiceId("heartbeat-101")
+            .setServiceId("test-module-heartbeat-101")
             .putStatusInfo("status", "healthy")
             .build();
             

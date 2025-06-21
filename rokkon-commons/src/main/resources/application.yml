@@ -1,0 +1,17 @@
+quarkus:
+  application:
+    name: rokkon-commons
+  http:
+    port: 38096
+    host: 0.0.0.0
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+
+# Test profile configuration
+"%test":
+  quarkus:
+    http:
+      test-port: 0  # Use random port for tests
