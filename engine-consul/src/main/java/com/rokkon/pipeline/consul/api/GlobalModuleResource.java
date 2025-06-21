@@ -241,4 +241,42 @@ public class GlobalModuleResource {
         LOG.infof("Listing enabled modules for cluster: %s", clusterName);
         return moduleRegistry.listEnabledModulesForCluster(clusterName);
     }
+    
+    @POST
+    @Path("/{serviceName}/archive")
+    @Operation(summary = "Archive an unhealthy service", 
+               description = "Moves an unhealthy service to archive section in Consul for audit purposes")
+    public Uni<Response> archiveUnhealthyService(
+            @PathParam("serviceName") String serviceName,
+            @QueryParam("reason") @DefaultValue("Service unhealthy") String reason) {
+        
+        LOG.infof("Archiving unhealthy service: %s, reason: %s", serviceName, reason);
+        
+        return moduleRegistry.archiveService(serviceName, reason)
+            .onItem().transform(success -> {
+                if (success) {
+                    return Response.ok(Map.of(
+                        "success", true, 
+                        "message", "Service archived successfully",
+                        "serviceName", serviceName
+                    )).build();
+                } else {
+                    return Response.status(Response.Status.NOT_FOUND)
+                        .entity(Map.of(
+                            "success", false, 
+                            "message", "Service not found or already archived"
+                        ))
+                        .build();
+                }
+            })
+            .onFailure().recoverWithItem(t -> {
+                LOG.errorf(t, "Failed to archive service %s", serviceName);
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(Map.of(
+                        "success", false, 
+                        "message", "Failed to archive service: " + t.getMessage()
+                    ))
+                    .build();
+            });
+    }
 }

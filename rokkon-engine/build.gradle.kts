@@ -34,13 +34,13 @@ dependencies {
     implementation("io.vertx:vertx-consul-client")
     
     // Engine modules
-    implementation("com.rokkon.pipeline:engine-consul:1.0.0-SNAPSHOT")
-    implementation("com.rokkon.pipeline:engine-validators:1.0.0-SNAPSHOT")
-    implementation("com.rokkon.pipeline:engine-models:1.0.0-SNAPSHOT")
+    implementation(project(":engine-consul"))
+    implementation(project(":engine-validators"))
+    implementation(project(":engine-models"))
     
     // Proto definitions
-    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
-    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
+    implementation(project(":rokkon-protobuf"))
+    implementation(project(":rokkon-commons"))
     
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.quarkus:quarkus-junit5-mockito")
@@ -53,7 +53,7 @@ dependencies {
     }
     
     // Test utilities for container testing
-    testImplementation("com.rokkon.pipeline:test-utilities:1.0.0-SNAPSHOT")
+    testImplementation(project(":test-utilities"))
 }
 
 group = "com.rokkon.pipeline"

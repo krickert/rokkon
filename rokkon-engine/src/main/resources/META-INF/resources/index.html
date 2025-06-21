@@ -978,21 +978,32 @@
                     
                     // Action buttons for module services
                     let actionButtons = '';
-                    if (isModuleService && service.healthy) {
-                        if (whitelistedModules.has(moduleName)) {
-                            // Module is already whitelisted
-                            actionButtons = `
-                                <button class="btn btn-sm btn-success" disabled>
-                                    <i class="bi bi-check-circle-fill"></i> Whitelisted for Clusters
-                                </button>
-                            `;
+                    if (isModuleService) {
+                        if (service.healthy) {
+                            if (whitelistedModules.has(moduleName)) {
+                                // Module is already whitelisted
+                                actionButtons = `
+                                    <button class="btn btn-sm btn-success" disabled>
+                                        <i class="bi bi-check-circle-fill"></i> Whitelisted for Clusters
+                                    </button>
+                                `;
+                            } else {
+                                // Module can be whitelisted
+                                actionButtons = `
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            onclick="whitelistModule('${moduleName}', '${service.address}', ${service.port}); return false;"
+                                            title="Enable this module for clusters">
+                                        <i class="bi bi-plus-circle"></i> Whitelist for Clusters
+                                    </button>
+                                `;
+                            }
                         } else {
-                            // Module can be whitelisted
+                            // Unhealthy service - offer archive option
                             actionButtons = `
-                                <button class="btn btn-sm btn-outline-primary" 
-                                        onclick="whitelistModule('${moduleName}', '${service.address}', ${service.port}); return false;"
-                                        title="Enable this module for clusters">
-                                    <i class="bi bi-plus-circle"></i> Whitelist for Clusters
+                                <button class="btn btn-sm btn-outline-warning" 
+                                        onclick="archiveUnhealthyService('${service.name}', '${service.id || service.name}'); return false;"
+                                        title="Archive this unhealthy service">
+                                    <i class="bi bi-archive"></i> Archive
                                 </button>
                             `;
                         }
@@ -1435,6 +1446,35 @@
             
             document.getElementById('pipelineIdJson').value = 'echo-pipeline';
             document.getElementById('pipelineConfigJson').value = JSON.stringify(samplePipeline, null, 2);
+        }
+        
+        function archiveUnhealthyService(serviceName, serviceId) {
+            if (!confirm(`Are you sure you want to archive the unhealthy service "${serviceName}"?\n\nThis will move it to the archive section in Consul and remove it from active services.`)) {
+                return;
+            }
+            
+            fetch(`/api/v1/global-modules/${encodeURIComponent(serviceName)}/archive?reason=${encodeURIComponent('Service unhealthy - archived by user')}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert(`Service "${serviceName}" has been archived successfully.`);
+                    // Refresh the services list
+                    loadAllServices();
+                    // Also refresh the modules graph
+                    loadModulesGraph();
+                } else {
+                    alert('Failed to archive service: ' + result.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error archiving service:', error);
+                alert('Failed to archive service: ' + error.message);
+            });
         }
     </script>
 </body>

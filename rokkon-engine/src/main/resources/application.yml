@@ -3,12 +3,12 @@ quarkus:
     name: rokkon-engine
 
   http:
-    port: 8081
+    port: 38090
     host: 0.0.0.0
 
   grpc:
     server:
-      port: 9000
+      port: 49000
       host: 0.0.0.0
       enable-reflection-service: true
       max-inbound-message-size: 4194304

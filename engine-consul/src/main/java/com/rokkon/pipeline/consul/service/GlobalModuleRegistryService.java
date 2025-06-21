@@ -455,4 +455,120 @@ public class GlobalModuleRegistryService {
             }
         });
     }
+    
+    /**
+     * Archive a service by moving it from active to archive namespace in Consul
+     */
+    public Uni<Boolean> archiveService(String serviceName, String reason) {
+        ConsulClient client = getConsulClient();
+        String timestamp = java.time.Instant.now().toString();
+        
+        // First, try to get the service from Consul's service registry
+        return Uni.createFrom().completionStage(
+            client.catalogServiceNodes(serviceName).toCompletionStage()
+        )
+        .onItem().transformToUni(serviceNodes -> {
+            if (serviceNodes == null || serviceNodes.getList() == null || serviceNodes.getList().isEmpty()) {
+                LOG.warnf("Service %s not found in Consul registry", serviceName);
+                return Uni.createFrom().item(false);
+            }
+            
+            // Get the first service node
+            var serviceNode = serviceNodes.getList().get(0);
+            
+            // Create archive metadata
+            String archiveJson;
+            try {
+                // Use simple JSON format to avoid Jackson dependency issues
+                archiveJson = String.format("""
+                    {
+                        "serviceName": "%s",
+                        "serviceId": "%s",
+                        "address": "%s",
+                        "port": %d,
+                        "archivedAt": "%s",
+                        "reason": "%s"
+                    }
+                    """,
+                    serviceNode.getName() != null ? serviceNode.getName() : serviceName,
+                    serviceNode.getId() != null ? serviceNode.getId() : "",
+                    serviceNode.getAddress() != null ? serviceNode.getAddress() : "",
+                    serviceNode.getPort(),
+                    timestamp,
+                    reason
+                );
+            } catch (Exception e) {
+                LOG.warnf("Failed to create archive JSON: %s", e.getMessage());
+                return archiveServiceSimple(serviceName, reason, timestamp);
+            }
+            
+            // Store in archive namespace
+            String archiveKey = String.format("%s/services/%s-%s", 
+                ARCHIVE_PREFIX, serviceName, timestamp.replace(":", "-").replace(".", "-"));
+            
+            return Uni.createFrom().completionStage(
+                client.putValue(archiveKey, archiveJson).toCompletionStage()
+            )
+            .onItem().transformToUni(success -> {
+                if (!success) {
+                    return Uni.createFrom().failure(
+                        new RuntimeException("Failed to archive service metadata")
+                    );
+                }
+                
+                // Now deregister the service using the service ID
+                String serviceId = serviceNode.getId() != null ? 
+                    serviceNode.getId() : serviceName;
+                    
+                return Uni.createFrom().completionStage(
+                    client.deregisterService(serviceId).toCompletionStage()
+                )
+                .onItem().transform(v -> {
+                    LOG.infof("Successfully archived and deregistered service %s", serviceName);
+                    return true;
+                });
+            });
+        })
+        .onFailure().recoverWithUni(t -> {
+            if (t.getMessage() != null && t.getMessage().contains("com.fasterxml.jackson")) {
+                // JSON serialization error - try simpler format
+                LOG.warnf("JSON serialization failed, using simple archive format: %s", t.getMessage());
+                return archiveServiceSimple(serviceName, reason, timestamp);
+            }
+            LOG.errorf(t, "Failed to archive service %s", serviceName);
+            return Uni.createFrom().item(false);
+        });
+    }
+    
+    private Uni<Boolean> archiveServiceSimple(String serviceName, String reason, String timestamp) {
+        ConsulClient client = getConsulClient();
+        
+        // Simple archive format without complex JSON serialization
+        String archiveJson = String.format("""
+            {
+                "serviceName": "%s",
+                "archivedAt": "%s",
+                "reason": "%s"
+            }
+            """,
+            serviceName,
+            timestamp,
+            reason
+        );
+        
+        String archiveKey = String.format("%s/services/%s-%s", 
+            ARCHIVE_PREFIX, serviceName, timestamp.replace(":", "-").replace(".", "-"));
+        
+        return Uni.createFrom().completionStage(
+            client.putValue(archiveKey, archiveJson).toCompletionStage()
+        )
+        .onItem().transform(success -> {
+            if (success) {
+                LOG.infof("Service %s archived (simple format)", serviceName);
+            }
+            return success;
+        });
+    }
+    
+    private static final String ARCHIVE_PREFIX = "rokkon/archive";
 }
