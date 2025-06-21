@@ -261,7 +261,7 @@
                                 </div>
                             </div>
                             <div class="row mb-3">
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label for="moduleType" class="form-label">Module Type</label>
                                     <select class="form-select" id="moduleType" required>
                                         <option value="PARSER">Parser</option>
@@ -271,11 +271,20 @@
                                         <option value="TEST">Test</option>
                                     </select>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
                                     <label for="moduleVersion" class="form-label">Version</label>
                                     <input type="text" class="form-control" id="moduleVersion" value="1.0.0" required>
                                 </div>
-                                <div class="col-md-4">
+                                <div class="col-md-3">
+                                    <label for="moduleVisibility" class="form-label">Visibility</label>
+                                    <select class="form-select" id="moduleVisibility" required>
+                                        <option value="PUBLIC">Public</option>
+                                        <option value="PRIVATE">Private</option>
+                                        <option value="RESTRICTED">Restricted</option>
+                                    </select>
+                                    <small class="text-muted">Private modules won't show in global UI</small>
+                                </div>
+                                <div class="col-md-3">
                                     <label for="clusterName" class="form-label">Cluster Name</label>
                                     <select class="form-select" id="clusterName" required>
                                         <option value="">Select a cluster...</option>
@@ -661,6 +670,7 @@
             const modulePort = document.getElementById('modulePort').value;
             const moduleType = document.getElementById('moduleType').value;
             const moduleVersion = document.getElementById('moduleVersion').value;
+            const moduleVisibility = document.getElementById('moduleVisibility').value;
             const clusterName = document.getElementById('clusterName').value;
             
             const useEngineConnection = document.getElementById('useEngineConnection').checked;
@@ -674,6 +684,7 @@
                 port: parseInt(modulePort),
                 serviceType: moduleType,
                 version: moduleVersion,
+                visibility: moduleVisibility,
                 metadata: {}
             };
             
@@ -1037,6 +1048,9 @@
             const serviceType = 'PIPELINE'; // Default, could be extracted from tags
             const version = '1.0.0'; // Default, could be extracted from tags
             
+            // For whitelisting from Consul, ask user about visibility
+            const visibility = prompt(`Set visibility for module "${moduleName}":\n\nPUBLIC - Shows in global UI\nPRIVATE - Hidden from global UI\nRESTRICTED - Business line specific\n\nEnter visibility (default: PUBLIC):`, 'PUBLIC');
+            
             const registrationData = {
                 moduleName: moduleName,
                 implementationId: moduleName + '-impl', // Default implementation ID
@@ -1044,6 +1058,7 @@
                 port: port,
                 serviceType: serviceType,
                 version: version,
+                visibility: visibility ? visibility.toUpperCase() : 'PUBLIC',
                 metadata: {},
                 // For now, we'll use the same host/port for engine connection
                 // This could be expanded to allow user to specify different values
@@ -1106,6 +1121,9 @@
         }
         
         function loadPipelines() {
+            // Also load public modules for pipeline creation
+            loadPublicModulesForPipelines();
+            
             fetch('/api/v1/pipelines/definitions')
                 .then(response => response.json())
                 .then(pipelines => {
@@ -1264,6 +1282,30 @@
                 console.error('Error deleting pipeline:', error);
                 alert('Failed to delete pipeline: ' + error.message);
             });
+        }
+        
+        function loadPublicModulesForPipelines() {
+            // Load only PUBLIC modules for pipeline creation
+            fetch('/api/v1/global-modules/public')
+                .then(response => response.json())
+                .then(modules => {
+                    // Store for later use when adding pipeline steps
+                    window.publicModules = modules;
+                    
+                    // Update the pipeline steps section with available modules
+                    const pipelineStepsDiv = document.getElementById('pipelineSteps');
+                    if (modules && modules.length > 0) {
+                        let html = '<p class="text-muted">Available modules (PUBLIC only):</p><ul class="list-unstyled">';
+                        modules.forEach(module => {
+                            html += `<li><i class="bi bi-box"></i> ${module.moduleName} (${module.serviceType})</li>`;
+                        });
+                        html += '</ul><p class="text-info"><small>Private modules can be added after pipeline creation</small></p>';
+                        pipelineStepsDiv.innerHTML = html;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading public modules:', error);
+                });
         }
     </script>
 </body>

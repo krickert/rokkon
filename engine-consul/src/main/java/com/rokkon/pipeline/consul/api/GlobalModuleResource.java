@@ -1,5 +1,6 @@
 package com.rokkon.pipeline.consul.api;
 
+import com.rokkon.pipeline.config.model.ModuleVisibility;
 import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService;
 import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ModuleRegistration;
 import io.smallrye.mutiny.Uni;
@@ -13,6 +14,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
 
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -36,7 +38,8 @@ public class GlobalModuleResource {
         @NotBlank String serviceType,
         String version,
         Map<String, String> metadata,
-        EngineConnectionConfig engineConnection
+        EngineConnectionConfig engineConnection,
+        String visibility  // Optional: PUBLIC, PRIVATE, RESTRICTED
     ) {}
     
     public record EngineConnectionConfig(
@@ -76,6 +79,16 @@ public class GlobalModuleResource {
             request.engineConnection() : 
             EngineConnectionConfig.defaultFrom(request.host(), request.port());
         
+        // Parse visibility if provided, otherwise use default
+        ModuleVisibility visibility = ModuleVisibility.DEFAULT;
+        if (request.visibility() != null) {
+            try {
+                visibility = ModuleVisibility.valueOf(request.visibility().toUpperCase());
+            } catch (IllegalArgumentException e) {
+                LOG.warnf("Invalid visibility value '%s', using default", request.visibility());
+            }
+        }
+        
         return moduleRegistry.registerModule(
             request.moduleName(),
             request.implementationId(),
@@ -85,7 +98,8 @@ public class GlobalModuleResource {
             request.version() != null ? request.version() : "1.0.0",
             request.metadata(),
             engineConn.host(),
-            engineConn.port()
+            engineConn.port(),
+            visibility
         )
         .onItem().transform(registration -> 
             Response.ok(ModuleResponse.success(registration)).build()
@@ -119,6 +133,24 @@ public class GlobalModuleResource {
     public Uni<Set<ModuleRegistration>> listModules() {
         LOG.info("Listing all registered modules");
         return moduleRegistry.listRegisteredModules();
+    }
+    
+    @GET
+    @Path("/public")
+    @Operation(summary = "List public modules only", 
+               description = "Returns only modules with PUBLIC visibility")
+    public Uni<Set<ModuleRegistration>> listPublicModules() {
+        LOG.info("Listing public modules only");
+        return moduleRegistry.listRegisteredModules()
+            .onItem().transform(modules -> {
+                Set<ModuleRegistration> publicModules = new LinkedHashSet<>();
+                for (ModuleRegistration module : modules) {
+                    if (module.visibility() == ModuleVisibility.PUBLIC) {
+                        publicModules.add(module);
+                    }
+                }
+                return publicModules;
+            });
     }
     
     @GET

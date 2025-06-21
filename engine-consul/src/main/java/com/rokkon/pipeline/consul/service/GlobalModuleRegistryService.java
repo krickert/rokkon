@@ -1,5 +1,6 @@
 package com.rokkon.pipeline.consul.service;
 
+import com.rokkon.pipeline.config.model.ModuleVisibility;
 import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
 import io.smallrye.mutiny.Uni;
 import io.vertx.ext.consul.ConsulClient;
@@ -49,7 +50,8 @@ public class GlobalModuleRegistryService {
         Map<String, String> metadata,
         long registeredAt,
         String engineHost,
-        int enginePort
+        int enginePort,
+        ModuleVisibility visibility
     ) implements Comparable<ModuleRegistration> {
         
         @Override
@@ -88,7 +90,8 @@ public class GlobalModuleRegistryService {
             String version,
             Map<String, String> metadata,
             String engineHost,
-            int enginePort) {
+            int enginePort,
+            ModuleVisibility visibility) {
         
         ConsulClient client = getConsulClient();
         String moduleId = generateModuleId(moduleName);
@@ -144,7 +147,8 @@ public class GlobalModuleRegistryService {
                     metadata != null ? metadata : Map.of(),
                     System.currentTimeMillis(),
                     engineHost,
-                    enginePort
+                    enginePort,
+                    visibility != null ? visibility : ModuleVisibility.DEFAULT
                 );
                 
                 // Create service options for Consul
@@ -154,6 +158,7 @@ public class GlobalModuleRegistryService {
                 serviceMeta.put("serviceType", serviceType);
                 serviceMeta.put("version", version);
                 serviceMeta.put("registeredAt", String.valueOf(registration.registeredAt()));
+                serviceMeta.put("visibility", registration.visibility().name());
                 
                 // Store engine connection info if different from Consul registration
                 if (!engineHost.equals(host) || enginePort != port) {
@@ -348,6 +353,18 @@ public class GlobalModuleRegistryService {
         String engineHost = meta.getOrDefault("engineHost", service.getAddress());
         int enginePort = Integer.parseInt(meta.getOrDefault("enginePort", String.valueOf(service.getPort())));
         
+        // Parse visibility, defaulting to PUBLIC if not present
+        ModuleVisibility visibility = ModuleVisibility.DEFAULT;
+        String visibilityStr = meta.get("visibility");
+        if (visibilityStr != null) {
+            try {
+                visibility = ModuleVisibility.valueOf(visibilityStr);
+            } catch (IllegalArgumentException e) {
+                LOG.warnf("Invalid visibility value '%s' for module %s, using default", 
+                         visibilityStr, service.getName());
+            }
+        }
+        
         return Uni.createFrom().item(new ModuleRegistration(
             service.getId(),
             meta.getOrDefault("moduleName", service.getName()),
@@ -359,7 +376,8 @@ public class GlobalModuleRegistryService {
             meta,
             Long.parseLong(meta.getOrDefault("registeredAt", "0")),
             engineHost,
-            enginePort
+            enginePort,
+            visibility
         ));
     }
     
@@ -377,7 +395,8 @@ public class GlobalModuleRegistryService {
                 "port": %d,
                 "serviceType": "%s",
                 "version": "%s",
-                "registeredAt": %d
+                "registeredAt": %d,
+                "visibility": "%s"
             }
             """,
             registration.moduleId(),
@@ -387,7 +406,8 @@ public class GlobalModuleRegistryService {
             registration.port(),
             registration.serviceType(),
             registration.version(),
-            registration.registeredAt()
+            registration.registeredAt(),
+            registration.visibility().name()
         );
         
         return Uni.createFrom().completionStage(
