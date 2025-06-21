@@ -319,15 +319,6 @@
                                     <input type="text" class="form-control" id="moduleVersion" value="1.0.0" required>
                                 </div>
                                 <div class="col-md-3">
-                                    <label for="moduleVisibility" class="form-label">Visibility</label>
-                                    <select class="form-select" id="moduleVisibility" required>
-                                        <option value="PUBLIC">Public</option>
-                                        <option value="PRIVATE">Private</option>
-                                        <option value="RESTRICTED">Restricted</option>
-                                    </select>
-                                    <small class="text-muted">Private modules won't show in global UI</small>
-                                </div>
-                                <div class="col-md-3">
                                     <label for="clusterName" class="form-label">Cluster Name</label>
                                     <select class="form-select" id="clusterName" required>
                                         <option value="">Select a cluster...</option>
@@ -365,6 +356,7 @@
 
     <script>
         document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded, checking engine status...');
             // Check engine status on load
             checkEngineStatus();
 
@@ -468,12 +460,14 @@
         }
         
         function checkStatus() {
+            console.log('checkStatus called');
             // Update UI to show checking status
             document.getElementById('engineStatus').textContent = 'Checking...';
             document.getElementById('engineStatus').className = 'badge bg-secondary';
             document.getElementById('pingStatus').textContent = 'Checking...';
             document.getElementById('consulStatus').textContent = 'Checking...';
 
+            console.log('Fetching /ping...');
             // Check ping endpoint
             fetch('/ping')
                 .then(response => {
@@ -724,7 +718,6 @@
             const modulePort = document.getElementById('modulePort').value;
             const moduleType = document.getElementById('moduleType').value;
             const moduleVersion = document.getElementById('moduleVersion').value;
-            const moduleVisibility = document.getElementById('moduleVisibility').value;
             const clusterName = document.getElementById('clusterName').value;
             
             const useEngineConnection = document.getElementById('useEngineConnection').checked;
@@ -738,7 +731,6 @@
                 port: parseInt(modulePort),
                 serviceType: moduleType,
                 version: moduleVersion,
-                visibility: moduleVisibility,
                 metadata: {}
             };
             
@@ -750,7 +742,7 @@
                 };
             }
 
-            fetch('/api/v1/global-modules/register', {
+            fetch('/api/v1/modules', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json'
@@ -952,7 +944,7 @@
             // First fetch all services, then check which ones are whitelisted
             Promise.all([
                 fetch('/api/v1/modules/all-services').then(r => r.json()),
-                fetch('/api/v1/global-modules').then(r => r.json()).catch(() => [])
+                fetch('/api/v1/modules').then(r => r.json()).catch(() => [])
             ])
             .then(([services, globalModules]) => {
                 const servicesList = document.getElementById('allServicesList');
@@ -962,8 +954,8 @@
                     return;
                 }
                 
-                // Create a set of whitelisted module names for quick lookup
-                const whitelistedModules = new Set(globalModules.map(m => m.moduleName));
+                // Create a set of registered module names for quick lookup
+                const registeredModules = new Set(globalModules.map(m => m.moduleName || m.name));
                 
                 // Build services table
                 let html = `
@@ -999,11 +991,11 @@
                     let actionButtons = '';
                     if (isModuleService) {
                         if (service.healthy) {
-                            if (whitelistedModules.has(moduleName)) {
-                                // Module is already whitelisted
+                            if (registeredModules.has(moduleName)) {
+                                // Module is already registered
                                 actionButtons = `
                                     <button class="btn btn-sm btn-success" disabled>
-                                        <i class="bi bi-check-circle-fill"></i> Whitelisted for Clusters
+                                        <i class="bi bi-check-circle-fill"></i> Registered
                                     </button>
                                 `;
                             } else {
@@ -1012,7 +1004,7 @@
                                     <button class="btn btn-sm btn-outline-primary" 
                                             onclick="whitelistModule('${moduleName}', '${service.address}', ${service.port}); return false;"
                                             title="Enable this module for clusters">
-                                        <i class="bi bi-plus-circle"></i> Whitelist for Clusters
+                                        <i class="bi bi-plus-circle"></i> Register Module
                                     </button>
                                 `;
                             }
@@ -1113,8 +1105,6 @@
             const serviceType = 'PIPELINE'; // Default, could be extracted from tags
             const version = '1.0.0'; // Default, could be extracted from tags
             
-            // For whitelisting from Consul, ask user about visibility
-            const visibility = prompt(`Set visibility for module "${moduleName}":\n\nPUBLIC - Shows in global UI\nPRIVATE - Hidden from global UI\nRESTRICTED - Business line specific\n\nEnter visibility (default: PUBLIC):`, 'PUBLIC');
             
             const registrationData = {
                 moduleName: moduleName,
@@ -1123,7 +1113,6 @@
                 port: port,
                 serviceType: serviceType,
                 version: version,
-                visibility: visibility ? visibility.toUpperCase() : 'PUBLIC',
                 metadata: {},
                 // For now, we'll use the same host/port for engine connection
                 // This could be expanded to allow user to specify different values
@@ -1373,7 +1362,7 @@
         
         function loadPublicModulesForPipelines() {
             // Load only PUBLIC modules for pipeline creation
-            fetch('/api/v1/global-modules/public')
+d             fetch('/api/v1/modules')
                 .then(response => response.json())
                 .then(modules => {
                     // Store for later use when adding pipeline steps

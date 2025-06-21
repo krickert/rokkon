@@ -12,7 +12,6 @@ import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.ConsulContainer;
 
 import java.time.Duration;
 import java.util.List;

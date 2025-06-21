@@ -1,7 +1,5 @@
 package com.rokkon.pipeline.engine.registration;
 
-import com.rokkon.pipeline.engine.model.ModuleRegistrationRequest;
-import com.rokkon.pipeline.engine.model.ModuleRegistrationResponse;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.junit.jupiter.api.Test;

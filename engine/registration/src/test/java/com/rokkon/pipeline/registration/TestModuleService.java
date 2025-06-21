@@ -51,7 +51,12 @@ public class TestModuleService implements PipeStepProcessor {
         
         return Uni.createFrom().item(responseBuilder.build());
     }
-    
+
+    @Override
+    public Uni<ProcessResponse> testProcessData(ProcessRequest request) {
+        return processData(request);
+    }
+
     @Override
     public Uni<ServiceRegistrationData> getServiceRegistration(Empty request) {
         LOG.debug("📋 Test module providing registration data");

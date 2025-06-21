@@ -1,0 +1,25 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Minimal Status Test</title>
+</head>
+<body>
+    <h1>Simple Status Test</h1>
+    <p>Ping: <span id="ping">Testing...</span></p>
+    <p>Consul: <span id="consul">Testing...</span></p>
+    
+    <script>
+        // Test ping
+        fetch('http://localhost:38090/ping')
+            .then(r => r.text())
+            .then(data => document.getElementById('ping').textContent = data)
+            .catch(err => document.getElementById('ping').textContent = 'Error: ' + err);
+            
+        // Test consul status
+        fetch('http://localhost:38090/api/consul/status')
+            .then(r => r.json())
+            .then(data => document.getElementById('consul').textContent = data.status)
+            .catch(err => document.getElementById('consul').textContent = 'Error: ' + err);
+    </script>
+</body>
+</html>

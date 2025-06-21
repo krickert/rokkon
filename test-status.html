@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Status Test</title>
+</head>
+<body>
+    <h1>Testing Status Endpoints</h1>
+    <div id="results"></div>
+    
+    <script>
+        const resultsDiv = document.getElementById('results');
+        
+        // Test ping endpoint
+        fetch('http://localhost:38090/ping')
+            .then(response => response.text())
+            .then(data => {
+                resultsDiv.innerHTML += '<p>Ping result: ' + data + '</p>';
+            })
+            .catch(error => {
+                resultsDiv.innerHTML += '<p>Ping error: ' + error + '</p>';
+            });
+            
+        // Test consul status
+        fetch('http://localhost:38090/api/consul/status')
+            .then(response => response.json())
+            .then(data => {
+                resultsDiv.innerHTML += '<p>Consul status: ' + JSON.stringify(data) + '</p>';
+            })
+            .catch(error => {
+                resultsDiv.innerHTML += '<p>Consul error: ' + error + '</p>';
+            });
+    </script>
+</body>
+</html>

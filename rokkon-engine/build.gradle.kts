@@ -53,6 +53,8 @@ dependencies {
         exclude(group = "org.apache.commons", module = "commons-compress")
     }
     implementation("com.networknt:json-schema-validator:1.5.7")
+    // https://mvnrepository.com/artifact/org.awaitility/awaitility
+    testImplementation("org.awaitility:awaitility:4.3.0")
     
     // Test utilities for container testing
     testImplementation(project(":test-utilities"))

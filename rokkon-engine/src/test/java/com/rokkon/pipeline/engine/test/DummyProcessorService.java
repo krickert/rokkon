@@ -59,7 +59,12 @@ public class DummyProcessorService implements PipeStepProcessor {
         
         return Uni.createFrom().item(response);
     }
-    
+
+    @Override
+    public Uni<ProcessResponse> testProcessData(ProcessRequest request) {
+        return processData(request);
+    }
+
     @Override
     public Uni<ServiceRegistrationData> getServiceRegistration(Empty request) {
         LOG.debugf("DummyProcessor registration requested");

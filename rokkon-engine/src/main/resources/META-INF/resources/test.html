@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Rokkon Test</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1>Rokkon Engine Status Test</h1>
+        
+        <div class="card mt-3">
+            <div class="card-body">
+                <h5>Engine Status</h5>
+                <p>Ping: <span id="pingStatus" class="badge bg-secondary">Checking...</span></p>
+                <p>Consul: <span id="consulStatus" class="badge bg-secondary">Checking...</span></p>
+                <button class="btn btn-primary" onclick="checkStatus()">Refresh</button>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        function checkStatus() {
+            console.log('Checking status...');
+            
+            // Test ping
+            fetch('/ping')
+                .then(response => response.text())
+                .then(data => {
+                    document.getElementById('pingStatus').textContent = data;
+                    document.getElementById('pingStatus').className = 'badge bg-success';
+                })
+                .catch(error => {
+                    document.getElementById('pingStatus').textContent = 'Error: ' + error;
+                    document.getElementById('pingStatus').className = 'badge bg-danger';
+                });
+                
+            // Test consul
+            fetch('/api/consul/status')
+                .then(response => response.json())
+                .then(data => {
+                    const el = document.getElementById('consulStatus');
+                    el.textContent = data.status;
+                    el.className = data.status === 'UP' ? 'badge bg-success' : 'badge bg-danger';
+                })
+                .catch(error => {
+                    document.getElementById('consulStatus').textContent = 'Error: ' + error;
+                    document.getElementById('consulStatus').className = 'badge bg-danger';
+                });
+        }
+        
+        // Check on load
+        checkStatus();
+    </script>
+</body>
+</html>
