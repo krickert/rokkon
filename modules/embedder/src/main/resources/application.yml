@@ -1,6 +1,8 @@
 quarkus:
   application:
     name: embedder-module
+  http:
+    port: 39093
   generate-code:
     grpc:
       scan-for-proto: com.rokkon.pipeline:rokkon-protobuf

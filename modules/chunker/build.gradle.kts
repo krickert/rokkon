@@ -11,6 +11,9 @@ repositories {
 
 dependencies {
     implementation("io.quarkus:quarkus-jackson")
+    implementation("io.quarkus:quarkus-rest")
+    implementation("io.quarkus:quarkus-rest-jackson")
+    implementation("io.quarkus:quarkus-smallrye-openapi")
     implementation("io.quarkus:quarkus-container-image-docker")
     implementation(enforcedPlatform(libs.quarkus.bom))
     implementation(libs.quarkus.grpc)

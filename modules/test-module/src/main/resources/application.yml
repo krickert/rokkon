@@ -5,7 +5,7 @@ quarkus:
     grpc:
       scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
   http:
-    port: 8080  # Standard HTTP port
+    port: 39095
     test-port: 0  # Random port for tests
   grpc:
     server:
