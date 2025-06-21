@@ -20,7 +20,7 @@ dependencies {
     implementation("io.quarkus:quarkus-arc")
     
     // Depend on engine-models for the data structures
-    implementation("com.rokkon.pipeline:engine-models:1.0.0-SNAPSHOT")
+    implementation(project(":engine:models"))
     
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("org.assertj:assertj-core:3.26.3")

@@ -9,20 +9,24 @@ pluginManagement {
 
 rootProject.name = "rokkon-engine-workspace"
 
-// Core protobuf and common libraries
+// Core libraries (at root level)
 include("rokkon-protobuf")
 include("rokkon-commons")
-
-// Test utilities
 include("test-utilities")
-include("engine-models")
-include("engine-validators")
-include("engine-registration")
-include("engine-consul")
+
+// Main engine application (at root level)
+include("rokkon-engine")
+
+// Engine components
+include("engine:models")
+include("engine:validators")
+include("engine:registration")
+include("engine:consul")
+
+// Modules
 include("modules:echo")
 include("modules:chunker")
 include("modules:parser")
 include("modules:embedder")
 include("modules:test-module")
-include("rokkon-engine")
     

@@ -34,9 +34,9 @@ dependencies {
     implementation("io.vertx:vertx-consul-client")
     
     // Engine modules
-    implementation(project(":engine-consul"))
-    implementation(project(":engine-validators"))
-    implementation(project(":engine-models"))
+    implementation(project(":engine:consul"))
+    implementation(project(":engine:validators"))
+    implementation(project(":engine:models"))
     
     // Proto definitions
     implementation(project(":rokkon-protobuf"))

@@ -37,6 +37,9 @@ quarkus:
     engine-models:
       group-id: com.rokkon.pipeline
       artifact-id: engine-models
+    engine-validators:
+      group-id: com.rokkon.pipeline
+      artifact-id: engine-validators
 
   # Health check configuration
   health:

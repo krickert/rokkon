@@ -1,6 +1,5 @@
 plugins {
     java
-    id("io.quarkus")
     `maven-publish`
 }
 

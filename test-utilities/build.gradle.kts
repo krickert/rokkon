@@ -1,6 +1,5 @@
 plugins {
     java
-    alias(libs.plugins.quarkus)
     `maven-publish`
 }
 
@@ -26,9 +25,9 @@ dependencies {
     
     implementation("org.assertj:assertj-core:3.24.2")
     // Use rokkon-protobuf for proto files
-    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
+    implementation(project(":rokkon-protobuf"))
     // Use rokkon-commons for utilities
-    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
+    implementation(project(":rokkon-commons"))
     
     // Add dependencies for container testing
     implementation("io.quarkus:quarkus-test-common")
@@ -46,11 +45,7 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-quarkus {
-    buildForkOptions {
-        systemProperty("quarkus.grpc.codegen.type", "mutiny")
-    }
-}
+// No Quarkus plugin needed for test utilities
 
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")

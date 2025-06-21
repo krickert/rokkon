@@ -34,8 +34,8 @@ dependencies {
     implementation("org.yaml:snakeyaml:2.2")
 
     // Our models and validators
-    implementation("com.rokkon.pipeline:engine-models:1.0.0-SNAPSHOT")
-    implementation("com.rokkon.pipeline:engine-validators:1.0.0-SNAPSHOT")
+    implementation(project(":engine:models"))
+    implementation(project(":engine:validators"))
 
     // Test dependencies
     testImplementation("io.quarkus:quarkus-junit5")
@@ -45,7 +45,7 @@ dependencies {
     testImplementation("org.testcontainers:consul:1.19.8")
     testImplementation("org.testcontainers:junit-jupiter:1.19.8")
     testImplementation("org.awaitility:awaitility:4.2.0")
-    testImplementation("com.rokkon.pipeline:test-utilities:1.0.0-SNAPSHOT")
+    testImplementation(project(":test-utilities"))
 }
 
 group = "com.rokkon.pipeline"
