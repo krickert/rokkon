@@ -32,6 +32,7 @@ dependencies {
     implementation("io.quarkus:quarkus-arc")
     implementation("io.quarkus:quarkus-vertx")
     implementation("io.vertx:vertx-consul-client")
+    implementation("io.quarkus:quarkus-grpc")
     
     // Engine modules
     implementation(project(":engine:consul"))
@@ -51,6 +52,7 @@ dependencies {
     testImplementation("org.testcontainers:consul:1.19.8") {
         exclude(group = "org.apache.commons", module = "commons-compress")
     }
+    implementation("com.networknt:json-schema-validator:1.5.7")
     
     // Test utilities for container testing
     testImplementation(project(":test-utilities"))

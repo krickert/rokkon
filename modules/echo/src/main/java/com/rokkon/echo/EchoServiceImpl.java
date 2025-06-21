@@ -47,4 +47,10 @@ public class EchoServiceImpl implements PipeStepProcessor {
         
         return Uni.createFrom().item(response);
     }
+    
+    @Override
+    public Uni<ProcessResponse> testProcessData(ProcessRequest request) {
+        LOG.debug("TestProcessData called - proxying to processData");
+        return processData(request);
+    }
 }

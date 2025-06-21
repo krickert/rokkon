@@ -26,6 +26,7 @@ import java.util.List;
 @Tag(name = "Module Whitelist", description = "Manage module whitelisting for clusters")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
+@Deprecated
 public class ModuleWhitelistResource {
     
     @Inject

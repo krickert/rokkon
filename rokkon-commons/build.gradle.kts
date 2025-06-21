@@ -18,7 +18,7 @@ dependencies {
     implementation("io.quarkus:quarkus-grpc")
     
     // Proto definitions from rokkon-protobuf
-    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
+    implementation(project(":rokkon-protobuf"))
     
     testImplementation("io.quarkus:quarkus-junit5")
 }

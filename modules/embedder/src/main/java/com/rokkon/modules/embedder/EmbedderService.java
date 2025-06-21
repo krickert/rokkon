@@ -290,6 +290,12 @@ public class EmbedderService implements PipeStepProcessor {
 
         return Uni.createFrom().item(response);
     }
+    
+    @Override
+    public Uni<ProcessResponse> testProcessData(ProcessRequest request) {
+        log.debug("TestProcessData called - proxying to processData");
+        return processData(request);
+    }
 
     private ProcessResponse createErrorResponse(String errorMessage, Throwable e) {
         ProcessResponse.Builder responseBuilder = ProcessResponse.newBuilder();

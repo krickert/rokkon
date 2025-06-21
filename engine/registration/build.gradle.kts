@@ -36,11 +36,11 @@ dependencies {
     implementation("io.grpc:grpc-services")
     
     // Proto definitions from shared project
-    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
-    implementation("com.rokkon.pipeline:rokkon-commons:1.0.0-SNAPSHOT")
-    
-    // Engine validators for schema validation
-    implementation("com.rokkon.pipeline:engine-validators:1.0.0-SNAPSHOT")
+    implementation(project(":rokkon-commons"))
+    implementation(project(":rokkon-protobuf")) // <--- THIS IS THE KEY
+    implementation(project(":engine:validators"))
+
+
     
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.quarkus:quarkus-junit5-mockito")

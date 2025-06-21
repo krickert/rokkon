@@ -18,7 +18,11 @@ import "google/protobuf/empty.proto"; // Import for the Empty message
 service PipeStepProcessor {
   // Processes a document according to the step's configuration and logic.
   rpc ProcessData(ProcessRequest) returns (ProcessResponse);
-  
+
+  // Test version of ProcessData that doesn't count as a legitimate call
+  // but follows the same processing logic
+  rpc TestProcessData(ProcessRequest) returns (ProcessResponse);
+
   // Returns static registration information about this module
   rpc GetServiceRegistration (google.protobuf.Empty) returns (ServiceRegistrationData);
 }

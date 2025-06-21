@@ -212,4 +212,45 @@ public class TestProcessorServiceImpl implements PipeStepProcessor {
         
         return Uni.createFrom().item(registration);
     }
+    
+    @Override
+    public Uni<ProcessResponse> testProcessData(ProcessRequest request) {
+        LOG.info("TestProcessData called - executing test version of processing");
+        
+        // For test processing, create a test document if none provided
+        if (request == null || !request.hasDocument()) {
+            PipeDoc testDoc = PipeDoc.newBuilder()
+                .setId("test-doc-" + System.currentTimeMillis())
+                .setTitle("Test Document")
+                .setBody("This is a test document for validation")
+                .build();
+            
+            ServiceMetadata testMetadata = ServiceMetadata.newBuilder()
+                .setStreamId("test-stream")
+                .setPipeStepName("test-step")
+                .setPipelineName("test-pipeline")
+                .build();
+            
+            ProcessConfiguration testConfig = ProcessConfiguration.newBuilder()
+                .build();
+            
+            request = ProcessRequest.newBuilder()
+                .setDocument(testDoc)
+                .setMetadata(testMetadata)
+                .setConfig(testConfig)
+                .build();
+        }
+        
+        // Process normally but with test flag in logs
+        return processDataInternal(request)
+            .onItem().transform(response -> {
+                // Add test marker to logs
+                ProcessResponse.Builder builder = response.toBuilder();
+                for (int i = 0; i < builder.getProcessorLogsCount(); i++) {
+                    builder.setProcessorLogs(i, "[TEST] " + builder.getProcessorLogs(i));
+                }
+                builder.addProcessorLogs("[TEST] Test validation completed successfully");
+                return builder.build();
+            });
+    }
 }

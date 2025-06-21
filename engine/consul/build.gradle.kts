@@ -36,6 +36,7 @@ dependencies {
     // Our models and validators
     implementation(project(":engine:models"))
     implementation(project(":engine:validators"))
+    implementation("com.networknt:json-schema-validator:1.5.7")
 
     // Test dependencies
     testImplementation("io.quarkus:quarkus-junit5")

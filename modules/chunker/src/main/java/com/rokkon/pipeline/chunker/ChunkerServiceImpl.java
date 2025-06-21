@@ -47,22 +47,97 @@ public class ChunkerServiceImpl implements PipeStepProcessor {
             return Uni.createFrom().item(createErrorResponse("Request cannot be null", null));
         }
 
+        // Use the internal method with isTest=false
+        return processDataInternal(request, false);
+    }
+
+    @Override
+    public Uni<ServiceRegistrationData> getServiceRegistration(Empty request) {
         return Uni.createFrom().item(() -> {
             try {
+                ServiceRegistrationData registration = ServiceRegistrationData.newBuilder()
+                        .setModuleName("chunker-module")
+                        .setJsonConfigSchema(ChunkerOptions.getJsonV7Schema())
+                        .build();
+
+                LOG.info("Returned service registration for chunker module");
+                return registration;
+
+            } catch (Exception e) {
+                LOG.error("Error getting service registration", e);
+                return ServiceRegistrationData.newBuilder()
+                    .setModuleName("chunker-module")
+                    .build();
+            }
+        });
+    }
+
+    @Override
+    public Uni<ProcessResponse> testProcessData(ProcessRequest request) {
+        LOG.info("TestProcessData called - executing test version of chunker processing");
+        
+        // For test processing, we use the same logic as processData but:
+        // 1. Don't write to any output buffers
+        // 2. Add a test marker to the logs
+        // 3. Use a test document if none provided
+        
+        if (request == null || !request.hasDocument()) {
+            // Create a test document for validation
+            PipeDoc testDoc = PipeDoc.newBuilder()
+                .setId("test-doc-" + System.currentTimeMillis())
+                .setBody("This is a test document for chunker validation. It contains enough text to be chunked into multiple pieces. " +
+                         "The chunker will process this text and create overlapping chunks according to the configuration. " +
+                         "This helps verify that the chunker module is functioning correctly.")
+                .build();
+            
+            ServiceMetadata testMetadata = ServiceMetadata.newBuilder()
+                .setStreamId("test-stream")
+                .setPipeStepName("test-step")
+                .build();
+            
+            ProcessConfiguration testConfig = ProcessConfiguration.newBuilder()
+                .setCustomJsonConfig(Struct.newBuilder()
+                    .putFields("source_field", com.google.protobuf.Value.newBuilder()
+                        .setStringValue("body").build())
+                    .putFields("chunk_size", com.google.protobuf.Value.newBuilder()
+                        .setNumberValue(50).build())
+                    .putFields("overlap_size", com.google.protobuf.Value.newBuilder()
+                        .setNumberValue(10).build())
+                    .build())
+                .build();
+            
+            request = ProcessRequest.newBuilder()
+                .setDocument(testDoc)
+                .setMetadata(testMetadata)
+                .setConfig(testConfig)
+                .build();
+        }
+        
+        // Process using regular logic but without side effects
+        return processDataInternal(request, true);
+    }
+    
+    private Uni<ProcessResponse> processDataInternal(ProcessRequest request, boolean isTest) {
+        return Uni.createFrom().item(() -> {
+            try {
+                // Same processing logic as processData
                 PipeDoc inputDoc = request.getDocument();
                 ProcessConfiguration config = request.getConfig();
                 ServiceMetadata metadata = request.getMetadata();
                 String streamId = metadata.getStreamId();
                 String pipeStepName = metadata.getPipeStepName();
 
-                LOG.infof("Processing document ID: %s for step: %s in stream: %s", 
-                    inputDoc != null && inputDoc.getId() != null ? inputDoc.getId() : "unknown", pipeStepName, streamId);
+                String logPrefix = isTest ? "[TEST] " : "";
+                LOG.infof("%sProcessing document ID: %s for step: %s in stream: %s", 
+                    logPrefix, 
+                    inputDoc != null && inputDoc.getId() != null ? inputDoc.getId() : "unknown", 
+                    pipeStepName, streamId);
 
                 ProcessResponse.Builder responseBuilder = ProcessResponse.newBuilder();
                 PipeDoc.Builder outputDocBuilder = inputDoc != null ? inputDoc.toBuilder() : PipeDoc.newBuilder();
 
-                // If there's no document, return success but with a log message
-                if (!request.hasDocument()) {
+                // If there's no document in non-test mode, return success but with a log message
+                if (!isTest && !request.hasDocument()) {
                     LOG.info("No document provided in request");
                     return ProcessResponse.newBuilder()
                             .setSuccess(true)
@@ -70,7 +145,7 @@ public class ChunkerServiceImpl implements PipeStepProcessor {
                             .build();
                 }
 
-                // Parse chunker options from the request configuration
+                // Parse chunker options
                 ChunkerOptions chunkerOptions;
                 Struct customJsonConfig = config.getCustomJsonConfig();
                 if (customJsonConfig != null && customJsonConfig.getFieldsCount() > 0) {
@@ -79,8 +154,6 @@ public class ChunkerServiceImpl implements PipeStepProcessor {
                             ChunkerOptions.class
                     );
                 } else {
-                    LOG.warnf("No custom JSON config provided for ChunkerService. Using defaults. streamId: %s, pipeStepName: %s", 
-                        streamId, pipeStepName);
                     chunkerOptions = new ChunkerOptions();
                 }
 
@@ -88,12 +161,12 @@ public class ChunkerServiceImpl implements PipeStepProcessor {
                     return createErrorResponse("Missing 'source_field' in ChunkerOptions", null);
                 }
 
-                // Create chunks using the OverlapChunker
+                // Create chunks
                 ChunkingResult chunkingResult = overlapChunker.createChunks(inputDoc, chunkerOptions, streamId, pipeStepName);
                 List<Chunk> chunkRecords = chunkingResult.chunks();
-                Map<String, String> placeholderToUrlMap = chunkingResult.placeholderToUrlMap();
 
                 if (!chunkRecords.isEmpty()) {
+                    Map<String, String> placeholderToUrlMap = chunkingResult.placeholderToUrlMap();
                     SemanticProcessingResult.Builder newSemanticResultBuilder = SemanticProcessingResult.newBuilder()
                             .setResultId(UUID.randomUUID().toString())
                             .setSourceFieldName(chunkerOptions.sourceField())
@@ -123,7 +196,7 @@ public class ChunkerServiceImpl implements PipeStepProcessor {
                                 placeholderToUrlMap.keySet().stream().anyMatch(ph -> chunkRecord.text().contains(ph));
 
                         Map<String, com.google.protobuf.Value> extractedMetadata = metadataExtractor.extractAllMetadata(
-                                sanitizedText,  // Use sanitized text for metadata extraction too
+                                sanitizedText,
                                 currentChunkNumber,
                                 chunkRecords.size(),
                                 containsUrlPlaceholder
@@ -139,55 +212,34 @@ public class ChunkerServiceImpl implements PipeStepProcessor {
                         currentChunkNumber++;
                     }
                     outputDocBuilder.addSemanticResults(newSemanticResultBuilder.build());
-                    responseBuilder.addProcessorLogs(String.format("%sSuccessfully created and added metadata to %d chunks from source field '%s' into result set '%s'. Chunker service successfully processed document.",
-                            chunkerOptions.logPrefix(), chunkRecords.size(), chunkerOptions.sourceField(), resultSetName));
-
+                    
+                    String successMessage = isTest ? 
+                        String.format("%s%sSuccessfully created and added metadata to %d chunks for testing. Chunker service validated successfully.",
+                            logPrefix, chunkerOptions.logPrefix(), chunkRecords.size()) :
+                        String.format("%s%sSuccessfully created and added metadata to %d chunks from source field '%s' into result set '%s'. Chunker service successfully processed document.",
+                            logPrefix, chunkerOptions.logPrefix(), chunkRecords.size(), chunkerOptions.sourceField(), resultSetName);
+                    
+                    responseBuilder.addProcessorLogs(successMessage);
                 } else {
-                    responseBuilder.addProcessorLogs(String.format("%sNo content in '%s' to chunk for document ID: %s",
-                            chunkerOptions.logPrefix(), chunkerOptions.sourceField(), inputDoc.getId()));
+                    responseBuilder.addProcessorLogs(String.format("%s%sNo content in '%s' to chunk for document ID: %s",
+                            logPrefix, chunkerOptions.logPrefix(), chunkerOptions.sourceField(), inputDoc.getId()));
                 }
 
                 responseBuilder.setSuccess(true);
                 PipeDoc outputDoc = outputDocBuilder.build();
                 responseBuilder.setOutputDoc(outputDoc);
 
-                // Add the document to the buffer - no need to check if enabled
-                // If buffer is disabled, the NoOpProcessingBuffer will do nothing
-                outputBuffer.add(outputDoc);
+                // IMPORTANT: Don't add to buffer if this is a test
+                if (!isTest) {
+                    outputBuffer.add(outputDoc);
+                }
 
-                ProcessResponse response = responseBuilder.build();
-                LOG.debugf("Chunker service returning success: %s with %d chunks", 
-                    response.getSuccess(), 
-                    response.hasOutputDoc() && response.getOutputDoc().getSemanticResultsCount() > 0 ? 
-                        response.getOutputDoc().getSemanticResults(0).getChunksCount() : 0);
-
-                return response;
+                return responseBuilder.build();
 
             } catch (Exception e) {
-                String errorMessage = String.format("Error in ChunkerService: %s", e.getMessage());
+                String errorMessage = String.format("Error in ChunkerService test: %s", e.getMessage());
                 LOG.error(errorMessage, e);
                 return createErrorResponse(errorMessage, e);
-            }
-        });
-    }
-
-    @Override
-    public Uni<ServiceRegistrationData> getServiceRegistration(Empty request) {
-        return Uni.createFrom().item(() -> {
-            try {
-                ServiceRegistrationData registration = ServiceRegistrationData.newBuilder()
-                        .setModuleName("chunker-module")
-                        .setJsonConfigSchema(ChunkerOptions.getJsonV7Schema())
-                        .build();
-
-                LOG.info("Returned service registration for chunker module");
-                return registration;
-
-            } catch (Exception e) {
-                LOG.error("Error getting service registration", e);
-                return ServiceRegistrationData.newBuilder()
-                    .setModuleName("chunker-module")
-                    .build();
             }
         });
     }

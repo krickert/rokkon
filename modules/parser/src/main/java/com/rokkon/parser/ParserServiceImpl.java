@@ -151,6 +151,12 @@ public class ParserServiceImpl implements PipeStepProcessor {
             }
         });
     }
+    
+    @Override
+    public Uni<ProcessResponse> testProcessData(ProcessRequest request) {
+        LOG.debug("TestProcessData called - proxying to processData");
+        return processData(request);
+    }
 
     /**
      * Loads the parser configuration schema from resources.

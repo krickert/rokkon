@@ -267,30 +267,17 @@ public class ModuleRegistrationServiceImpl implements ModuleRegistration {
     
     /**
      * Authenticate a module before registration.
-     * Validates: 1) Module is in whitelist, 2) Schema consistency if already registered
+     * Only validates schema consistency if already registered
      */
     private Uni<AuthenticationResult> authenticateModule(ModuleInfo request) {
         LOG.debugf("🔐 Authenticating module: %s", request.getServiceName());
         
-        // First check whitelist (registeredModules acts as our whitelist)
-        // TODO: This should probably come from configuration, not runtime state
-        boolean isWhitelisted = registeredModules.containsKey(request.getServiceId()) ||
-                               isModuleTypeAllowed(request.getServiceName());
-        
-        if (!isWhitelisted) {
-            LOG.warnf("❌ Module %s is not in the whitelist", request.getServiceName());
-            return Uni.createFrom().item(AuthenticationResult.failure(
-                String.format("Module %s is not allowed. Please contact administrators to whitelist this module type.",
-                             request.getServiceName())
-            ));
-        }
-        
-        // Module is whitelisted, now check if it's already registered in Consul
+        // Check if module is already registered in Consul
         return consulRegistry.getExistingModule(request.getServiceName())
             .map(existingModuleOpt -> {
                 if (existingModuleOpt.isEmpty()) {
                     // First time registration - no schema to compare
-                    LOG.debugf("✅ Module %s is whitelisted and new, authentication passed", request.getServiceName());
+                    LOG.debugf("✅ Module %s is new, authentication passed", request.getServiceName());
                     return AuthenticationResult.success();
                 }
                 

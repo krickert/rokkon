@@ -1,7 +1,12 @@
 package com.rokkon.pipeline.consul.service;
 
-import com.rokkon.pipeline.config.model.ModuleVisibility;
 import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.networknt.schema.JsonSchema;
+import com.networknt.schema.JsonSchemaFactory;
+import com.networknt.schema.SpecVersion;
+import com.networknt.schema.ValidationMessage;
 import io.smallrye.mutiny.Uni;
 import io.vertx.ext.consul.ConsulClient;
 import io.vertx.ext.consul.Service;
@@ -32,9 +37,15 @@ public class GlobalModuleRegistryService {
     
     private static final Logger LOG = Logger.getLogger(GlobalModuleRegistryService.class);
     private static final String MODULE_KV_PREFIX = "rokkon/modules/registered/";
+    private static final String ARCHIVE_PREFIX = "rokkon/archive";
     
     @Inject
     ConsulConnectionManager connectionManager;
+    
+    @Inject
+    ObjectMapper objectMapper;
+    
+    private final JsonSchemaFactory schemaFactory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7);
     
     /**
      * Module registration data stored globally
@@ -51,7 +62,7 @@ public class GlobalModuleRegistryService {
         long registeredAt,
         String engineHost,
         int enginePort,
-        ModuleVisibility visibility
+        String jsonSchema  // Optional JSON schema for validation
     ) implements Comparable<ModuleRegistration> {
         
         @Override
@@ -91,7 +102,7 @@ public class GlobalModuleRegistryService {
             Map<String, String> metadata,
             String engineHost,
             int enginePort,
-            ModuleVisibility visibility) {
+            String jsonSchema) {
         
         ConsulClient client = getConsulClient();
         String moduleId = generateModuleId(moduleName);
@@ -99,12 +110,21 @@ public class GlobalModuleRegistryService {
         LOG.infof("Registering module globally: %s (%s) at %s:%d (engine connection: %s:%d)", 
                   moduleName, implementationId, host, port, engineHost, enginePort);
         
+        // Validate JSON Schema v7 if provided
+        if (jsonSchema != null && !jsonSchema.trim().isEmpty()) {
+            if (!isValidJsonSchemaV7(jsonSchema)) {
+                throw new IllegalArgumentException(
+                    String.format("Invalid JSON Schema v7 provided for module '%s'", moduleName)
+                );
+            }
+        }
+        
         // First check if this module is already registered
         return listRegisteredModules()
             .onItem().transformToUni(existingModules -> {
                 // Create a test registration to check against the set
                 ModuleRegistration testRegistration = new ModuleRegistration(
-                    "", moduleName, "", "", 0, "", "", Map.of(), 0, "", 0, ModuleVisibility.DEFAULT
+                    "", moduleName, "", "", 0, "", "", Map.of(), 0, "", 0, null
                 );
                 
                 // Since equals() is based on moduleName, this will check if any module with this name exists
@@ -117,6 +137,17 @@ public class GlobalModuleRegistryService {
                     
                     LOG.warnf("Module %s is already registered. Existing registration: %s", 
                              moduleName, existing);
+                    
+                    // Check if schema has changed - use proper JSON comparison, not string comparison
+                    if (existing != null && jsonSchema != null && existing.jsonSchema() != null) {
+                        if (!areJsonSchemasEquivalent(existing.jsonSchema(), jsonSchema)) {
+                            LOG.errorf("Module %s schema mismatch detected", moduleName);
+                            throw new IllegalArgumentException(
+                                String.format("Schema mismatch for module '%s'. The provided schema does not match the registered schema.", 
+                                            moduleName)
+                            );
+                        }
+                    }
                     
                     return Uni.createFrom().failure(new WebApplicationException(
                         String.format("Module '%s' is already registered. Please deregister it first before re-registering.", moduleName),
@@ -148,7 +179,7 @@ public class GlobalModuleRegistryService {
                     System.currentTimeMillis(),
                     engineHost,
                     enginePort,
-                    visibility != null ? visibility : ModuleVisibility.DEFAULT
+                    jsonSchema
                 );
                 
                 // Create service options for Consul
@@ -158,7 +189,12 @@ public class GlobalModuleRegistryService {
                 serviceMeta.put("serviceType", serviceType);
                 serviceMeta.put("version", version);
                 serviceMeta.put("registeredAt", String.valueOf(registration.registeredAt()));
-                serviceMeta.put("visibility", registration.visibility().name());
+                // serviceMeta.put("visibility", "PUBLIC"); // Removed - all modules are public now
+                
+                // Store JSON schema if provided
+                if (jsonSchema != null && !jsonSchema.trim().isEmpty()) {
+                    serviceMeta.put("jsonSchema", jsonSchema);
+                }
                 
                 // Store engine connection info if different from Consul registration
                 if (!engineHost.equals(host) || enginePort != port) {
@@ -353,17 +389,8 @@ public class GlobalModuleRegistryService {
         String engineHost = meta.getOrDefault("engineHost", service.getAddress());
         int enginePort = Integer.parseInt(meta.getOrDefault("enginePort", String.valueOf(service.getPort())));
         
-        // Parse visibility, defaulting to PUBLIC if not present
-        ModuleVisibility visibility = ModuleVisibility.DEFAULT;
-        String visibilityStr = meta.get("visibility");
-        if (visibilityStr != null) {
-            try {
-                visibility = ModuleVisibility.valueOf(visibilityStr);
-            } catch (IllegalArgumentException e) {
-                LOG.warnf("Invalid visibility value '%s' for module %s, using default", 
-                         visibilityStr, service.getName());
-            }
-        }
+        // Get schema if stored in metadata
+        String jsonSchema = meta.get("jsonSchema");
         
         return Uni.createFrom().item(new ModuleRegistration(
             service.getId(),
@@ -377,7 +404,7 @@ public class GlobalModuleRegistryService {
             Long.parseLong(meta.getOrDefault("registeredAt", "0")),
             engineHost,
             enginePort,
-            visibility
+            jsonSchema
         ));
     }
     
@@ -396,7 +423,7 @@ public class GlobalModuleRegistryService {
                 "serviceType": "%s",
                 "version": "%s",
                 "registeredAt": %d,
-                "visibility": "%s"
+                "jsonSchema": %s
             }
             """,
             registration.moduleId(),
@@ -407,7 +434,7 @@ public class GlobalModuleRegistryService {
             registration.serviceType(),
             registration.version(),
             registration.registeredAt(),
-            registration.visibility().name()
+            registration.jsonSchema() != null ? "\"" + registration.jsonSchema().replace("\"", "\\\"") + "\"" : "null"
         );
         
         return Uni.createFrom().completionStage(
@@ -570,5 +597,40 @@ public class GlobalModuleRegistryService {
         });
     }
     
-    private static final String ARCHIVE_PREFIX = "rokkon/archive";
+    /**
+     * Compare two JSON schemas for semantic equivalence.
+     * This handles differences in formatting, property ordering, etc.
+     */
+    private boolean areJsonSchemasEquivalent(String schema1, String schema2) {
+        try {
+            // Parse both schemas as JSON
+            JsonNode schemaNode1 = objectMapper.readTree(schema1);
+            JsonNode schemaNode2 = objectMapper.readTree(schema2);
+            
+            // Use Jackson's equals which does deep comparison ignoring order
+            return schemaNode1.equals(schemaNode2);
+        } catch (Exception e) {
+            LOG.errorf("Failed to compare schemas: %s", e.getMessage());
+            return false;
+        }
+    }
+    
+    /**
+     * Validate that a schema is a valid JSON Schema v7
+     */
+    private boolean isValidJsonSchemaV7(String schemaContent) {
+        if (schemaContent == null || schemaContent.trim().isEmpty()) {
+            return false;
+        }
+        
+        try {
+            JsonNode schemaNode = objectMapper.readTree(schemaContent);
+            // Attempt to create a JsonSchema - this validates it's proper JSON Schema v7
+            JsonSchema schema = schemaFactory.getSchema(schemaNode);
+            return true;
+        } catch (Exception e) {
+            LOG.errorf("Invalid JSON Schema v7: %s", e.getMessage());
+            return false;
+        }
+    }
 }

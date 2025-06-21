@@ -17,24 +17,13 @@ Migrate Rokkon Engine from Micronaut to Quarkus with a focus on reliability, eas
 ```
 src/main/java/com/rokkon/engine/
 ├── core/              # Core functionality - brings everything together
-│   ├── orchestrator/  # Main pipeline orchestration logic
+│   ├── engine/      # Main pipeline orchestration logic
 │   ├── registry/      # Module registration and lifecycle
 │   └── coordinator/   # Message routing coordination
 ├── commons/           # Shared events and common utilities
 │   ├── events/        # Common event types
 │   ├── models/        # Shared data models
 │   └── utils/         # Common utilities
-├── grpc/              # gRPC transport layer
-│   ├── server/        # gRPC server implementations
-│   ├── client/        # gRPC client connections
-│   └── interceptors/  # gRPC interceptors and middleware
-├── kafka/             # Kafka transport with dynamic listeners
-│   ├── producers/     # Kafka message producers
-│   ├── consumers/     # Dynamic Kafka consumers
-│   └── routing/       # Message routing logic
-└── slotmanager/       # Kafka slot management (TBD - may not be needed)
-    ├── claims/        # Consul-based partition claims
-    └── coordination/  # Slot coordination logic
 ```
 
 ## Key Requirements
