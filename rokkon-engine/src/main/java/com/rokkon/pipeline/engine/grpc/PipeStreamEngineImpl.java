@@ -1,5 +1,6 @@
 package com.rokkon.pipeline.engine.grpc;
 
+import com.rokkon.pipeline.engine.service.PipelineExecutorService;
 import com.rokkon.search.engine.PipeStreamEngine;
 import com.rokkon.search.engine.ProcessResponse;
 import com.rokkon.search.engine.ProcessStatus;
@@ -7,6 +8,7 @@ import com.rokkon.search.model.PipeStream;
 import io.quarkus.grpc.GrpcService;
 import io.smallrye.mutiny.Multi;
 import io.smallrye.mutiny.Uni;
+import jakarta.inject.Inject;
 import jakarta.inject.Singleton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -22,6 +24,9 @@ import java.util.UUID;
 public class PipeStreamEngineImpl implements PipeStreamEngine {
 
     private static final Logger LOG = LoggerFactory.getLogger(PipeStreamEngineImpl.class);
+    
+    @Inject
+    PipelineExecutorService pipelineExecutor;
 
     @Override
     public Uni<PipeStream> testPipeStream(PipeStream request) {
@@ -39,14 +44,30 @@ public class PipeStreamEngineImpl implements PipeStreamEngine {
         LOG.info("Processing pipe async: streamId={}, pipeline={}", 
                 request.getStreamId(), request.getCurrentPipelineName());
 
-        // For now, just return a success response
-        return Uni.createFrom().item(ProcessResponse.newBuilder()
-                .setStreamId(request.getStreamId())
-                .setStatus(ProcessStatus.ACCEPTED)
-                .setMessage("Pipeline processing started")
-                .setRequestId(UUID.randomUUID().toString())
-                .setTimestamp(System.currentTimeMillis())
-                .build());
+        // Extract pipeline name and document
+        String pipelineName = request.getCurrentPipelineName();
+        if (pipelineName == null || pipelineName.isBlank()) {
+            return Uni.createFrom().failure(
+                new IllegalArgumentException("Pipeline name is required in PipeStream")
+            );
+        }
+        
+        if (!request.hasDocument()) {
+            return Uni.createFrom().failure(
+                new IllegalArgumentException("Document is required in PipeStream")
+            );
+        }
+        
+        // Execute the pipeline
+        return pipelineExecutor.executePipeline(
+            pipelineName, 
+            request.getDocument(),
+            request.getActionType()
+        )
+        .onFailure().transform(error -> {
+            LOG.error("Pipeline execution failed for stream {}", request.getStreamId(), error);
+            return new RuntimeException("Pipeline execution failed: " + error.getMessage(), error);
+        });
     }
 
     @Override

@@ -189,34 +189,77 @@
                         <div id="createPipelineForm" style="display: none;" class="mt-3">
                             <hr>
                             <h6>Create New Pipeline Definition</h6>
-                            <form id="pipelineDefinitionForm">
-                                <div class="mb-3">
-                                    <label for="pipelineId" class="form-label">Pipeline ID</label>
-                                    <input type="text" class="form-control" id="pipelineId" placeholder="my-pipeline" required>
-                                    <small class="text-muted">Unique identifier for this pipeline</small>
+                            
+                            <!-- Tab navigation -->
+                            <ul class="nav nav-tabs mb-3" id="pipelineCreationTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="form-tab" data-bs-toggle="tab" data-bs-target="#form-content" type="button">
+                                        Form Builder
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#json-content" type="button">
+                                        JSON Editor
+                                    </button>
+                                </li>
+                            </ul>
+                            
+                            <!-- Tab content -->
+                            <div class="tab-content" id="pipelineCreationTabContent">
+                                <!-- Form tab -->
+                                <div class="tab-pane fade show active" id="form-content" role="tabpanel">
+                                    <form id="pipelineDefinitionForm">
+                                        <div class="mb-3">
+                                            <label for="pipelineId" class="form-label">Pipeline ID</label>
+                                            <input type="text" class="form-control" id="pipelineId" placeholder="my-pipeline" required>
+                                            <small class="text-muted">Unique identifier for this pipeline</small>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="pipelineName" class="form-label">Pipeline Name</label>
+                                            <input type="text" class="form-control" id="pipelineName" placeholder="My Pipeline" required>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="pipelineDescription" class="form-label">Description</label>
+                                            <textarea class="form-control" id="pipelineDescription" rows="2" 
+                                                    placeholder="Describe what this pipeline does..."></textarea>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Pipeline Steps</label>
+                                            <div id="pipelineSteps">
+                                                <p class="text-muted">Add steps after creating the pipeline</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <button type="submit" class="btn btn-success">Create Pipeline</button>
+                                        <button type="button" class="btn btn-secondary" onclick="hideCreatePipelineForm()">Cancel</button>
+                                    </form>
                                 </div>
                                 
-                                <div class="mb-3">
-                                    <label for="pipelineName" class="form-label">Pipeline Name</label>
-                                    <input type="text" class="form-control" id="pipelineName" placeholder="My Pipeline" required>
+                                <!-- JSON tab -->
+                                <div class="tab-pane fade" id="json-content" role="tabpanel">
+                                    <form id="pipelineJsonForm">
+                                        <div class="mb-3">
+                                            <label for="pipelineIdJson" class="form-label">Pipeline ID</label>
+                                            <input type="text" class="form-control" id="pipelineIdJson" placeholder="my-pipeline" required>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="pipelineConfigJson" class="form-label">Pipeline Configuration (JSON)</label>
+                                            <textarea class="form-control font-monospace" id="pipelineConfigJson" rows="15" 
+                                                    placeholder='{"pipelineName": "My Pipeline", "pipelineSteps": {...}}' required></textarea>
+                                            <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="loadSamplePipeline()">
+                                                Load Sample Pipeline
+                                            </button>
+                                        </div>
+                                        
+                                        <button type="submit" class="btn btn-success">Create from JSON</button>
+                                        <button type="button" class="btn btn-secondary" onclick="hideCreatePipelineForm()">Cancel</button>
+                                    </form>
                                 </div>
-                                
-                                <div class="mb-3">
-                                    <label for="pipelineDescription" class="form-label">Description</label>
-                                    <textarea class="form-control" id="pipelineDescription" rows="2" 
-                                            placeholder="Describe what this pipeline does..."></textarea>
-                                </div>
-                                
-                                <div class="mb-3">
-                                    <label class="form-label">Pipeline Steps</label>
-                                    <div id="pipelineSteps">
-                                        <p class="text-muted">Add steps after creating the pipeline</p>
-                                    </div>
-                                </div>
-                                
-                                <button type="submit" class="btn btn-success">Create Pipeline</button>
-                                <button type="button" class="btn btn-secondary" onclick="hideCreatePipelineForm()">Cancel</button>
-                            </form>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -382,30 +425,22 @@
                     pipelineSteps: {} // Empty initially - steps can be added later
                 };
                 
-                fetch(`/api/v1/pipelines/definitions/${pipelineId}`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify(pipelineConfig)
-                })
-                .then(response => response.json())
-                .then(result => {
-                    if (result.success) {
-                        alert(`Pipeline "${pipelineName}" created successfully!`);
-                        hideCreatePipelineForm();
-                        loadPipelines();
-                    } else {
-                        const errors = result.errors && result.errors.length > 0 ? 
-                            result.errors.join(', ') : 
-                            result.message || 'Unknown error';
-                        alert('Failed to create pipeline: ' + errors);
-                    }
-                })
-                .catch(error => {
-                    console.error('Error creating pipeline:', error);
-                    alert('Failed to create pipeline: ' + error.message);
-                });
+                createPipelineFromConfig(pipelineId, pipelineConfig);
+            });
+            
+            // Set up JSON form submission
+            document.getElementById('pipelineJsonForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const pipelineId = document.getElementById('pipelineIdJson').value.trim();
+                const jsonText = document.getElementById('pipelineConfigJson').value.trim();
+                
+                try {
+                    const pipelineConfig = JSON.parse(jsonText);
+                    createPipelineFromConfig(pipelineId, pipelineConfig);
+                } catch (error) {
+                    alert('Invalid JSON: ' + error.message);
+                }
             });
         });
 
@@ -1125,7 +1160,15 @@
             loadPublicModulesForPipelines();
             
             fetch('/api/v1/pipelines/definitions')
-                .then(response => response.json())
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            throw new Error('404 - No pipelines found');
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
                 .then(pipelines => {
                     const pipelinesList = document.getElementById('pipelinesList');
                     
@@ -1187,8 +1230,15 @@
                 })
                 .catch(error => {
                     console.error('Error loading pipelines:', error);
-                    document.getElementById('pipelinesList').innerHTML = 
-                        '<p class="text-danger">Failed to load pipelines. Check your connection.</p>';
+                    
+                    // Check if it's a 404 (no pipelines) vs actual connection error
+                    if (error.message && error.message.includes('404')) {
+                        document.getElementById('pipelinesList').innerHTML = 
+                            '<p class="text-muted">No pipeline definitions found. Create one to get started.</p>';
+                    } else {
+                        document.getElementById('pipelinesList').innerHTML = 
+                            '<p class="text-danger">Failed to load pipelines. Error: ' + (error.message || 'Unknown error') + '</p>';
+                    }
                 });
         }
         
@@ -1306,6 +1356,85 @@
                 .catch(error => {
                     console.error('Error loading public modules:', error);
                 });
+        }
+        
+        function createPipelineFromConfig(pipelineId, pipelineConfig) {
+            fetch(`/api/v1/pipelines/definitions/${pipelineId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(pipelineConfig)
+            })
+            .then(response => {
+                return response.json().then(data => ({
+                    status: response.status,
+                    body: data
+                }));
+            })
+            .then(result => {
+                if (result.body.success) {
+                    alert(`Pipeline "${pipelineConfig.pipelineName}" created successfully!`);
+                    hideCreatePipelineForm();
+                    loadPipelines();
+                } else {
+                    const errors = result.body.errors && result.body.errors.length > 0 ? 
+                        result.body.errors.join('\n') : 
+                        result.body.message || 'Unknown error';
+                    alert('Failed to create pipeline:\n' + errors);
+                }
+            })
+            .catch(error => {
+                console.error('Error creating pipeline:', error);
+                alert('Failed to create pipeline: ' + error.message);
+            });
+        }
+        
+        function loadSamplePipeline() {
+            const samplePipeline = {
+                "pipelineName": "Simple Echo Pipeline",
+                "pipelineDescription": "A simple pipeline that echoes through multiple steps",
+                "pipelineSteps": {
+                    "start": {
+                        "stepName": "start",
+                        "stepType": "INITIAL_PIPELINE",
+                        "description": "Entry point of the pipeline",
+                        "outputs": {
+                            "to-echo": {
+                                "targetStepName": "echo-step",
+                                "transportType": "GRPC"
+                            }
+                        }
+                    },
+                    "echo-step": {
+                        "stepName": "echo-step",
+                        "stepType": "PIPELINE",
+                        "description": "Echo the document",
+                        "processorInfo": {
+                            "grpcServiceName": "echo",
+                            "moduleType": "ECHO"
+                        },
+                        "outputs": {
+                            "to-parser": {
+                                "targetStepName": "parser-step",
+                                "transportType": "GRPC"
+                            }
+                        }
+                    },
+                    "parser-step": {
+                        "stepName": "parser-step",
+                        "stepType": "PIPELINE",
+                        "description": "Parse the document",
+                        "processorInfo": {
+                            "grpcServiceName": "parser",
+                            "moduleType": "PARSER"
+                        }
+                    }
+                }
+            };
+            
+            document.getElementById('pipelineIdJson').value = 'echo-pipeline';
+            document.getElementById('pipelineConfigJson').value = JSON.stringify(samplePipeline, null, 2);
         }
     </script>
 </body>

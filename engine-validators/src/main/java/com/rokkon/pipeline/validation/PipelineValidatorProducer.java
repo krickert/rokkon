@@ -45,23 +45,25 @@ public class PipelineValidatorProducer {
         validatorList.add(intraPipelineLoopValidator);
         validatorList.add(stepTypeValidator);
         
-        return new CompositePipelineConfigValidator("Pipeline Configuration Validator", validatorList);
-    }
-    
-    /**
-     * Composite validator that implements PipelineConfigValidator interface.
-     */
-    @ApplicationScoped
-    public static class CompositePipelineConfigValidator extends CompositeValidator<PipelineConfig> 
-            implements PipelineConfigValidator {
+        // Create a composite validator that also implements PipelineConfigValidator
+        CompositeValidator<PipelineConfig> composite = new CompositeValidator<>("Pipeline Configuration Validator", validatorList);
         
-        public CompositePipelineConfigValidator(String name, List<Validator<PipelineConfig>> validators) {
-            super(name, validators);
-        }
-        
-        @Override
-        public int getPriority() {
-            return 0; // Composite validator runs all validators in their own priority order
-        }
+        // Return a wrapper that implements PipelineConfigValidator
+        return new PipelineConfigValidator() {
+            @Override
+            public ValidationResult validate(PipelineConfig config) {
+                return composite.validate(config);
+            }
+            
+            @Override
+            public String getValidatorName() {
+                return composite.getValidatorName();
+            }
+            
+            @Override
+            public int getPriority() {
+                return 0;
+            }
+        };
     }
 }

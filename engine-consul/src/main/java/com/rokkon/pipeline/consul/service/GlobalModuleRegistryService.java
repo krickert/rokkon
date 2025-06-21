@@ -104,7 +104,7 @@ public class GlobalModuleRegistryService {
             .onItem().transformToUni(existingModules -> {
                 // Create a test registration to check against the set
                 ModuleRegistration testRegistration = new ModuleRegistration(
-                    "", moduleName, "", "", 0, "", "", Map.of(), 0, "", 0
+                    "", moduleName, "", "", 0, "", "", Map.of(), 0, "", 0, ModuleVisibility.DEFAULT
                 );
                 
                 // Since equals() is based on moduleName, this will check if any module with this name exists
@@ -227,7 +227,7 @@ public class GlobalModuleRegistryService {
             }
             
             return Uni.combine().all().unis(registrationUnis)
-                .combinedWith(list -> {
+                .with(list -> {
                     // Use LinkedHashSet to maintain order and prevent duplicates
                     Set<ModuleRegistration> registrations = new LinkedHashSet<>();
                     list.forEach(obj -> registrations.add((ModuleRegistration) obj));
