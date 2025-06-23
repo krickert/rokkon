@@ -1,0 +1,46 @@
+quarkus:
+  application:
+    name: test-module-test
+  # Disable config validation for unrecognized keys
+  config:
+    unknown-keys-fail-build: false
+  http:
+    port: 0  # Random port for tests
+    test-port: 0
+  grpc:
+    server:
+      port: 0  # Random port for tests
+      host: 0.0.0.0
+      enable-reflection-service: true
+      max-inbound-message-size: 1073741824  # 1GB
+      health:
+        enabled: true
+    clients:
+      testService:
+        max-inbound-message-size: 1073741824  # 1GB
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+
+# Module specific configuration
+test:
+  processor:
+    name: test-processor
+    delay:
+      ms: 0
+  module:
+    container:
+      name: "rokkon/test-module:1.0.0-SNAPSHOT"
+      grpc:
+        port: 9090
+      internal:
+        grpc:
+          port: 9090
+      http:
+        port: 8080
+
+# Disable Consul config for tests
+  consul-config:
+    enabled: false

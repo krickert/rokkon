@@ -1,0 +1,940 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rokkon Engine Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        .module-tree .cluster-name {
+            color: #495057;
+            margin-bottom: 10px;
+        }
+        .module-node {
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        .module-node:hover {
+            background-color: #e9ecef;
+        }
+        .module-node a {
+            color: #495057;
+        }
+        .module-node a:hover {
+            color: #007bff;
+        }
+        .service-row {
+            cursor: pointer;
+        }
+        .service-row:hover {
+            background-color: #f8f9fa;
+        }
+        .grpc-services {
+            display: none;
+            background-color: #f8f9fa;
+        }
+        .grpc-services.show {
+            display: table-row;
+        }
+    </style>
+</head>
+<body>
+    <div class="container mt-4">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <span class="text-primary">Rokkon</span> Engine Dashboard
+            </h1>
+            <div>
+                <span id="engineStatus" class="badge bg-secondary">Checking...</span>
+            </div>
+        </header>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Engine Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Engine API:</span>
+                            <span id="pingStatus">Checking...</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Consul Connection:</span>
+                            <span id="consulStatus">Checking...</span>
+                        </div>
+                        <button id="refreshStatus" class="btn btn-primary" onclick="checkAll()">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh Status
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Statistics Section -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Service Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <h3 id="totalModules" class="text-primary">0</h3>
+                                    <small class="text-muted">Total Modules</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <h3 id="healthyModules" class="text-success">0</h3>
+                                    <small class="text-muted">Healthy Modules</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <h3 id="baseServices" class="text-info">0</h3>
+                                    <small class="text-muted">Base Services</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <h3 id="zombieCount" class="text-warning">0</h3>
+                                    <small class="text-muted">Zombie Instances</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Pipe Explorer Section -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Pipe Explorer</h5>
+                        <div>
+                            <button class="btn btn-sm btn-success" onclick="createDefaultCluster()">Create Default Cluster</button>
+                            <button class="btn btn-sm btn-primary ms-2" onclick="showNewClusterForm()">New Cluster</button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <!-- Clusters Section -->
+                        <div class="mb-4">
+                            <h6>Available Clusters</h6>
+                            <div id="clustersList">
+                                <p class="text-muted">Loading clusters...</p>
+                            </div>
+                            
+                            <!-- New Cluster Form (hidden by default) -->
+                            <div id="newClusterForm" class="mt-3" style="display: none;">
+                                <hr>
+                                <h6>Create New Cluster</h6>
+                                <form id="createClusterForm" onsubmit="createNewCluster(event)">
+                                    <div class="mb-2">
+                                        <label for="newClusterName" class="form-label">Cluster Name</label>
+                                        <input type="text" class="form-control" id="newClusterName" placeholder="Enter cluster name" required>
+                                    </div>
+                                    <div class="mb-2">
+                                        <label for="defaultPipeline" class="form-label">Default Pipeline (Optional)</label>
+                                        <input type="text" class="form-control" id="defaultPipeline" placeholder="default">
+                                    </div>
+                                    <button type="submit" class="btn btn-success btn-sm">Create</button>
+                                    <button type="button" class="btn btn-secondary btn-sm" onclick="hideNewClusterForm()">Cancel</button>
+                                </form>
+                            </div>
+                        </div>
+                        
+                        <!-- Pipeline Explorer (future) -->
+                        <div id="pipeExplorer">
+                            <p class="text-muted">Pipeline details will appear here...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- All Consul Services Section -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">All Consul Services</h5>
+                        <div>
+                            <button class="btn btn-sm btn-warning" onclick="cleanupZombies()">
+                                <i class="bi bi-trash"></i> Cleanup Zombies
+                            </button>
+                            <button class="btn btn-sm btn-primary ms-2" onclick="showRegisterModuleModal()">
+                                <i class="bi bi-plus-circle"></i> Register Module
+                            </button>
+                        </div>
+                    </div>
+                    <div class="card-body">
+                        <div id="allServicesList">
+                            <p class="text-muted">Loading services...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Management Section -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Pipeline Definitions</h5>
+                        <button class="btn btn-sm btn-primary" onclick="showCreatePipelineForm()">
+                            <i class="bi bi-plus-circle"></i> Create Pipeline
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="pipelinesList">
+                            <p class="text-muted">Loading pipelines...</p>
+                        </div>
+                        
+                        <!-- New Pipeline Definition Form (hidden by default) -->
+                        <div id="newPipelineDefinitionForm" class="mt-3" style="display: none;">
+                            <hr>
+                            <h6>Create New Pipeline Definition</h6>
+                            <form id="createPipelineDefinitionForm" onsubmit="createNewPipelineDefinition(event)">
+                                <div class="mb-2">
+                                    <label for="pipelineDefinitionName" class="form-label">Pipeline Name</label>
+                                    <input type="text" class="form-control" id="pipelineDefinitionName" placeholder="Enter pipeline name" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="pipelineDefinitionDescription" class="form-label">Description</label>
+                                    <textarea class="form-control" id="pipelineDefinitionDescription" rows="2" placeholder="Optional description"></textarea>
+                                </div>
+                                <button type="submit" class="btn btn-success btn-sm">Create Definition</button>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="hideCreatePipelineForm()">Cancel</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Register Module Modal -->
+    <div class="modal fade" id="registerModuleModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Register New Module</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="registerModuleForm">
+                        <div class="mb-3">
+                            <label for="moduleName" class="form-label">Module Name</label>
+                            <input type="text" class="form-control" id="moduleName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="implementationId" class="form-label">Implementation ID</label>
+                            <input type="text" class="form-control" id="implementationId" required>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-8">
+                                <label for="moduleHost" class="form-label">Host</label>
+                                <input type="text" class="form-control" id="moduleHost" required>
+                            </div>
+                            <div class="col-md-4">
+                                <label for="modulePort" class="form-label">Port</label>
+                                <input type="number" class="form-control" id="modulePort" required>
+                            </div>
+                        </div>
+                        <div class="mb-3 mt-3">
+                            <label for="serviceType" class="form-label">Service Type</label>
+                            <select class="form-control" id="serviceType">
+                                <option value="GRPC">gRPC</option>
+                                <option value="HTTP">HTTP</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="registerModule()">Register</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // Global state
+        let dashboardData = null;
+        
+        // Initial load
+        document.addEventListener('DOMContentLoaded', function() {
+            checkAll();
+            loadPipelines();
+            loadClusters();
+        });
+        
+        // Check all statuses
+        function checkAll() {
+            checkPing();
+            checkConsulStatus();
+            loadDashboard();
+        }
+        
+        // Check if the API is responsive
+        function checkPing() {
+            fetch('/ping')
+                .then(response => {
+                    const statusEl = document.getElementById('pingStatus');
+                    const engineStatusEl = document.getElementById('engineStatus');
+                    
+                    if (response.ok) {
+                        statusEl.innerHTML = '<span class="text-success">Connected</span>';
+                        engineStatusEl.textContent = 'Online';
+                        engineStatusEl.className = 'badge bg-success';
+                    } else {
+                        statusEl.innerHTML = '<span class="text-danger">Disconnected</span>';
+                        engineStatusEl.textContent = 'Offline';
+                        engineStatusEl.className = 'badge bg-danger';
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('pingStatus').innerHTML = '<span class="text-danger">Error</span>';
+                    document.getElementById('engineStatus').textContent = 'Error';
+                    document.getElementById('engineStatus').className = 'badge bg-danger';
+                    console.error('Ping error:', error);
+                });
+        }
+        
+        // Check Consul status
+        function checkConsulStatus() {
+            fetch('/api/consul/status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusEl = document.getElementById('consulStatus');
+                    
+                    if (data.status === 'UP') {
+                        statusEl.innerHTML = '<span class="text-success">Connected</span>';
+                    } else {
+                        statusEl.innerHTML = '<span class="text-danger">Not Connected</span>';
+                    }
+                })
+                .catch(error => {
+                    console.error('Consul status error:', error);
+                    document.getElementById('consulStatus').innerHTML = '<span class="text-danger">Error</span>';
+                });
+        }
+        
+        // Load dashboard data
+        function loadDashboard() {
+            fetch('/api/v1/modules/dashboard')
+                .then(response => {
+                    if (!response.ok) throw new Error('Failed to fetch dashboard data');
+                    return response.json();
+                })
+                .then(data => {
+                    dashboardData = data;
+                    updateStatistics(data.statistics);
+                    renderServices(data);
+                })
+                .catch(error => {
+                    console.error('Error loading dashboard:', error);
+                    document.getElementById('allServicesList').innerHTML = 
+                        '<p class="text-danger">Failed to load services. Check Consul connection.</p>';
+                });
+        }
+        
+        // Update statistics display
+        function updateStatistics(stats) {
+            document.getElementById('totalModules').textContent = stats.total_modules || 0;
+            document.getElementById('healthyModules').textContent = stats.healthy_modules || 0;
+            document.getElementById('baseServices').textContent = stats.total_base_services || 0;
+            document.getElementById('zombieCount').textContent = stats.zombie_count || 0;
+        }
+        
+        // Render all services
+        function renderServices(data) {
+            const servicesList = document.getElementById('allServicesList');
+            let html = '';
+            
+            // Add zombie warning if present
+            if (data.statistics.zombie_count > 0) {
+                html += `
+                    <div class="alert alert-warning d-flex align-items-center mb-3" role="alert">
+                        <i class="bi bi-exclamation-triangle-fill me-2"></i>
+                        <div>
+                            <strong>Zombie Instances Detected</strong><br>
+                            <small>Found ${data.statistics.zombie_count} instance(s) in Consul that are not registered in Rokkon.</small>
+                        </div>
+                    </div>
+                `;
+            }
+            
+            html += `
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Service Name</th>
+                                <th>Status</th>
+                                <th>Instances</th>
+                                <th>Type</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+            `;
+            
+            // Render base services
+            if (data.base_services && data.base_services.length > 0) {
+                html += `
+                    <tr class="table-light">
+                        <td colspan="5" class="fw-bold bg-light">
+                            <i class="bi bi-server me-2"></i>Base Services
+                        </td>
+                    </tr>
+                `;
+                
+                data.base_services.forEach(service => {
+                    const healthyCount = service.instances.filter(i => i.healthy).length;
+                    const totalCount = service.instances.length;
+                    const hasGrpcServices = service.instances.some(i => i.grpc_services && i.grpc_services.length > 0);
+                    
+                    html += `
+                        <tr class="service-row ${hasGrpcServices ? 'has-grpc' : ''}" onclick="toggleGrpcServices('${service.name}')">
+                            <td>
+                                ${hasGrpcServices ? '<i class="bi bi-chevron-right me-2" id="chevron-${service.name}"></i>' : ''}
+                                <strong>${service.name}</strong>
+                                <span class="badge bg-secondary ms-2">${service.type}</span>
+                            </td>
+                            <td>
+                                <span class="badge ${healthyCount === totalCount ? 'bg-success' : healthyCount > 0 ? 'bg-warning' : 'bg-danger'}">
+                                    ${healthyCount}/${totalCount} Healthy
+                                </span>
+                            </td>
+                            <td>${totalCount}</td>
+                            <td>Infrastructure</td>
+                            <td>-</td>
+                        </tr>
+                    `;
+                    
+                    // Add gRPC services row if available
+                    if (hasGrpcServices) {
+                        const grpcServices = [...new Set(service.instances.flatMap(i => i.grpc_services || []))];
+                        html += `
+                            <tr class="grpc-services" id="grpc-${service.name}">
+                                <td colspan="5" class="ps-5">
+                                    <strong>gRPC Services:</strong>
+                                    ${grpcServices.map(s => `<span class="badge bg-info ms-2">${s}</span>`).join('')}
+                                </td>
+                            </tr>
+                        `;
+                    }
+                });
+            }
+            
+            // Render module services
+            if (data.module_services && data.module_services.length > 0) {
+                html += `
+                    <tr class="table-light">
+                        <td colspan="5" class="fw-bold bg-light">
+                            <i class="bi bi-puzzle me-2"></i>Module Services
+                        </td>
+                    </tr>
+                `;
+                
+                data.module_services.forEach(module => {
+                    const healthyCount = module.instances.filter(i => i.healthy && i.registered).length;
+                    const totalCount = module.instances.length;
+                    const registeredCount = module.instances.filter(i => i.registered).length;
+                    
+                    // Module group header
+                    html += `
+                        <tr class="table-primary">
+                            <td colspan="5">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>${module.service_name}</strong>
+                                        <span class="badge bg-info ms-2">Module Group</span>
+                                        <span class="badge ${healthyCount === registeredCount ? 'bg-success' : healthyCount > 0 ? 'bg-warning' : 'bg-danger'} ms-2">
+                                            ${healthyCount}/${registeredCount} Healthy
+                                        </span>
+                                        ${registeredCount < totalCount ? `<span class="badge bg-warning ms-2">${totalCount - registeredCount} Unregistered</span>` : ''}
+                                    </div>
+                                    <button class="btn btn-sm btn-outline-secondary" onclick="toggleModuleInstances('${module.module_name}')">
+                                        <i class="bi bi-chevron-down" id="chevron-${module.module_name}"></i> Show Instances
+                                    </button>
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                    
+                    // Module instances
+                    module.instances.forEach((instance, index) => {
+                        const statusBadge = instance.healthy ? 
+                            '<span class="badge bg-success">Healthy</span>' : 
+                            '<span class="badge bg-danger">Unhealthy</span>';
+                        
+                        let actionButtons = '';
+                        if (instance.registered) {
+                            if (instance.enabled) {
+                                actionButtons = `
+                                    <button class="btn btn-sm btn-warning" onclick="disableModule('${instance.module_id}')">
+                                        <i class="bi bi-pause-circle"></i> Disable
+                                    </button>
+                                    <button class="btn btn-sm btn-danger ms-1" onclick="deregisterModule('${instance.module_id}')">
+                                        <i class="bi bi-x-circle"></i> Deregister
+                                    </button>
+                                `;
+                            } else {
+                                actionButtons = `
+                                    <button class="btn btn-sm btn-success" onclick="enableModule('${instance.module_id}')">
+                                        <i class="bi bi-play-circle"></i> Enable
+                                    </button>
+                                    <button class="btn btn-sm btn-danger ms-1" onclick="deregisterModule('${instance.module_id}')">
+                                        <i class="bi bi-x-circle"></i> Deregister
+                                    </button>
+                                `;
+                            }
+                        } else {
+                            actionButtons = `
+                                <button class="btn btn-sm btn-outline-primary" 
+                                        onclick="registerModuleFromConsul('${module.module_name}', '${instance.address}', ${instance.port})">
+                                    <i class="bi bi-plus-circle"></i> Register
+                                </button>
+                            `;
+                        }
+                        
+                        const rowClass = instance.enabled === false ? 'table-secondary opacity-75' : '';
+                        const nameStyle = instance.enabled === false ? 'text-decoration: line-through;' : '';
+                        
+                        // Container info
+                        let containerInfo = '';
+                        if (instance.container_id || instance.container_name) {
+                            const containerId = instance.container_id ? instance.container_id.substring(0, 12) : '';
+                            const containerName = instance.container_name || '';
+                            containerInfo = `
+                                <br><small class="text-muted">
+                                    ${containerName ? `<i class="bi bi-box-seam"></i> ${containerName}` : ''}
+                                    ${containerId ? `(${containerId})` : ''}
+                                </small>
+                            `;
+                        }
+                        
+                        html += `
+                            <tr class="${rowClass} module-instance-${module.module_name}" style="display: none;">
+                                <td class="ps-4">
+                                    <i class="bi bi-arrow-return-right me-2"></i>
+                                    <span style="${nameStyle}">Instance ${index + 1}</span>
+                                    ${!instance.enabled ? '<span class="badge bg-secondary ms-2">Disabled</span>' : ''}
+                                    ${!instance.registered ? '<span class="badge bg-warning ms-2">Unregistered</span>' : ''}
+                                    ${containerInfo}
+                                </td>
+                                <td>${statusBadge}</td>
+                                <td>${instance.address}:${instance.port}</td>
+                                <td>Processor</td>
+                                <td>${actionButtons}</td>
+                            </tr>
+                        `;
+                    });
+                });
+            }
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            servicesList.innerHTML = html;
+        }
+        
+        // Toggle gRPC services display
+        function toggleGrpcServices(serviceName) {
+            const grpcRow = document.getElementById(`grpc-${serviceName}`);
+            const chevron = document.getElementById(`chevron-${serviceName}`);
+            
+            if (grpcRow) {
+                grpcRow.classList.toggle('show');
+                if (chevron) {
+                    chevron.classList.toggle('bi-chevron-right');
+                    chevron.classList.toggle('bi-chevron-down');
+                }
+            }
+        }
+        
+        // Toggle module instances display
+        function toggleModuleInstances(moduleName) {
+            const instances = document.querySelectorAll(`.module-instance-${moduleName}`);
+            const chevron = document.getElementById(`chevron-${moduleName}`);
+            
+            instances.forEach(row => {
+                row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+            });
+            
+            if (chevron) {
+                chevron.classList.toggle('bi-chevron-down');
+                chevron.classList.toggle('bi-chevron-right');
+            }
+        }
+        
+        // Module management functions
+        function showRegisterModuleModal() {
+            const modal = new bootstrap.Modal(document.getElementById('registerModuleModal'));
+            modal.show();
+        }
+        
+        function registerModule() {
+            const data = {
+                module_name: document.getElementById('moduleName').value,
+                implementation_id: document.getElementById('implementationId').value,
+                host: document.getElementById('moduleHost').value,
+                port: parseInt(document.getElementById('modulePort').value),
+                service_type: document.getElementById('serviceType').value,
+                version: "1.0.0"
+            };
+            
+            fetch('/api/v1/modules', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    bootstrap.Modal.getInstance(document.getElementById('registerModuleModal')).hide();
+                    loadDashboard();
+                } else {
+                    alert('Failed to register module: ' + result.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error registering module:', error);
+                alert('Failed to register module');
+            });
+        }
+        
+        function registerModuleFromConsul(moduleName, address, port) {
+            if (!confirm(`Register module "${moduleName}" at ${address}:${port}?`)) return;
+            
+            const data = {
+                module_name: moduleName,
+                implementation_id: moduleName,
+                host: address,
+                port: port,
+                service_type: 'GRPC',
+                version: "1.0.0"
+            };
+            
+            fetch('/api/v1/modules', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify(data)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    loadDashboard();
+                } else {
+                    alert('Failed to register module: ' + result.message);
+                }
+            });
+        }
+        
+        function enableModule(moduleId) {
+            fetch(`/api/v1/modules/${moduleId}/enable`, {method: 'PUT'})
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        loadDashboard();
+                    } else {
+                        alert('Failed to enable module: ' + result.message);
+                    }
+                });
+        }
+        
+        function disableModule(moduleId) {
+            fetch(`/api/v1/modules/${moduleId}/disable`, {method: 'PUT'})
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        loadDashboard();
+                    } else {
+                        alert('Failed to disable module: ' + result.message);
+                    }
+                });
+        }
+        
+        function deregisterModule(moduleId) {
+            if (!confirm('Are you sure you want to deregister this module?')) return;
+            
+            fetch(`/api/v1/modules/${moduleId}`, {method: 'DELETE'})
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        loadDashboard();
+                    } else {
+                        alert('Failed to deregister module: ' + result.message);
+                    }
+                });
+        }
+        
+        function cleanupZombies() {
+            if (!confirm('Clean up all zombie instances?')) return;
+            
+            fetch('/api/v1/modules/cleanup-zombies', {method: 'POST'})
+                .then(response => response.json())
+                .then(result => {
+                    alert(`Cleanup complete. Removed ${result.cleaned_count || 0} zombie instances.`);
+                    loadDashboard();
+                });
+        }
+        
+        // Pipeline management
+        function loadPipelines() {
+            fetch('/api/v1/pipelines/definitions')
+                .then(response => response.json())
+                .then(pipelines => {
+                    const pipelinesList = document.getElementById('pipelinesList');
+                    if (pipelines.length === 0) {
+                        pipelinesList.innerHTML = '<p class="text-muted">No pipelines defined yet.</p>';
+                        return;
+                    }
+                    
+                    let html = '<div class="list-group">';
+                    pipelines.forEach(pipeline => {
+                        html += `
+                            <div class="list-group-item">
+                                <div class="d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <h6 class="mb-1">${pipeline.name}</h6>
+                                        <p class="mb-1 text-muted">${pipeline.description || 'No description'}</p>
+                                        <small>Steps: ${pipeline.steps ? pipeline.steps.length : 0}</small>
+                                    </div>
+                                    <div>
+                                        <button class="btn btn-sm btn-outline-primary" onclick="editPipeline('${pipeline.name}')">
+                                            <i class="bi bi-pencil"></i> Edit
+                                        </button>
+                                        <button class="btn btn-sm btn-outline-danger ms-1" onclick="deletePipeline('${pipeline.name}')">
+                                            <i class="bi bi-trash"></i> Delete
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    html += '</div>';
+                    pipelinesList.innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error loading pipelines:', error);
+                    document.getElementById('pipelinesList').innerHTML = 
+                        '<p class="text-danger">Failed to load pipelines.</p>';
+                });
+        }
+        
+        function showCreatePipelineForm() {
+            document.getElementById('newPipelineDefinitionForm').style.display = 'block';
+            document.getElementById('pipelineDefinitionName').focus();
+        }
+        
+        function editPipeline(name) {
+            alert(`Edit pipeline "${name}" - Coming soon!`);
+        }
+        
+        function deletePipeline(name) {
+            if (!confirm(`Delete pipeline "${name}"?`)) return;
+            
+            fetch(`/api/v1/pipelines/definitions/${name}`, {method: 'DELETE'})
+                .then(response => {
+                    if (response.ok) {
+                        loadPipelines();
+                    } else {
+                        alert('Failed to delete pipeline');
+                    }
+                });
+        }
+        
+        // Cluster management functions
+        function loadClusters() {
+            fetch('/api/v1/clusters')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch clusters');
+                    }
+                    return response.json();
+                })
+                .then(clusters => {
+                    const clustersList = document.getElementById('clustersList');
+                    
+                    if (clusters.length === 0) {
+                        clustersList.innerHTML = '<p class="text-muted">No clusters available. Create one to get started.</p>';
+                    } else {
+                        let html = '<ul class="list-group">';
+                        clusters.forEach(cluster => {
+                            const createdAt = new Date(cluster.created_at).toLocaleString();
+                            html += `
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>${cluster.name}</strong>
+                                        <small class="text-muted d-block">Created: ${createdAt}</small>
+                                    </div>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteCluster('${cluster.name}')">Delete</button>
+                                </li>
+                            `;
+                        });
+                        html += '</ul>';
+                        clustersList.innerHTML = html;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading clusters:', error);
+                    document.getElementById('clustersList').innerHTML = 
+                        '<p class="text-danger">Failed to load clusters. Check Consul connection.</p>';
+                });
+        }
+        
+        function createDefaultCluster() {
+            fetch('/api/v1/clusters/default', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: '{}'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.valid) {
+                    alert('Default cluster created successfully!');
+                    loadClusters();
+                } else {
+                    alert('Failed to create cluster: ' + (result.errors ? result.errors.join(', ') : 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error creating cluster:', error);
+                alert('Failed to create cluster. Check Consul connection.');
+            });
+        }
+        
+        function createNewCluster(event) {
+            event.preventDefault();
+            
+            const clusterName = document.getElementById('newClusterName').value.trim();
+            const defaultPipeline = document.getElementById('defaultPipeline').value.trim() || null;
+            
+            const requestBody = {};
+            if (defaultPipeline) {
+                requestBody.metadata = {
+                    defaultPipeline: defaultPipeline
+                };
+            }
+            
+            fetch(`/api/v1/clusters/${clusterName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.valid) {
+                    alert(`Cluster "${clusterName}" created successfully!`);
+                    hideNewClusterForm();
+                    loadClusters();
+                } else {
+                    alert('Failed to create cluster: ' + (result.errors ? result.errors.join(', ') : 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error creating cluster:', error);
+                alert('Failed to create cluster. Check Consul connection.');
+            });
+        }
+        
+        function deleteCluster(clusterName) {
+            if (!confirm(`Are you sure you want to delete cluster "${clusterName}"?`)) {
+                return;
+            }
+            
+            fetch(`/api/v1/clusters/${clusterName}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.valid) {
+                    alert('Cluster deleted successfully!');
+                    loadClusters();
+                } else {
+                    alert('Failed to delete cluster: ' + (result.errors ? result.errors.join(', ') : 'Unknown error'));
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting cluster:', error);
+                alert('Failed to delete cluster');
+            });
+        }
+        
+        function showNewClusterForm() {
+            document.getElementById('newClusterForm').style.display = 'block';
+            document.getElementById('newClusterName').focus();
+        }
+        
+        function hideNewClusterForm() {
+            document.getElementById('newClusterForm').style.display = 'none';
+            document.getElementById('createClusterForm').reset();
+        }
+        
+        // Pipeline definition functions
+        function hideCreatePipelineForm() {
+            document.getElementById('newPipelineDefinitionForm').style.display = 'none';
+            document.getElementById('createPipelineDefinitionForm').reset();
+        }
+        
+        function createNewPipelineDefinition(event) {
+            event.preventDefault();
+            
+            const pipelineName = document.getElementById('pipelineDefinitionName').value.trim();
+            const description = document.getElementById('pipelineDefinitionDescription').value.trim();
+            
+            const pipelineData = {
+                name: pipelineName,
+                description: description || null,
+                steps: [] // Start with empty steps
+            };
+            
+            fetch(`/api/v1/pipelines/definitions/${pipelineName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(pipelineData)
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Failed to create pipeline definition');
+                }
+                return response.json();
+            })
+            .then(result => {
+                alert(`Pipeline definition "${pipelineName}" created successfully!`);
+                hideCreatePipelineForm();
+                loadPipelines(); // Refresh the pipeline list
+            })
+            .catch(error => {
+                console.error('Error creating pipeline definition:', error);
+                alert('Failed to create pipeline definition: ' + error.message);
+            });
+        }
+        
+        // Auto-refresh every 30 seconds
+        setInterval(checkAll, 30000);
+    </script>
+</body>
+</html>

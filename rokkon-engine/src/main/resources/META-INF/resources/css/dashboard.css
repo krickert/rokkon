@@ -1,0 +1,208 @@
+/* Rokkon Dashboard Styles */
+
+/* Module Tree Styles */
+.module-tree .cluster-name {
+    color: #495057;
+    margin-bottom: 10px;
+}
+
+.module-node {
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    transition: background-color 0.2s;
+}
+
+.module-node:hover {
+    background-color: #e9ecef;
+}
+
+.module-node a {
+    color: #495057;
+}
+
+.module-node a:hover {
+    color: #007bff;
+}
+
+/* Service Table Styles */
+.service-row {
+    cursor: pointer;
+}
+
+.service-row:hover {
+    background-color: #f8f9fa;
+}
+
+.grpc-services {
+    display: none;
+    background-color: #f8f9fa;
+}
+
+.grpc-services.show {
+    display: table-row;
+}
+
+/* Module Instance Styles */
+.module-instance-row {
+    display: none;
+}
+
+.opacity-75 {
+    opacity: 0.75;
+}
+
+/* Pipeline Builder Styles */
+.pipeline-builder {
+    min-height: 200px;
+    border: 2px dashed #dee2e6;
+    border-radius: 0.25rem;
+    padding: 1rem;
+}
+
+.pipeline-module {
+    background-color: #f8f9fa;
+    border: 1px solid #dee2e6;
+    border-radius: 0.25rem;
+    padding: 0.5rem;
+    margin-bottom: 0.5rem;
+}
+
+/* Status Badge Styles */
+.badge {
+    font-size: 0.875rem;
+}
+
+/* Alert Styles */
+.alert {
+    margin-bottom: 1rem;
+}
+
+/* Responsive Table Styles */
+.table-responsive {
+    margin-top: 1rem;
+}
+
+/* Card Styles */
+.card {
+    margin-bottom: 1.5rem;
+}
+
+.card-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Button Group Styles */
+.btn-group-sm > .btn {
+    padding: 0.25rem 0.5rem;
+    font-size: 0.875rem;
+}
+
+/* Navigation Tabs */
+.nav-tabs {
+    margin-bottom: 1rem;
+}
+
+/* Form Styles */
+.form-label {
+    font-weight: 500;
+}
+
+.form-control:focus,
+.form-select:focus {
+    border-color: #86b7fe;
+    box-shadow: 0 0 0 0.25rem rgba(13, 110, 253, 0.25);
+}
+
+/* Modal Styles */
+.modal-header {
+    background-color: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+/* Statistics Display */
+.text-center h3 {
+    margin-bottom: 0.25rem;
+}
+
+.text-center small {
+    font-size: 0.875rem;
+}
+
+/* Icon Spacing */
+.bi {
+    margin-right: 0.25rem;
+}
+
+/* Disabled State */
+.text-decoration-line-through {
+    text-decoration: line-through;
+}
+
+/* Loading States */
+.loading {
+    opacity: 0.6;
+    pointer-events: none;
+}
+
+/* Error States */
+.error-message {
+    color: #dc3545;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+/* Success States */
+.success-message {
+    color: #198754;
+    font-size: 0.875rem;
+    margin-top: 0.25rem;
+}
+
+/* Pipeline States */
+.pipeline-draft {
+    border-left: 3px solid #ffc107;
+}
+
+.pipeline-draft .list-group-item {
+    background-color: #fff8e1;
+}
+
+/* Validation Warning Icon */
+.bi-exclamation-triangle-fill.text-warning {
+    cursor: help;
+}
+
+/* Deploy Button */
+.btn-outline-success {
+    --bs-btn-hover-bg: #198754;
+    --bs-btn-hover-border-color: #198754;
+}
+
+/* Validation Styles */
+.validation-summary {
+    display: inline-block;
+}
+
+.validation-details {
+    max-width: 400px;
+}
+
+.validation-details h6 {
+    font-size: 0.875rem;
+    font-weight: 600;
+    margin-bottom: 0.5rem;
+}
+
+.validation-details ul {
+    font-size: 0.875rem;
+}
+
+/* Popover Styles */
+.popover {
+    max-width: 400px;
+}
+
+.popover-body .validation-details {
+    margin: 0;
+}

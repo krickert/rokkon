@@ -1,0 +1,14 @@
+version: '3.8'
+
+services:
+  consul:
+    image: hashicorp/consul:1.21.1
+    container_name: rokkon-consul-dev
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    command: agent -dev -ui -client=0.0.0.0
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    labels:
+      - "quarkus-dev-service-consul=true"

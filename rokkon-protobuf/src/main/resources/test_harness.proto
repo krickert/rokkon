@@ -1,0 +1,192 @@
+syntax = "proto3";
+
+package com.rokkon.test;
+
+import "google/protobuf/struct.proto";
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "pipe_step_processor_service.proto";
+
+option java_package = "com.rokkon.test";
+option java_multiple_files = true;
+
+// Test harness service for integration testing
+service TestHarness {
+    // Bidirectional streaming for test execution
+    rpc ExecuteTestStream(stream TestCommand) returns (stream TestEvent);
+    
+    // Simple request/response for basic tests
+    rpc ExecuteTest(TestCommand) returns (TestResult);
+    
+    // Get current module status
+    rpc GetModuleStatus(google.protobuf.Empty) returns (ModuleStatus);
+}
+
+// Commands that can be sent to the test module
+message TestCommand {
+    string command_id = 1;
+    google.protobuf.Timestamp timestamp = 2;
+    
+    oneof command {
+        // Send a document for processing
+        ProcessDocumentCommand process_document = 10;
+        
+        // Verify module registration
+        VerifyRegistrationCommand verify_registration = 11;
+        
+        // Check health status
+        CheckHealthCommand check_health = 12;
+        
+        // Wait for an event
+        WaitForEventCommand wait_for_event = 13;
+        
+        // Configure test module behavior
+        ConfigureModuleCommand configure_module = 14;
+        
+        // Simulate various scenarios
+        SimulateScenarioCommand simulate_scenario = 15;
+    }
+}
+
+// Events reported back from the test module
+message TestEvent {
+    string event_id = 1;
+    string command_id = 2;  // Links back to the command that triggered this
+    google.protobuf.Timestamp timestamp = 3;
+    
+    oneof event {
+        // Document was received
+        DocumentReceivedEvent document_received = 10;
+        
+        // Document was processed
+        DocumentProcessedEvent document_processed = 11;
+        
+        // Module was registered
+        ModuleRegisteredEvent module_registered = 12;
+        
+        // Health check performed
+        HealthCheckEvent health_check = 13;
+        
+        // Error occurred
+        ErrorEvent error = 14;
+        
+        // Generic event for extensibility
+        GenericEvent generic = 15;
+    }
+}
+
+// Command to process a document
+message ProcessDocumentCommand {
+    com.rokkon.search.model.ProcessRequest request = 1;
+    bool expect_success = 2;
+    int64 timeout_ms = 3;
+}
+
+// Command to verify registration
+message VerifyRegistrationCommand {
+    string expected_module_name = 1;
+    bool check_consul = 2;
+}
+
+// Command to check health
+message CheckHealthCommand {
+    bool include_details = 1;
+}
+
+// Command to wait for specific events
+message WaitForEventCommand {
+    repeated string event_types = 1;  // Types of events to wait for
+    int64 timeout_ms = 2;
+}
+
+// Command to configure module behavior
+message ConfigureModuleCommand {
+    google.protobuf.Struct config = 1;
+    bool reset_to_defaults = 2;
+}
+
+// Command to simulate scenarios
+message SimulateScenarioCommand {
+    enum Scenario {
+        NORMAL_PROCESSING = 0;
+        SLOW_PROCESSING = 1;
+        RANDOM_FAILURES = 2;
+        MEMORY_LEAK = 3;
+        HIGH_CPU = 4;
+        NETWORK_ISSUES = 5;
+    }
+    
+    Scenario scenario = 1;
+    google.protobuf.Struct parameters = 2;
+    int64 duration_ms = 3;
+}
+
+// Event: Document received
+message DocumentReceivedEvent {
+    string document_id = 1;
+    string pipeline_name = 2;
+    string step_name = 3;
+    int64 hop_number = 4;
+}
+
+// Event: Document processed
+message DocumentProcessedEvent {
+    string document_id = 1;
+    bool success = 2;
+    string error_message = 3;
+    google.protobuf.Struct processing_metadata = 4;
+    int64 processing_time_ms = 5;
+}
+
+// Event: Module registered
+message ModuleRegisteredEvent {
+    string module_name = 1;
+    string consul_service_id = 2;
+    bool success = 3;
+    string error_message = 4;
+}
+
+// Event: Health check
+message HealthCheckEvent {
+    enum HealthStatus {
+        HEALTHY = 0;
+        UNHEALTHY = 1;
+        DEGRADED = 2;
+    }
+    
+    HealthStatus status = 1;
+    google.protobuf.Struct details = 2;
+}
+
+// Event: Error
+message ErrorEvent {
+    string error_type = 1;
+    string error_message = 2;
+    string stack_trace = 3;
+    google.protobuf.Struct context = 4;
+}
+
+// Generic event for extensibility
+message GenericEvent {
+    string event_type = 1;
+    google.protobuf.Struct data = 2;
+}
+
+// Test result for simple request/response
+message TestResult {
+    bool success = 1;
+    repeated string messages = 2;
+    google.protobuf.Struct data = 3;
+    repeated TestEvent events = 4;
+}
+
+// Current module status
+message ModuleStatus {
+    bool is_registered = 1;
+    string module_name = 2;
+    int64 documents_processed = 3;
+    int64 documents_failed = 4;
+    google.protobuf.Timestamp last_activity = 5;
+    map<string, string> current_config = 6;
+    repeated string active_scenarios = 7;
+}

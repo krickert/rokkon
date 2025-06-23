@@ -1,0 +1,37 @@
+[versions]
+quarkus = "3.23.4"
+grpc = "1.69.1"
+protobuf = "3.25.5"
+mutiny = "2.9.0"
+junit = "5.10.1"
+
+[libraries]
+# Quarkus
+quarkus-bom = { module = "io.quarkus.platform:quarkus-bom", version.ref = "quarkus" }
+quarkus-grpc = { module = "io.quarkus:quarkus-grpc" }
+quarkus-junit5 = { module = "io.quarkus:quarkus-junit5" }
+quarkus-junit5-internal = { module = "io.quarkus:quarkus-junit5-internal" }
+quarkus-test-grpc = { module = "io.quarkus:quarkus-test-grpc" }
+quarkus-container-image-docker = { module = "io.quarkus:quarkus-container-image-docker" }
+
+# gRPC and Protobuf
+grpc-core = { module = "io.grpc:grpc-core", version.ref = "grpc" }
+grpc-protobuf = { module = "io.grpc:grpc-protobuf", version.ref = "grpc" }
+grpc-stub = { module = "io.grpc:grpc-stub", version.ref = "grpc" }
+grpc-services = { module = "io.grpc:grpc-services", version.ref = "grpc" }
+protobuf-java = { module = "com.google.protobuf:protobuf-java", version.ref = "protobuf" }
+mutiny = { module = "io.smallrye.reactive:mutiny", version.ref = "mutiny" }
+javax-annotation-api = { module = "javax.annotation:javax.annotation-api", version = "1.3.2" }
+
+# Testing
+junit-bom = { module = "org.junit:junit-bom", version.ref = "junit" }
+junit-jupiter = { module = "org.junit.jupiter:junit-jupiter" }
+assertj = { module = "org.assertj:assertj-core", version = "3.24.2" }
+
+[plugins]
+quarkus = { id = "io.quarkus", version.ref = "quarkus" }
+protobuf = { id = "com.google.protobuf", version = "0.9.4" }
+
+[bundles]
+quarkus-grpc = ["quarkus-grpc"]
+quarkus-test = ["quarkus-junit5", "junit-jupiter", "assertj"]

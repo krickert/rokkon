@@ -1,0 +1,21 @@
+quarkus:
+  application:
+    name: engine-models
+  http:
+    port: 38095
+    host: 0.0.0.0
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+  index-dependency:
+    rokkon-commons:
+      group-id: com.rokkon.pipeline
+      artifact-id: rokkon-commons
+
+# Test profile configuration
+"%test":
+  quarkus:
+    http:
+      test-port: 0  # Use random port for tests

@@ -1,0 +1,55 @@
+# Example of how configuration would be stored in Consul's config
+# These would be under /config/application/ in Consul KV store
+# or in application.yml as defaults
+
+# Simple engine configuration properties
+rokkon:
+  engine:
+    grpc-port: 49000
+    rest-port: 8080
+    instance-id: engine-prod-01  # Optional, auto-generated if not set
+    debug: false
+  
+  # Consul operational settings
+  consul:
+    cleanup:
+      enabled: true
+      interval: 5m
+      zombie-threshold: 2m
+      cleanup-stale-whitelist: true
+    health:
+      check-interval: 10s
+      deregister-after: 1m
+      timeout: 5s
+  
+  # Module management settings
+  modules:
+    auto-discover: false        # Don't auto-discover, require explicit registration
+    service-prefix: "module-"   # Prefix for module services in Consul
+    require-whitelist: true     # Modules must be whitelisted for use
+    connection-timeout: 30s
+    max-instances-per-module: 10
+  
+  # Default cluster settings
+  default-cluster:
+    name: default
+    auto-create: true
+    description: "Default cluster for Rokkon pipelines"
+
+# Quarkus Consul Config settings
+quarkus:
+  consul-config:
+    enabled: true
+    agent:
+      host: localhost
+      port: 8500
+    properties-prefix: config   # Look under /config/ in Consul
+    format: yaml               # Support YAML format in Consul
+    watch: true                # Enable hot reload of config changes
+    watch-period: 10s          # Check for changes every 10 seconds
+
+# What stays in KV store (NOT in config):
+# - /rokkon/pipelines/{name} -> Full pipeline JSON documents
+# - /rokkon/modules/{id} -> Module registration metadata
+# - /rokkon/clusters/{name}/enabled-modules/{id} -> Whitelist entries
+# - /rokkon/clusters/{name}/pipelines/{name} -> Pipeline assignments

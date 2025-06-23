@@ -1,0 +1,38 @@
+quarkus:
+  http:
+    test-port: 0  # Use random port for tests
+  grpc:
+    server:
+      port: 0  # Use random port for tests
+      test-port: 0
+  # Disable consul-config for tests
+  consul-config:
+    enabled: false
+    agent:
+      host: localhost
+      port: 8500
+    watch:
+      enabled: false
+      period: 10s
+    format: properties
+
+# Consul configuration for tests
+consul:
+  host: localhost
+  port: 8500
+
+# Test module container properties (dummy values for tests that don't use containers)
+test:
+  module:
+    container:
+      internal:
+        grpc:
+          port: 9090
+        http:
+          port: 8080
+      grpc:
+        port: 19090
+      http:
+        port: 18080
+      name: test-module-dummy
+      id: dummy-container-id

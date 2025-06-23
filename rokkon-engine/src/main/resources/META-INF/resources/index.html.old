@@ -1,0 +1,1499 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rokkon Engine Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            background-color: #f8f9fa;
+        }
+        .card {
+            margin-bottom: 20px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .card-header {
+            background-color: #343a40;
+            color: white;
+        }
+        .status-indicator {
+            width: 15px;
+            height: 15px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 5px;
+        }
+        .status-online {
+            background-color: #28a745;
+        }
+        .status-offline {
+            background-color: #dc3545;
+        }
+        .logo {
+            max-height: 50px;
+            margin-right: 10px;
+        }
+        .module-tree .cluster-name {
+            color: #495057;
+            margin-bottom: 10px;
+        }
+        .module-node {
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        .module-node:hover {
+            background-color: #e9ecef;
+        }
+        .module-node a {
+            color: #495057;
+        }
+        .module-node a:hover {
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <span class="text-primary">Rokkon</span> Engine Dashboard
+            </h1>
+            <div>
+                <span id="engineStatus" class="badge bg-secondary">Checking...</span>
+            </div>
+        </header>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Engine Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Engine API:</span>
+                            <span id="pingStatus">Checking...</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Consul Connection:</span>
+                            <span id="consulStatus">Checking...</span>
+                        </div>
+                        <button id="refreshStatus" class="btn btn-primary">Refresh Status</button>
+                        <button id="changeConsulConnection" class="btn btn-secondary ms-2">Change Consul Connection</button>
+                        
+                        <!-- Consul Configuration Section -->
+                        <div id="consulConfig" class="mt-3" style="display: none;">
+                            <hr>
+                            <h6>Configure Consul Connection</h6>
+                            <form id="consulConfigForm">
+                                <div class="mb-2">
+                                    <label for="consulHost" class="form-label">Host</label>
+                                    <input type="text" class="form-control" id="consulHost" value="localhost" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="consulPort" class="form-label">Port</label>
+                                    <input type="number" class="form-control" id="consulPort" value="8500" required>
+                                </div>
+                                <button type="submit" class="btn btn-success btn-sm">Connect</button>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="disconnectConsul()">Disconnect</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Available Clusters</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="clustersList" class="mb-3">
+                            <p class="text-muted">Loading clusters...</p>
+                        </div>
+                        <button id="createDefaultCluster" class="btn btn-success btn-sm">Create Default Cluster</button>
+                        <button id="showNewClusterForm" class="btn btn-primary btn-sm ms-2">New Cluster</button>
+                        
+                        <!-- New Cluster Form -->
+                        <div id="newClusterForm" class="mt-3" style="display: none;">
+                            <hr>
+                            <h6>Create New Cluster</h6>
+                            <form id="createClusterForm">
+                                <div class="mb-2">
+                                    <label for="newClusterName" class="form-label">Cluster Name</label>
+                                    <input type="text" class="form-control" id="newClusterName" placeholder="Enter cluster name" required>
+                                </div>
+                                <div class="mb-2">
+                                    <label for="defaultPipeline" class="form-label">Default Pipeline (Optional)</label>
+                                    <input type="text" class="form-control" id="defaultPipeline" placeholder="default">
+                                </div>
+                                <button type="submit" class="btn btn-success btn-sm">Create</button>
+                                <button type="button" class="btn btn-secondary btn-sm" onclick="hideNewClusterForm()">Cancel</button>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Registered Modules by Cluster</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="modulesList">
+                            <p class="text-muted">Loading modules...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">All Consul Services</h5>
+                    </div>
+                    <div class="card-body">
+                        <div id="allServicesList">
+                            <p class="text-muted">Loading services...</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Pipeline Management Section -->
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header d-flex justify-content-between align-items-center">
+                        <h5 class="mb-0">Pipeline Definitions</h5>
+                        <button class="btn btn-sm btn-primary" onclick="showCreatePipelineForm()">
+                            <i class="bi bi-plus-circle"></i> Create Pipeline
+                        </button>
+                    </div>
+                    <div class="card-body">
+                        <div id="pipelinesList">
+                            <p class="text-muted">Loading pipelines...</p>
+                        </div>
+                        
+                        <!-- Create Pipeline Form (initially hidden) -->
+                        <div id="createPipelineForm" style="display: none;" class="mt-3">
+                            <hr>
+                            <h6>Create New Pipeline Definition</h6>
+                            
+                            <!-- Tab navigation -->
+                            <ul class="nav nav-tabs mb-3" id="pipelineCreationTabs" role="tablist">
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link active" id="form-tab" data-bs-toggle="tab" data-bs-target="#form-content" type="button">
+                                        Form Builder
+                                    </button>
+                                </li>
+                                <li class="nav-item" role="presentation">
+                                    <button class="nav-link" id="json-tab" data-bs-toggle="tab" data-bs-target="#json-content" type="button">
+                                        JSON Editor
+                                    </button>
+                                </li>
+                            </ul>
+                            
+                            <!-- Tab content -->
+                            <div class="tab-content" id="pipelineCreationTabContent">
+                                <!-- Form tab -->
+                                <div class="tab-pane fade show active" id="form-content" role="tabpanel">
+                                    <form id="pipelineDefinitionForm">
+                                        <div class="mb-3">
+                                            <label for="pipelineId" class="form-label">Pipeline ID</label>
+                                            <input type="text" class="form-control" id="pipelineId" placeholder="my-pipeline" required>
+                                            <small class="text-muted">Unique identifier for this pipeline</small>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="pipelineName" class="form-label">Pipeline Name</label>
+                                            <input type="text" class="form-control" id="pipelineName" placeholder="My Pipeline" required>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="pipelineDescription" class="form-label">Description</label>
+                                            <textarea class="form-control" id="pipelineDescription" rows="2" 
+                                                    placeholder="Describe what this pipeline does..."></textarea>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label class="form-label">Pipeline Steps</label>
+                                            <div id="pipelineSteps">
+                                                <p class="text-muted">Add steps after creating the pipeline</p>
+                                            </div>
+                                        </div>
+                                        
+                                        <button type="submit" class="btn btn-success">Create Pipeline</button>
+                                        <button type="button" class="btn btn-secondary" onclick="hideCreatePipelineForm()">Cancel</button>
+                                    </form>
+                                </div>
+                                
+                                <!-- JSON tab -->
+                                <div class="tab-pane fade" id="json-content" role="tabpanel">
+                                    <form id="pipelineJsonForm">
+                                        <div class="mb-3">
+                                            <label for="pipelineIdJson" class="form-label">Pipeline ID</label>
+                                            <input type="text" class="form-control" id="pipelineIdJson" placeholder="my-pipeline" required>
+                                        </div>
+                                        
+                                        <div class="mb-3">
+                                            <label for="pipelineConfigJson" class="form-label">Pipeline Configuration (JSON)</label>
+                                            <textarea class="form-control font-monospace" id="pipelineConfigJson" rows="15" 
+                                                    placeholder='{"pipelineName": "My Pipeline", "pipelineSteps": {...}}' required></textarea>
+                                            <button type="button" class="btn btn-sm btn-secondary mt-2" onclick="loadSamplePipeline()">
+                                                Load Sample Pipeline
+                                            </button>
+                                        </div>
+                                        
+                                        <button type="submit" class="btn btn-success">Create from JSON</button>
+                                        <button type="button" class="btn btn-secondary" onclick="hideCreatePipelineForm()">Cancel</button>
+                                    </form>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Module Details Modal -->
+        <div class="modal fade" id="moduleDetailsModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Module Details</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body" id="moduleDetailsContent">
+                        <p>Loading...</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Register New Module</h5>
+                    </div>
+                    <div class="card-body">
+                        <form id="registerModuleForm">
+                            <div class="row mb-3">
+                                <div class="col-md-4">
+                                    <label for="moduleName" class="form-label">Module Name</label>
+                                    <input type="text" class="form-control" id="moduleName" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="moduleHost" class="form-label">Host</label>
+                                    <input type="text" class="form-control" id="moduleHost" value="localhost" required>
+                                </div>
+                                <div class="col-md-4">
+                                    <label for="modulePort" class="form-label">Port</label>
+                                    <input type="number" class="form-control" id="modulePort" required>
+                                </div>
+                            </div>
+                            <div class="row mb-3">
+                                <div class="col-md-3">
+                                    <label for="moduleType" class="form-label">Module Type</label>
+                                    <select class="form-select" id="moduleType" required>
+                                        <option value="PARSER">Parser</option>
+                                        <option value="CHUNKER">Chunker</option>
+                                        <option value="EMBEDDER">Embedder</option>
+                                        <option value="ECHO">Echo</option>
+                                        <option value="TEST">Test</option>
+                                    </select>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="moduleVersion" class="form-label">Version</label>
+                                    <input type="text" class="form-control" id="moduleVersion" value="1.0.0" required>
+                                </div>
+                                <div class="col-md-3">
+                                    <label for="clusterName" class="form-label">Cluster Name</label>
+                                    <select class="form-select" id="clusterName" required>
+                                        <option value="">Select a cluster...</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            <div class="mb-3">
+                                <div class="form-check">
+                                    <input class="form-check-input" type="checkbox" id="useEngineConnection" onclick="toggleEngineConnection()">
+                                    <label class="form-check-label" for="useEngineConnection">
+                                        Use different connection for engine validation (optional)
+                                    </label>
+                                </div>
+                            </div>
+                            
+                            <div id="engineConnectionFields" style="display: none;" class="row mb-3">
+                                <div class="col-md-6">
+                                    <label for="engineHost" class="form-label">Engine Connection Host</label>
+                                    <input type="text" class="form-control" id="engineHost" placeholder="e.g., localhost">
+                                </div>
+                                <div class="col-md-6">
+                                    <label for="enginePort" class="form-label">Engine Connection Port</label>
+                                    <input type="number" class="form-control" id="enginePort" placeholder="e.g., 49090">
+                                </div>
+                            </div>
+                            
+                            <button type="submit" class="btn btn-success">Register Module</button>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            console.log('Page loaded, checking engine status...');
+            // Check engine status on load
+            checkEngineStatus();
+
+            // Set up refresh button
+            document.getElementById('refreshStatus').addEventListener('click', function() {
+                checkEngineStatus();
+            });
+            
+            // Set up change consul connection button
+            document.getElementById('changeConsulConnection').addEventListener('click', function() {
+                const configSection = document.getElementById('consulConfig');
+                if (configSection.style.display === 'none') {
+                    configSection.style.display = 'block';
+                    document.getElementById('consulHost').focus();
+                } else {
+                    configSection.style.display = 'none';
+                }
+            });
+            
+            // Set up create cluster button
+            document.getElementById('createDefaultCluster').addEventListener('click', createDefaultCluster);
+
+            // Set up new cluster form button
+            document.getElementById('showNewClusterForm').addEventListener('click', function() {
+                document.getElementById('newClusterForm').style.display = 'block';
+                document.getElementById('newClusterName').focus();
+            });
+
+            // Set up create cluster form
+            document.getElementById('createClusterForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                createNewCluster();
+            });
+
+            // Set up module registration form
+            document.getElementById('registerModuleForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                registerModule();
+            });
+            
+            // Set up Consul configuration form
+            document.getElementById('consulConfigForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                updateConsulConnection();
+            });
+            
+            // Set up pipeline form submission
+            document.getElementById('pipelineDefinitionForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const pipelineId = document.getElementById('pipelineId').value.trim();
+                const pipelineName = document.getElementById('pipelineName').value.trim();
+                const pipelineDescription = document.getElementById('pipelineDescription').value.trim();
+                
+                // Use the UI-specific endpoint
+                fetch('/api/v1/ui/pipelines/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        pipelineId: pipelineId,
+                        pipelineName: pipelineName,
+                        pipelineDescription: pipelineDescription
+                    })
+                })
+                .then(response => response.json())
+                .then(result => {
+                    if (result.success) {
+                        alert(`Pipeline "${pipelineName}" created successfully!`);
+                        hideCreatePipelineForm();
+                        loadPipelines();
+                    } else {
+                        alert('Failed to create pipeline: ' + result.message);
+                    }
+                })
+                .catch(error => {
+                    console.error('Error creating pipeline:', error);
+                    alert('Failed to create pipeline: ' + error.message);
+                });
+            });
+            
+            // Set up JSON form submission
+            document.getElementById('pipelineJsonForm').addEventListener('submit', function(e) {
+                e.preventDefault();
+                
+                const pipelineId = document.getElementById('pipelineIdJson').value.trim();
+                const jsonText = document.getElementById('pipelineConfigJson').value.trim();
+                
+                try {
+                    const pipelineConfig = JSON.parse(jsonText);
+                    createPipelineFromConfig(pipelineId, pipelineConfig);
+                } catch (error) {
+                    alert('Invalid JSON: ' + error.message);
+                }
+            });
+        });
+
+        function checkEngineStatus() {
+            checkStatus();
+        }
+        
+        function checkStatus() {
+            console.log('checkStatus called');
+            // Update UI to show checking status
+            document.getElementById('engineStatus').textContent = 'Checking...';
+            document.getElementById('engineStatus').className = 'badge bg-secondary';
+            document.getElementById('pingStatus').textContent = 'Checking...';
+            document.getElementById('consulStatus').textContent = 'Checking...';
+
+            console.log('Fetching /ping...');
+            // Check ping endpoint
+            fetch('/ping')
+                .then(response => {
+                    if (response.ok) {
+                        return response.text();
+                    }
+                    throw new Error('Ping failed');
+                })
+                .then(data => {
+                    document.getElementById('pingStatus').textContent = 'Online (' + data + ')';
+                    document.getElementById('engineStatus').textContent = 'Online';
+                    document.getElementById('engineStatus').className = 'badge bg-success';
+                })
+                .catch(error => {
+                    document.getElementById('pingStatus').textContent = 'Offline';
+                    document.getElementById('engineStatus').textContent = 'Offline';
+                    document.getElementById('engineStatus').className = 'badge bg-danger';
+                    console.error('Error checking ping:', error);
+                });
+
+            // Check actual Consul status from the API
+            fetch('/api/consul/status')
+                .then(response => response.json())
+                .then(data => {
+                    const statusElement = document.getElementById('consulStatus');
+                    const configSection = document.getElementById('consulConfig');
+                    
+                    if (data.status === 'UP') {
+                        if (data.error && data.error.includes('Dev container')) {
+                            statusElement.textContent = 'Running (dev mode)';
+                            statusElement.className = 'text-success';
+                        } else {
+                            statusElement.textContent = 'Connected';
+                            statusElement.className = 'text-success';
+                        }
+                        // Don't automatically show form when connected - user must click button
+                        configSection.style.display = 'none';
+                    } else if (data.status === 'STARTING') {
+                        statusElement.textContent = 'Starting dev container...';
+                        statusElement.className = 'text-info';
+                        configSection.style.display = 'none';
+                        // Check again in 2 seconds
+                        setTimeout(checkStatus, 2000);
+                    } else if (data.status === 'DOWN') {
+                        const errorMsg = data.error ? ` (${data.error})` : '';
+                        statusElement.textContent = 'Down' + errorMsg;
+                        statusElement.className = 'text-danger';
+                        // Show form automatically when Consul is down
+                        configSection.style.display = 'block';
+                    } else {
+                        statusElement.textContent = 'Unknown';
+                        statusElement.className = 'text-warning';
+                        // Show form automatically when status is unknown
+                        configSection.style.display = 'block';
+                    }
+                    
+                    // Get current connection config
+                    fetch('/api/v1/consul/connection')
+                        .then(resp => resp.json())
+                        .then(connData => {
+                            if (connData.host) {
+                                document.getElementById('consulHost').value = connData.host;
+                                document.getElementById('consulPort').value = connData.port;
+                            }
+                        });
+                })
+                .catch(error => {
+                    console.error('Error checking Consul status:', error);
+                    const statusElement = document.getElementById('consulStatus');
+                    statusElement.textContent = 'Down (can\'t connect to API)';
+                    statusElement.className = 'text-danger';
+                    document.getElementById('consulConfig').style.display = 'block';
+                });
+                
+            // Load clusters
+            loadClusters();
+            
+            // Load modules graph
+            loadModulesGraph();
+            
+            // Load all services
+            loadAllServices();
+            
+            // Load pipeline definitions
+            loadPipelines();
+        }
+        
+        function loadClusters() {
+            fetch('/api/v1/clusters')
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error('Failed to fetch clusters');
+                    }
+                    return response.json();
+                })
+                .then(clusters => {
+                    const clustersList = document.getElementById('clustersList');
+                    const clusterDropdown = document.getElementById('clusterName');
+                    
+                    // Update the clusters list display
+                    if (clusters.length === 0) {
+                        clustersList.innerHTML = '<p class="text-muted">No clusters available. Create one to get started.</p>';
+                        clusterDropdown.innerHTML = '<option value="">No clusters available</option>';
+                        clusterDropdown.disabled = true;
+                    } else {
+                        // Update the display list
+                        clustersList.innerHTML = '<ul class="list-group">';
+                        clusters.forEach(cluster => {
+                            const createdAt = new Date(cluster.createdAt).toLocaleString();
+                            clustersList.innerHTML += `
+                                <li class="list-group-item d-flex justify-content-between align-items-center">
+                                    <div>
+                                        <strong>${cluster.name}</strong>
+                                        <small class="text-muted d-block">Created: ${createdAt}</small>
+                                    </div>
+                                    <button class="btn btn-danger btn-sm" onclick="deleteCluster('${cluster.name}')">Delete</button>
+                                </li>
+                            `;
+                        });
+                        clustersList.innerHTML += '</ul>';
+                        
+                        // Update the dropdown
+                        clusterDropdown.disabled = false;
+                        clusterDropdown.innerHTML = '<option value="">Select a cluster...</option>';
+                        clusters.forEach(cluster => {
+                            const option = document.createElement('option');
+                            option.value = cluster.name;
+                            option.textContent = cluster.name;
+                            clusterDropdown.appendChild(option);
+                        });
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading clusters:', error);
+                    document.getElementById('clustersList').innerHTML = 
+                        '<p class="text-danger">Failed to load clusters. Check Consul connection.</p>';
+                    document.getElementById('clusterName').innerHTML = '<option value="">Failed to load clusters</option>';
+                    document.getElementById('clusterName').disabled = true;
+                });
+        }
+        
+        function createDefaultCluster() {
+            fetch('/api/v1/clusters/default', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: '{}'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.valid) {
+                    alert('Default cluster created successfully!');
+                    loadClusters();
+                } else {
+                    alert('Failed to create cluster: ' + result.errors.join(', '));
+                }
+            })
+            .catch(error => {
+                console.error('Error creating cluster:', error);
+                alert('Failed to create cluster');
+            });
+        }
+        
+        function deleteCluster(clusterName) {
+            if (!confirm(`Are you sure you want to delete cluster "${clusterName}"?`)) {
+                return;
+            }
+            
+            fetch(`/api/v1/clusters/${clusterName}`, {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.valid) {
+                    alert('Cluster deleted successfully!');
+                    loadClusters();
+                } else {
+                    alert('Failed to delete cluster: ' + result.errors.join(', '));
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting cluster:', error);
+                alert('Failed to delete cluster');
+            });
+        }
+
+        function createNewCluster() {
+            const clusterName = document.getElementById('newClusterName').value.trim();
+            const defaultPipeline = document.getElementById('defaultPipeline').value.trim() || null;
+            
+            if (!clusterName) {
+                alert('Please enter a cluster name');
+                return;
+            }
+            
+            // Create the cluster with metadata if pipeline is specified
+            const requestBody = {};
+            if (defaultPipeline) {
+                requestBody.metadata = {
+                    defaultPipeline: defaultPipeline
+                };
+            }
+            
+            fetch(`/api/v1/clusters/${clusterName}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestBody)
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.valid) {
+                    alert(`Cluster "${clusterName}" created successfully!`);
+                    hideNewClusterForm();
+                    loadClusters();
+                } else {
+                    alert('Failed to create cluster: ' + result.errors.join(', '));
+                }
+            })
+            .catch(error => {
+                console.error('Error creating cluster:', error);
+                alert('Failed to create cluster');
+            });
+        }
+        
+        function hideNewClusterForm() {
+            document.getElementById('newClusterForm').style.display = 'none';
+            document.getElementById('createClusterForm').reset();
+        }
+        
+        function toggleEngineConnection() {
+            const checkbox = document.getElementById('useEngineConnection');
+            const fields = document.getElementById('engineConnectionFields');
+            fields.style.display = checkbox.checked ? 'block' : 'none';
+            
+            // Clear fields when hidden
+            if (!checkbox.checked) {
+                document.getElementById('engineHost').value = '';
+                document.getElementById('enginePort').value = '';
+            }
+        }
+
+        function registerModule() {
+            const moduleName = document.getElementById('moduleName').value;
+            const moduleHost = document.getElementById('moduleHost').value;
+            const modulePort = document.getElementById('modulePort').value;
+            const moduleType = document.getElementById('moduleType').value;
+            const moduleVersion = document.getElementById('moduleVersion').value;
+            const clusterName = document.getElementById('clusterName').value;
+            
+            const useEngineConnection = document.getElementById('useEngineConnection').checked;
+            const engineHost = document.getElementById('engineHost').value;
+            const enginePort = document.getElementById('enginePort').value;
+
+            const moduleData = {
+                moduleName: moduleName,
+                implementationId: moduleName + '-impl',
+                host: moduleHost,
+                port: parseInt(modulePort),
+                serviceType: moduleType,
+                version: moduleVersion,
+                metadata: {}
+            };
+            
+            // Add engine connection if specified
+            if (useEngineConnection && engineHost && enginePort) {
+                moduleData.engineConnection = {
+                    host: engineHost,
+                    port: parseInt(enginePort)
+                };
+            }
+
+            fetch('/api/v1/modules', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(moduleData)
+            })
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    alert('Module registered successfully!');
+                    // Update the modules list
+                    updateModulesList(moduleName, moduleType);
+                } else {
+                    alert('Failed to register module: ' + data.message);
+                }
+            })
+            .catch(error => {
+                alert('Error registering module: ' + error.message);
+                console.error('Error:', error);
+            });
+        }
+
+        function loadModulesGraph() {
+            // First, get all clusters
+            let allClusters = [];
+            let modulesByCluster = {};
+            
+            // Fetch clusters first
+            fetch('/api/v1/clusters')
+                .then(response => response.json())
+                .then(clusters => {
+                    allClusters = clusters;
+                    // Initialize empty arrays for each cluster
+                    clusters.forEach(cluster => {
+                        modulesByCluster[cluster.name] = [];
+                    });
+                    
+                    // Then try to fetch modules
+                    return fetch('/api/v1/modules/by-cluster');
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        // If modules fetch fails, we still show clusters
+                        return {};
+                    }
+                    return response.json();
+                })
+                .then(modules => {
+                    // Merge modules into our cluster structure
+                    Object.entries(modules).forEach(([clusterName, moduleList]) => {
+                        if (modulesByCluster[clusterName]) {
+                            modulesByCluster[clusterName] = moduleList;
+                        }
+                    });
+                    
+                    // Now render the view
+                    const modulesList = document.getElementById('modulesList');
+                    
+                    if (allClusters.length === 0) {
+                        modulesList.innerHTML = '<p class="text-muted">No clusters available.</p>';
+                        return;
+                    }
+                    
+                    // Build expandable cluster view
+                    let html = '<div class="module-tree">';
+                    
+                    allClusters.forEach(cluster => {
+                        const modules = modulesByCluster[cluster.name] || [];
+                        const hasModules = modules.length > 0;
+                        const clusterClass = hasModules ? '' : 'text-muted';
+                        const iconClass = hasModules ? 'bi-folder2' : 'bi-folder2-open';
+                        
+                        html += `
+                            <div class="cluster-node mb-3">
+                                <h6 class="cluster-name ${clusterClass}" 
+                                    data-bs-toggle="collapse" 
+                                    data-bs-target="#cluster-${cluster.name}"
+                                    style="cursor: pointer;">
+                                    <i class="bi ${iconClass}"></i> 
+                                    <strong>${cluster.name}</strong>
+                                    <span class="badge ${hasModules ? 'bg-secondary' : 'bg-light text-dark'} ms-2">
+                                        ${modules.length} modules
+                                    </span>
+                                </h6>
+                                <div class="collapse ${hasModules ? 'show' : ''}" id="cluster-${cluster.name}">
+                                    <div class="module-nodes ms-4">
+                        `;
+                        
+                        if (hasModules) {
+                            modules.forEach(module => {
+                                html += `
+                                    <div class="module-node p-2 mb-1 border-start border-2 ps-3">
+                                        <a href="#" onclick="showModuleDetails('${module.name}'); return false;" 
+                                           class="text-decoration-none">
+                                            <i class="bi bi-box"></i> 
+                                            <strong>${module.name}</strong>
+                                            <span class="badge bg-primary ms-2">${module.type}</span>
+                                        </a>
+                                    </div>
+                                `;
+                            });
+                        } else {
+                            html += `
+                                <p class="text-muted ms-3">No modules registered in this cluster</p>
+                            `;
+                        }
+                        
+                        html += `
+                                    </div>
+                                </div>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    modulesList.innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error loading clusters/modules:', error);
+                    document.getElementById('modulesList').innerHTML = 
+                        '<p class="text-danger">Failed to load data.</p>';
+                });
+        }
+        
+        function showModuleDetails(moduleName) {
+            const modal = new bootstrap.Modal(document.getElementById('moduleDetailsModal'));
+            const content = document.getElementById('moduleDetailsContent');
+            
+            content.innerHTML = '<p>Loading module details...</p>';
+            modal.show();
+            
+            fetch(`/api/v1/modules/${moduleName}/details`)
+                .then(response => response.json())
+                .then(instances => {
+                    if (instances.error) {
+                        content.innerHTML = `<p class="text-danger">${instances.error}</p>`;
+                        return;
+                    }
+                    
+                    let html = '<div class="module-details">';
+                    
+                    instances.forEach((instance, index) => {
+                        html += `
+                            <div class="instance mb-3">
+                                <h6>Instance ${index + 1}</h6>
+                                <table class="table table-sm">
+                                    <tr>
+                                        <th>ID:</th>
+                                        <td>${instance.ID}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Node:</th>
+                                        <td>${instance.Node}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Address:</th>
+                                        <td>${instance.Address}:${instance.ServicePort}</td>
+                                    </tr>
+                                    <tr>
+                                        <th>Tags:</th>
+                                        <td>${instance.ServiceTags.join(', ')}</td>
+                                    </tr>
+                                `;
+                        
+                        if (instance.ServiceMeta && Object.keys(instance.ServiceMeta).length > 0) {
+                            html += `
+                                    <tr>
+                                        <th>Metadata:</th>
+                                        <td>
+                                            <pre class="mb-0">${JSON.stringify(instance.ServiceMeta, null, 2)}</pre>
+                                        </td>
+                                    </tr>
+                            `;
+                        }
+                        
+                        html += `
+                                </table>
+                            </div>
+                        `;
+                    });
+                    
+                    html += '</div>';
+                    content.innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error loading module details:', error);
+                    content.innerHTML = '<p class="text-danger">Failed to load module details.</p>';
+                });
+        }
+        
+        function updateModulesList(moduleName, moduleType) {
+            // Reload the entire graph after registration
+            loadModulesGraph();
+            // Also reload all services
+            loadAllServices();
+        }
+        
+        function loadAllServices() {
+            // First fetch all services, then check which ones are whitelisted
+            Promise.all([
+                fetch('/api/v1/modules/all-services').then(r => r.json()),
+                fetch('/api/v1/modules').then(r => r.json()).catch(() => [])
+            ])
+            .then(([services, globalModules]) => {
+                const servicesList = document.getElementById('allServicesList');
+                
+                if (!services || services.length === 0) {
+                    servicesList.innerHTML = '<p class="text-muted">No services registered in Consul.</p>';
+                    return;
+                }
+                
+                // Create a set of registered module names for quick lookup
+                const registeredModules = new Set(globalModules.map(m => m.moduleName || m.name));
+                
+                // Build services table
+                let html = `
+                    <div class="table-responsive">
+                        <table class="table table-hover">
+                            <thead>
+                                <tr>
+                                    <th>Service Name</th>
+                                    <th>Status</th>
+                                    <th>Address</th>
+                                    <th>Port</th>
+                                    <th>Tags</th>
+                                    <th>Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                `;
+                
+                services.forEach(service => {
+                    const statusBadge = service.healthy ? 
+                        '<span class="badge bg-success">Healthy</span>' : 
+                        '<span class="badge bg-danger">Unhealthy</span>';
+                    
+                    const tags = service.tags && service.tags.length > 0 ? 
+                        service.tags.join(', ') : 
+                        '<span class="text-muted">None</span>';
+                    
+                    // Check if this is a module service
+                    const isModuleService = service.name.startsWith('module-');
+                    const moduleName = isModuleService ? service.name.substring(7) : service.name;
+                    
+                    // Action buttons for module services
+                    let actionButtons = '';
+                    if (isModuleService) {
+                        if (service.healthy) {
+                            if (registeredModules.has(moduleName)) {
+                                // Module is already registered
+                                actionButtons = `
+                                    <button class="btn btn-sm btn-success" disabled>
+                                        <i class="bi bi-check-circle-fill"></i> Registered
+                                    </button>
+                                `;
+                            } else {
+                                // Module can be whitelisted
+                                actionButtons = `
+                                    <button class="btn btn-sm btn-outline-primary" 
+                                            onclick="whitelistModule('${moduleName}', '${service.address}', ${service.port}); return false;"
+                                            title="Enable this module for clusters">
+                                        <i class="bi bi-plus-circle"></i> Register Module
+                                    </button>
+                                `;
+                            }
+                        } else {
+                            // Unhealthy service - offer archive option
+                            actionButtons = `
+                                <button class="btn btn-sm btn-outline-warning" 
+                                        onclick="archiveUnhealthyService('${service.name}', '${service.id || service.name}'); return false;"
+                                        title="Archive this unhealthy service">
+                                    <i class="bi bi-archive"></i> Archive
+                                </button>
+                            `;
+                        }
+                    }
+                    
+                    html += `
+                        <tr>
+                            <td>
+                                <a href="#" onclick="showModuleDetails('${service.name}'); return false;">
+                                    ${service.name}
+                                </a>
+                            </td>
+                            <td>${statusBadge}</td>
+                            <td>${service.address || 'N/A'}</td>
+                            <td>${service.port || 'N/A'}</td>
+                            <td><small>${tags}</small></td>
+                            <td>${actionButtons}</td>
+                        </tr>
+                    `;
+                });
+                
+                html += `
+                            </tbody>
+                        </table>
+                    </div>
+                `;
+                
+                servicesList.innerHTML = html;
+            })
+            .catch(error => {
+                console.error('Error loading all services:', error);
+                document.getElementById('allServicesList').innerHTML = 
+                    '<p class="text-danger">Failed to load services. Check Consul connection.</p>';
+            });
+        }
+        
+        function updateConsulConnection() {
+            const host = document.getElementById('consulHost').value;
+            const port = parseInt(document.getElementById('consulPort').value);
+            
+            fetch('/api/v1/consul/connection', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({ host, port })
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert('Successfully connected to Consul!');
+                    checkStatus();
+                } else {
+                    alert('Failed to connect: ' + result.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error updating Consul connection:', error);
+                alert('Failed to update connection');
+            });
+        }
+        
+        function disconnectConsul() {
+            if (!confirm('Are you sure you want to disconnect from Consul?')) {
+                return;
+            }
+            
+            fetch('/api/v1/consul/connection', {
+                method: 'DELETE'
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert('Disconnected from Consul');
+                    checkStatus();
+                } else {
+                    alert('Failed to disconnect: ' + result.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error disconnecting from Consul:', error);
+                alert('Failed to disconnect');
+            });
+        }
+        
+        function whitelistModule(moduleName, address, port) {
+            // Extract module metadata from the service tags if available
+            const serviceType = 'PIPELINE'; // Default, could be extracted from tags
+            const version = '1.0.0'; // Default, could be extracted from tags
+            
+            
+            const registrationData = {
+                moduleName: moduleName,
+                implementationId: moduleName + '-impl', // Default implementation ID
+                host: address,
+                port: port,
+                serviceType: serviceType,
+                version: version,
+                metadata: {},
+                // For now, we'll use the same host/port for engine connection
+                // This could be expanded to allow user to specify different values
+                engineConnection: null
+            };
+            
+            // Show confirmation dialog
+            if (!confirm(`Do you want to whitelist the module "${moduleName}" at ${address}:${port}?`)) {
+                return;
+            }
+            
+            // Register the module globally
+            fetch('/api/v1/global-modules/register', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(registrationData)
+            })
+            .then(response => {
+                return response.json().then(data => {
+                    // Include the status code in the data
+                    data.statusCode = response.status;
+                    return data;
+                });
+            })
+            .then(data => {
+                if (data.success) {
+                    alert(`Module "${moduleName}" has been whitelisted successfully!`);
+                    // Refresh the services list
+                    loadAllServices();
+                    // Also refresh the modules graph
+                    loadModulesGraph();
+                } else {
+                    // Check if it's a conflict (already registered)
+                    if (data.statusCode === 409) {
+                        alert(`Module "${moduleName}" is already whitelisted.`);
+                    } else {
+                        alert('Failed to whitelist module: ' + data.message);
+                    }
+                    // Refresh the UI anyway to show the current state
+                    loadAllServices();
+                }
+            })
+            .catch(error => {
+                console.error('Error whitelisting module:', error);
+                alert('Failed to whitelist module: ' + error.message);
+            });
+        }
+        
+        // Pipeline Management Functions
+        function showCreatePipelineForm() {
+            document.getElementById('createPipelineForm').style.display = 'block';
+            document.getElementById('pipelineId').focus();
+        }
+        
+        function hideCreatePipelineForm() {
+            document.getElementById('createPipelineForm').style.display = 'none';
+            document.getElementById('pipelineDefinitionForm').reset();
+        }
+        
+        function loadPipelines() {
+            // Also load public modules for pipeline creation
+            loadPublicModulesForPipelines();
+            
+            fetch('/api/v1/pipelines/definitions')
+                .then(response => {
+                    if (!response.ok) {
+                        if (response.status === 404) {
+                            throw new Error('404 - No pipelines found');
+                        }
+                        throw new Error(`HTTP error! status: ${response.status}`);
+                    }
+                    return response.json();
+                })
+                .then(pipelines => {
+                    const pipelinesList = document.getElementById('pipelinesList');
+                    
+                    if (!pipelines || pipelines.length === 0) {
+                        pipelinesList.innerHTML = '<p class="text-muted">No pipeline definitions found. Create one to get started.</p>';
+                        return;
+                    }
+                    
+                    let html = `
+                        <div class="table-responsive">
+                            <table class="table table-hover">
+                                <thead>
+                                    <tr>
+                                        <th>Pipeline ID</th>
+                                        <th>Name</th>
+                                        <th>Description</th>
+                                        <th>Steps</th>
+                                        <th>Created</th>
+                                        <th>Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                    `;
+                    
+                    pipelines.forEach(pipeline => {
+                        const createdAt = pipeline.createdAt ? new Date(pipeline.createdAt).toLocaleDateString() : 'N/A';
+                        const stepCount = pipeline.stepCount || 0;
+                        const description = pipeline.description || '<span class="text-muted">No description</span>';
+                        
+                        html += `
+                            <tr>
+                                <td><strong>${pipeline.id}</strong></td>
+                                <td>${pipeline.name}</td>
+                                <td><small>${description}</small></td>
+                                <td>${stepCount} steps</td>
+                                <td>${createdAt}</td>
+                                <td>
+                                    <button class="btn btn-sm btn-outline-primary" onclick="viewPipelineDetails('${pipeline.id}')">
+                                        <i class="bi bi-eye"></i> View
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-success" onclick="createPipelineInstance('${pipeline.id}')">
+                                        <i class="bi bi-play-circle"></i> Deploy
+                                    </button>
+                                    <button class="btn btn-sm btn-outline-danger" onclick="deletePipeline('${pipeline.id}')">
+                                        <i class="bi bi-trash"></i> Delete
+                                    </button>
+                                </td>
+                            </tr>
+                        `;
+                    });
+                    
+                    html += `
+                                </tbody>
+                            </table>
+                        </div>
+                    `;
+                    
+                    pipelinesList.innerHTML = html;
+                })
+                .catch(error => {
+                    console.error('Error loading pipelines:', error);
+                    
+                    // Check if it's a 404 (no pipelines) vs actual connection error
+                    if (error.message && error.message.includes('404')) {
+                        document.getElementById('pipelinesList').innerHTML = 
+                            '<p class="text-muted">No pipeline definitions found. Create one to get started.</p>';
+                    } else {
+                        document.getElementById('pipelinesList').innerHTML = 
+                            '<p class="text-danger">Failed to load pipelines. Error: ' + (error.message || 'Unknown error') + '</p>';
+                    }
+                });
+        }
+        
+        function viewPipelineDetails(pipelineId) {
+            // For now, just show an alert. This could open a modal with full pipeline config
+            fetch(`/api/v1/pipelines/definitions/${pipelineId}`)
+                .then(response => response.json())
+                .then(pipeline => {
+                    const details = JSON.stringify(pipeline, null, 2);
+                    alert(`Pipeline Details:\n\n${details}`);
+                })
+                .catch(error => {
+                    console.error('Error loading pipeline details:', error);
+                    alert('Failed to load pipeline details');
+                });
+        }
+        
+        function createPipelineInstance(pipelineId) {
+            // Get list of clusters first
+            fetch('/api/v1/clusters')
+                .then(response => response.json())
+                .then(clusters => {
+                    if (!clusters || clusters.length === 0) {
+                        alert('No clusters available. Please create a cluster first.');
+                        return;
+                    }
+                    
+                    // For now, use a simple prompt. Later this could be a modal
+                    const clusterList = clusters.map(c => c.name).join(', ');
+                    const clusterName = prompt(`Enter cluster name to deploy to:\nAvailable clusters: ${clusterList}`);
+                    
+                    if (!clusterName) {
+                        return;
+                    }
+                    
+                    const instanceId = prompt('Enter instance ID (e.g., prod-instance-1):');
+                    if (!instanceId) {
+                        return;
+                    }
+                    
+                    const instanceRequest = {
+                        pipelineDefinitionId: pipelineId,
+                        configOverrides: {} // Empty for now
+                    };
+                    
+                    fetch(`/api/v1/clusters/${clusterName}/pipeline-instances/${instanceId}`, {
+                        method: 'PUT',
+                        headers: {
+                            'Content-Type': 'application/json'
+                        },
+                        body: JSON.stringify(instanceRequest)
+                    })
+                    .then(response => response.json())
+                    .then(result => {
+                        if (result.success) {
+                            alert(`Pipeline instance "${instanceId}" created in cluster "${clusterName}"!`);
+                            // Could refresh instance list here
+                        } else {
+                            alert('Failed to create instance: ' + result.message);
+                        }
+                    })
+                    .catch(error => {
+                        console.error('Error creating instance:', error);
+                        alert('Failed to create instance: ' + error.message);
+                    });
+                })
+                .catch(error => {
+                    console.error('Error loading clusters:', error);
+                    alert('Failed to load clusters');
+                });
+        }
+        
+        function deletePipeline(pipelineId) {
+            if (!confirm(`Are you sure you want to delete pipeline "${pipelineId}"?\n\nThis will also delete all instances of this pipeline.`)) {
+                return;
+            }
+            
+            fetch(`/api/v1/pipelines/definitions/${pipelineId}`, {
+                method: 'DELETE'
+            })
+            .then(response => {
+                if (response.ok) {
+                    // Success! The backend returns 204 No Content on successful delete
+                    alert('Pipeline deleted successfully!');
+                    loadPipelines(); // Refresh the list
+                } else if (response.status === 404) {
+                    alert('Pipeline not found');
+                } else if (response.status === 409) {
+                    alert('Cannot delete pipeline: It has active instances');
+                } else {
+                    // Try to get error message from response
+                    return response.text().then(text => {
+                        throw new Error(text || `HTTP error! status: ${response.status}`);
+                    });
+                }
+            })
+            .catch(error => {
+                console.error('Error deleting pipeline:', error);
+                alert('Failed to delete pipeline: ' + error.message);
+            });
+        }
+        
+        function loadPublicModulesForPipelines() {
+            // Load only PUBLIC modules for pipeline creation
+d             fetch('/api/v1/modules')
+                .then(response => response.json())
+                .then(modules => {
+                    // Store for later use when adding pipeline steps
+                    window.publicModules = modules;
+                    
+                    // Update the pipeline steps section with available modules
+                    const pipelineStepsDiv = document.getElementById('pipelineSteps');
+                    if (modules && modules.length > 0) {
+                        let html = '<p class="text-muted">Available modules (PUBLIC only):</p><ul class="list-unstyled">';
+                        modules.forEach(module => {
+                            html += `<li><i class="bi bi-box"></i> ${module.moduleName} (${module.serviceType})</li>`;
+                        });
+                        html += '</ul><p class="text-info"><small>Private modules can be added after pipeline creation</small></p>';
+                        pipelineStepsDiv.innerHTML = html;
+                    }
+                })
+                .catch(error => {
+                    console.error('Error loading public modules:', error);
+                });
+        }
+        
+        function createPipelineFromConfig(pipelineId, pipelineConfig) {
+            fetch(`/api/v1/pipelines/definitions/${pipelineId}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(pipelineConfig)
+            })
+            .then(response => {
+                return response.json().then(data => ({
+                    status: response.status,
+                    body: data
+                }));
+            })
+            .then(result => {
+                if (result.body.success) {
+                    alert(`Pipeline "${pipelineConfig.pipelineName}" created successfully!`);
+                    hideCreatePipelineForm();
+                    loadPipelines();
+                } else {
+                    const errors = result.body.errors && result.body.errors.length > 0 ? 
+                        result.body.errors.join('\n') : 
+                        result.body.message || 'Unknown error';
+                    alert('Failed to create pipeline:\n' + errors);
+                }
+            })
+            .catch(error => {
+                console.error('Error creating pipeline:', error);
+                alert('Failed to create pipeline: ' + error.message);
+            });
+        }
+        
+        function loadSamplePipeline() {
+            const samplePipeline = {
+                "pipelineName": "Simple Echo Pipeline",
+                "pipelineDescription": "A simple pipeline that echoes through multiple steps",
+                "pipelineSteps": {
+                    "start": {
+                        "stepName": "start",
+                        "stepType": "INITIAL_PIPELINE",
+                        "description": "Entry point of the pipeline",
+                        "outputs": {
+                            "to-echo": {
+                                "targetStepName": "echo-step",
+                                "transportType": "GRPC"
+                            }
+                        }
+                    },
+                    "echo-step": {
+                        "stepName": "echo-step",
+                        "stepType": "PIPELINE",
+                        "description": "Echo the document",
+                        "processorInfo": {
+                            "grpcServiceName": "echo",
+                            "moduleType": "ECHO"
+                        },
+                        "outputs": {
+                            "to-parser": {
+                                "targetStepName": "parser-step",
+                                "transportType": "GRPC"
+                            }
+                        }
+                    },
+                    "parser-step": {
+                        "stepName": "parser-step",
+                        "stepType": "PIPELINE",
+                        "description": "Parse the document",
+                        "processorInfo": {
+                            "grpcServiceName": "parser",
+                            "moduleType": "PARSER"
+                        }
+                    }
+                }
+            };
+            
+            document.getElementById('pipelineIdJson').value = 'echo-pipeline';
+            document.getElementById('pipelineConfigJson').value = JSON.stringify(samplePipeline, null, 2);
+        }
+        
+        function archiveUnhealthyService(serviceName, serviceId) {
+            if (!confirm(`Are you sure you want to archive the unhealthy service "${serviceName}"?\n\nThis will move it to the archive section in Consul and remove it from active services.`)) {
+                return;
+            }
+            
+            fetch(`/api/v1/global-modules/${encodeURIComponent(serviceName)}/archive?reason=${encodeURIComponent('Service unhealthy - archived by user')}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => response.json())
+            .then(result => {
+                if (result.success) {
+                    alert(`Service "${serviceName}" has been archived successfully.`);
+                    // Refresh the services list
+                    loadAllServices();
+                    // Also refresh the modules graph
+                    loadModulesGraph();
+                } else {
+                    alert('Failed to archive service: ' + result.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error archiving service:', error);
+                alert('Failed to archive service: ' + error.message);
+            });
+        }
+    </script>
+    
+    <!-- Bootstrap JS Bundle (includes Popper) -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package com.rokkon.search.engine;
+
+option java_multiple_files = true;
+option java_package = "com.rokkon.search.engine";
+option java_outer_classname = "ConnectorServiceProto";
+
+import "rokkon_core_types.proto"; // This should define com.rokkon.search.model.PipeDoc
+
+
+// --- Messages for the Connector RPC ---
+message ConnectorRequest {
+  // REQUIRED. Identifies which connector type is sending this
+  // Examples: "gutenberg", "wikipedia", "arxiv", "gdelt"
+  // The engine uses this to determine pipeline routing
+  string connector_type = 1;
+  
+  // REQUIRED. The document to be processed
+  com.rokkon.search.model.PipeDoc document = 2;
+  
+  // RECOMMENDED. Tags for categorization, filtering, and routing
+  // Examples: ["english", "public-domain", "2024", "literature", "fiction"]
+  repeated string tags = 3;
+  
+  // Optional. If this document is part of a batch operation
+  optional com.rokkon.search.model.BatchInfo batch_info = 4;
+  
+  // Optional. Additional context that will be passed through the pipeline
+  // Replaces initial_context_params
+  map<string, string> context_params = 5;
+  
+  // Optional. Connector can suggest a stream_id (engine may override)
+  optional string suggested_stream_id = 6;
+  
+  // Optional. Processing priority: 0=low, 1=normal (default), 2=high
+  optional int32 priority = 7;
+  
+  // Optional. Version of the connector sending this request
+  optional string connector_version = 8;
+}
+
+message ConnectorResponse {
+  // The unique stream_id assigned by the engine to this ingestion flow.
+  // This allows the connector to correlate this ingestion with the pipeline execution.
+  string stream_id = 1;
+
+  // Indicates if the ingestion request was successfully accepted and queued by the engine.
+  // This does not guarantee the pipeline itself will succeed, only that ingestion was accepted.
+  bool accepted = 2;
+
+  // Optional message, e.g., "Ingestion accepted for stream ID [stream_id], targeting configured pipeline."
+  string message = 3;
+}
+// PipeStreamEngine service orchestrates pipeline execution.
+service ConnectorEngine {
+  // Ingests new data (as a PipeDoc identified by a source_identifier) into the system
+  // to start a pipeline asynchronously. The engine will:
+  // 1. Use source_identifier to look up the configured target pipeline and initial step.
+  // 2. Create the PipeStream, generate a stream_id.
+  // 3. Initiate the pipeline.
+  rpc processConnectorDoc(ConnectorRequest) returns (ConnectorResponse);
+}

@@ -1,0 +1,56 @@
+# Development profile overrides for local Consul
+quarkus:
+  http:
+    port: 8080
+    host: 0.0.0.0  # Bind to all interfaces in container
+  
+  grpc:
+    server:
+      host: 0.0.0.0  # Bind to all interfaces for local development
+      port: 49000
+  
+  consul-config:
+    enabled: true
+    agent:
+      host-port: localhost:8500
+    properties-value-keys: 
+      - config/application
+      - config/dev
+    format: yaml
+    watch: true
+    watch-period: 10s
+    fail-on-missing-key: false
+
+# Override Consul settings for local development
+consul:
+  host: ${CONSUL_HOST:consul}  # Use consul service name in docker network
+  port: ${CONSUL_PORT:8500}
+
+# Override Stork settings for local Consul
+stork:
+  default:
+    service-discovery:
+      consul-host: ${CONSUL_HOST:consul}
+      consul-port: ${CONSUL_PORT:8500}
+  echo-service:
+    service-discovery:
+      consul-host: ${CONSUL_HOST:consul}
+      consul-port: ${CONSUL_PORT:8500}
+  chunker-service:
+    service-discovery:
+      consul-host: ${CONSUL_HOST:consul}
+      consul-port: ${CONSUL_PORT:8500}
+  parser-service:
+    service-discovery:
+      consul-host: ${CONSUL_HOST:consul}
+      consul-port: ${CONSUL_PORT:8500}
+  embedder-service:
+    service-discovery:
+      consul-host: ${CONSUL_HOST:consul}
+      consul-port: ${CONSUL_PORT:8500}
+
+# Disable validation for dev
+smallrye:
+  config:
+    mapping:
+      validate-unknown: false

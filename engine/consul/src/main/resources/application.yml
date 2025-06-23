@@ -1,0 +1,120 @@
+quarkus:
+  application:
+    name: engine-consul
+  
+  # Generate gRPC code from protobuf
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+  
+  # Consul Config - Load configuration from Consul KV store
+  consul-config:
+    enabled: true
+    agent:
+      host: ${CONSUL_HOST:localhost}
+      port: ${CONSUL_PORT:8500}
+    properties-value-keys:
+      - config/application  # Load from /config/application in Consul KV
+      - config/${quarkus.profile}  # Profile-specific config
+    format: yaml  # Support YAML format in Consul
+    watch: true   # Enable hot reload of config changes
+    watch-period: 10s  # Check for changes every 10 seconds
+
+  # HTTP configuration
+  http:
+    port: 38091
+    host: 0.0.0.0
+
+  # Swagger UI
+  swagger-ui:
+    always-include: true
+    path: /swagger-ui
+
+  # OpenAPI
+  smallrye-openapi:
+    path: /openapi
+    info-title: Rokkon Pipeline Configuration API
+    info-version: 1.0.0
+    info-description: REST API for managing pipeline configurations in Consul
+
+  # REST configuration
+
+  # Stork service discovery for Consul
+  stork:
+    # Pipeline services discovery
+    pipeline-service:
+      service-discovery:
+        type: consul
+        consul-host: ${CONSUL_HOST:localhost}
+        consul-port: ${CONSUL_PORT:8500}
+
+    # Module services discovery
+    module-service:
+      service-discovery:
+        type: consul
+        consul-host: ${CONSUL_HOST:localhost}
+        consul-port: ${CONSUL_PORT:8500}
+
+  # Logging
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+    console:
+      enable: true
+      format: "%d{HH:mm:ss} %-5p [%c{2.}] (%t) %s%e%n"
+
+  # Index dependencies for reflection
+  index-dependency:
+    com-rokkon-pipeline-engine-models:
+      group-id: com.rokkon.pipeline
+      artifact-id: engine-models
+
+# Consul configuration
+consul:
+  host: ${CONSUL_HOST:localhost}
+  port: ${CONSUL_PORT:8500}
+
+# Rokkon configuration defaults
+# These can be overridden by values in Consul KV store
+rokkon:
+  engine:
+    grpc-port: 49000
+    rest-port: 8080
+    debug: false
+  
+  consul:
+    cleanup:
+      enabled: true
+      interval: 5m
+      zombie-threshold: 2m
+      cleanup-stale-whitelist: true
+    health:
+      check-interval: 10s
+      deregister-after: 1m
+      timeout: 5s
+  
+  modules:
+    auto-discover: false
+    service-prefix: "module-"
+    require-whitelist: true
+    connection-timeout: 30s
+    max-instances-per-module: 10
+  
+  default-cluster:
+    name: default
+    auto-create: true
+    description: "Default cluster for Rokkon pipelines"
+
+# Development profile
+"%dev":
+  quarkus:
+    live-reload:
+      instrumentation: true
+
+# Test profile
+"%test":
+  quarkus:
+    log:
+      level: DEBUG

@@ -1,0 +1,154 @@
+/**
+ * API Module - Handles all API communications
+ */
+const API = {
+    // Base API endpoints
+    endpoints: {
+        ping: '/ping',
+        consulStatus: '/api/consul/status',
+        dashboard: '/api/v1/modules/dashboard',
+        modules: '/api/v1/modules',
+        allServices: '/api/v1/modules/all-services',
+        cleanupZombies: '/api/v1/modules/cleanup-zombies',
+        pipelines: '/api/v1/pipelines/definitions',
+        clusters: '/api/v1/clusters'
+    },
+
+    // Generic fetch wrapper with error handling
+    async fetchJson(url, options = {}) {
+        try {
+            const response = await fetch(url, {
+                ...options,
+                headers: {
+                    'Content-Type': 'application/json',
+                    ...options.headers
+                }
+            });
+
+            if (!response.ok) {
+                // For 404s, check if it's an empty collection
+                if (response.status === 404 && url.includes('/pipelines/definitions')) {
+                    return []; // Return empty array for pipelines
+                }
+                const error = await response.json().catch(() => ({ message: response.statusText }));
+                throw new Error(error.message || `HTTP ${response.status}`);
+            }
+
+            return await response.json();
+        } catch (error) {
+            console.error(`API Error (${url}):`, error);
+            throw error;
+        }
+    },
+
+    // Engine status check
+    async checkPing() {
+        try {
+            const response = await fetch(this.endpoints.ping);
+            const text = await response.text();
+            return { success: true, data: text };
+        } catch (error) {
+            return { success: false, error: error.message };
+        }
+    },
+
+    // Consul status check
+    async checkConsulStatus() {
+        return this.fetchJson(this.endpoints.consulStatus);
+    },
+
+    // Dashboard data
+    async getDashboard() {
+        return this.fetchJson(this.endpoints.dashboard);
+    },
+
+    // Module operations
+    async registerModule(moduleData) {
+        return this.fetchJson(this.endpoints.modules, {
+            method: 'POST',
+            body: JSON.stringify(moduleData)
+        });
+    },
+
+    async enableModule(moduleId) {
+        return this.fetchJson(`${this.endpoints.modules}/${moduleId}/enable`, {
+            method: 'PUT'
+        });
+    },
+
+    async disableModule(moduleId) {
+        return this.fetchJson(`${this.endpoints.modules}/${moduleId}/disable`, {
+            method: 'PUT'
+        });
+    },
+
+    async deregisterModule(moduleId) {
+        return this.fetchJson(`${this.endpoints.modules}/${moduleId}`, {
+            method: 'DELETE'
+        });
+    },
+
+    async listModules() {
+        return this.fetchJson(this.endpoints.modules);
+    },
+
+    async cleanupZombies() {
+        return this.fetchJson(this.endpoints.cleanupZombies, {
+            method: 'POST'
+        });
+    },
+
+    // Pipeline operations
+    async listPipelines() {
+        return this.fetchJson(this.endpoints.pipelines);
+    },
+
+    async getPipeline(name) {
+        return this.fetchJson(`${this.endpoints.pipelines}/${name}`);
+    },
+
+    async createPipeline(pipelineData) {
+        return this.fetchJson(this.endpoints.pipelines, {
+            method: 'POST',
+            body: JSON.stringify(pipelineData)
+        });
+    },
+
+    async updatePipeline(name, pipelineData) {
+        return this.fetchJson(`${this.endpoints.pipelines}/${name}`, {
+            method: 'PUT',
+            body: JSON.stringify(pipelineData)
+        });
+    },
+
+    async deletePipeline(name) {
+        return this.fetchJson(`${this.endpoints.pipelines}/${name}`, {
+            method: 'DELETE'
+        });
+    },
+
+    async validatePipeline(pipelineData) {
+        return this.fetchJson(`${this.endpoints.pipelines}/validate`, {
+            method: 'POST',
+            body: JSON.stringify(pipelineData)
+        });
+    },
+
+    // Cluster operations
+    async listClusters() {
+        return this.fetchJson(this.endpoints.clusters);
+    },
+
+    async createCluster(clusterName) {
+        return this.fetchJson(this.endpoints.clusters, {
+            method: 'POST',
+            body: JSON.stringify({ name: clusterName })
+        });
+    },
+
+    async deleteCluster(clusterName) {
+        return this.fetchJson(`${this.endpoints.clusters}/${clusterName}`, {
+            method: 'DELETE'
+        });
+    }
+};

@@ -1,0 +1,51 @@
+quarkus:
+  application:
+    name: test-module
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+  http:
+    port: 39095
+    test-port: 0  # Random port for tests
+  grpc:
+    server:
+      port: 49095  # Standardized port for test-module
+      host: 0.0.0.0
+      enable-reflection-service: true
+      max-inbound-message-size: 1073741824  # 1GB
+      health:
+        enabled: true
+    clients:
+      testService:
+        max-inbound-message-size: 1073741824  # 1GB
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+  container-image:
+    build: true
+    push: false
+    name: test-module
+    tag: latest
+    group: rokkon
+    # Use docker builder
+    builder: docker
+
+# Module specific configuration
+test:
+  processor:
+    name: test-processor
+    delay:
+      ms: 0
+
+# Test profile configuration
+"%test":
+  quarkus:
+    grpc:
+      server:
+        port: 0  # Use random port for tests
+        max-inbound-message-size: 1073741824  # 1GB for tests
+      clients:
+        testService:
+          max-inbound-message-size: 1073741824  # 1GB

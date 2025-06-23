@@ -1,0 +1,16 @@
+quarkus:
+  http:
+    port: 38093  # Different port for validators when run standalone
+  application:
+    name: engine-validators
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+
+# Ensure beans are discoverable
+  index-dependency:
+    engine-validators:
+      group-id: com.rokkon.pipeline
+      artifact-id: engine-validators

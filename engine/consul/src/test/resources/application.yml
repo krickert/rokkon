@@ -1,0 +1,73 @@
+# Test configuration
+# Disable validation for unknown config properties
+smallrye:
+  config:
+    mapping:
+      validate-unknown: false
+
+quarkus:
+  application:
+    name: engine-consul-test
+  
+  # Enable consul-config for tests - connect to test container
+  consul-config:
+    enabled: true
+    agent:
+      host: ${consul.host:localhost}
+      port: ${consul.port:8500}
+    properties-value-keys:
+      - config/application  # Load from /config/application in Consul KV
+      - config/test         # Test-specific config
+    format: yaml
+    watch: false  # Disable watch for tests to avoid timing issues
+    fail-on-missing-key: false  # Don't fail if keys don't exist yet
+  
+  # HTTP configuration for tests
+  http:
+    test-port: 0  # Use random port for tests
+  
+  # Logging for tests
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+      "io.quarkus.test":
+        level: DEBUG
+      "io.quarkiverse.config.consul":
+        level: DEBUG
+
+# Test consul connection
+consul:
+  host: localhost
+  port: 8500
+
+# Test configuration values
+rokkon:
+  engine:
+    grpc-port: 49000
+    rest-port: 8080
+    debug: false
+  
+  consul:
+    cleanup:
+      enabled: true
+      interval: 5m
+      zombie-threshold: 2m
+      cleanup-stale-whitelist: true
+    health:
+      check-interval: 10s
+      deregister-after: 1m
+      timeout: 5s
+  
+  modules:
+    auto-discover: false
+    service-prefix: "module-"
+    require-whitelist: true
+    connection-timeout: 30s
+    max-instances-per-module: 10
+  
+  default-cluster:
+    name: default
+    auto-create: true
+    description: "Default cluster for Rokkon pipelines"
