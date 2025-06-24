@@ -1,0 +1,33 @@
+quarkus:
+  http:
+    port: 39093
+  grpc:
+    server:
+      port: 49093
+  log:
+    level: DEBUG
+    console:
+      enable: true
+    category:
+      "com.rokkon":
+        level: DEBUG
+  
+  # Development-specific settings
+  opentelemetry:
+    enabled: false  # Disable OpenTelemetry in dev mode
+  
+  # Development-specific container settings
+  container-image:
+    build: false
+    push: false
+
+# Use local file system for processing buffer in dev mode
+processing:
+  buffer:
+    enabled: true
+    directory: ${java.io.tmpdir}/embedder-dev-output
+
+# Disable GPU for development (unless you have a compatible GPU)
+djl:
+  pytorch:
+    use-gpu: false
