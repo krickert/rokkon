@@ -1,0 +1,43 @@
+quarkus:
+  application:
+    name: chunker-module
+  http:
+    port: 39092
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+  grpc:
+    server:
+      port: 49092
+      host: 0.0.0.0
+      enable-reflection-service: true
+      max-inbound-message-size: 1073741824  # 1GB - it's 2025!
+      max-outbound-message-size: 1073741824  # 1GB for responses
+    clients:
+      # Add gRPC client configurations here if needed
+      chunkerService:
+        max-inbound-message-size: 1073741824  # 1GB
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+  container-image:
+    build: false  # Set to true when you want to build the image
+    push: false   # Set to true when you want to push to registry
+    registry: "registry.rokkon.com:8443"
+    image: "rokkon/chunker-module:${quarkus.application.version}"
+    dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
+    group: rokkon
+    # Credentials should be provided via environment variables:
+    # QUARKUS_CONTAINER_IMAGE_USERNAME
+    # QUARKUS_CONTAINER_IMAGE_PASSWORD
+
+# Processing buffer configuration
+processing:
+  buffer:
+    enabled: ${PROCESSING_BUFFER_ENABLED:false}
+    capacity: ${PROCESSING_BUFFER_CAPACITY:100}
+    directory: ${PROCESSING_BUFFER_DIRECTORY:build/chunker-output}
+    prefix: ${PROCESSING_BUFFER_PREFIX:chunker_output}
+

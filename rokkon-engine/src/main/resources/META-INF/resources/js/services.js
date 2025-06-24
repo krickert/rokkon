@@ -2,6 +2,12 @@
  * Services Module - Handles service display and management
  */
 const Services = {
+    // Track expanded states
+    expandedStates: {
+        grpcServices: new Set(),
+        moduleInstances: new Set()
+    },
+
     // Update statistics display
     updateStatistics(stats) {
         document.getElementById('totalModules').textContent = stats.total_modules || 0;
@@ -52,6 +58,9 @@ const Services = {
         `;
         
         servicesList.innerHTML = html;
+        
+        // Restore expanded states
+        this.restoreExpandedStates();
     },
 
     renderZombieWarning(zombieCount) {
@@ -234,16 +243,23 @@ const Services = {
     // Toggle gRPC services display
     toggleGrpcServices(serviceName) {
         const grpcRow = document.getElementById(`grpc-${serviceName}`);
-            const chevron = document.getElementById(`chevron-${serviceName}`);
-            
-            if (grpcRow) {
-                grpcRow.classList.toggle('show');
+        const chevron = document.getElementById(`chevron-${serviceName}`);
+        
+        if (grpcRow) {
+            const isExpanded = grpcRow.classList.contains('show');
+            if (isExpanded) {
+                grpcRow.classList.remove('show');
+                this.expandedStates.grpcServices.delete(serviceName);
+            } else {
+                grpcRow.classList.add('show');
+                this.expandedStates.grpcServices.add(serviceName);
             }
-            
-            if (chevron) {
-                chevron.classList.toggle('bi-chevron-right');
-                chevron.classList.toggle('bi-chevron-down');
-            }
+        }
+        
+        if (chevron) {
+            chevron.classList.toggle('bi-chevron-right');
+            chevron.classList.toggle('bi-chevron-down');
+        }
     },
 
     // Toggle module instances display
@@ -251,13 +267,53 @@ const Services = {
         const instances = document.querySelectorAll(`.module-instance-${moduleName}`);
         const chevron = document.getElementById(`chevron-${moduleName}`);
         
+        const isExpanded = instances.length > 0 && instances[0].style.display !== 'none';
+        
         instances.forEach(row => {
-            row.style.display = row.style.display === 'none' ? 'table-row' : 'none';
+            row.style.display = isExpanded ? 'none' : 'table-row';
         });
+        
+        if (isExpanded) {
+            this.expandedStates.moduleInstances.delete(moduleName);
+        } else {
+            this.expandedStates.moduleInstances.add(moduleName);
+        }
         
         if (chevron) {
             chevron.classList.toggle('bi-chevron-down');
             chevron.classList.toggle('bi-chevron-right');
         }
+    },
+
+    // Restore expanded states after rendering
+    restoreExpandedStates() {
+        // Restore gRPC services
+        this.expandedStates.grpcServices.forEach(serviceName => {
+            const grpcRow = document.getElementById(`grpc-${serviceName}`);
+            const chevron = document.getElementById(`chevron-${serviceName}`);
+            
+            if (grpcRow) {
+                grpcRow.classList.add('show');
+            }
+            if (chevron) {
+                chevron.classList.remove('bi-chevron-right');
+                chevron.classList.add('bi-chevron-down');
+            }
+        });
+        
+        // Restore module instances
+        this.expandedStates.moduleInstances.forEach(moduleName => {
+            const instances = document.querySelectorAll(`.module-instance-${moduleName}`);
+            const chevron = document.getElementById(`chevron-${moduleName}`);
+            
+            instances.forEach(row => {
+                row.style.display = 'table-row';
+            });
+            
+            if (chevron) {
+                chevron.classList.remove('bi-chevron-down');
+                chevron.classList.add('bi-chevron-right');
+            }
+        });
     }
 };

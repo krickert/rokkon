@@ -138,7 +138,7 @@ const Dashboard = {
             if (this.autoRefreshEnabled) {
                 this.loadCurrentTab();
             }
-        }, 30000); // Refresh every 30 seconds
+        }, 60000); // Refresh every 60 seconds
     },
 
     // Stop auto-refresh

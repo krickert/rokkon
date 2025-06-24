@@ -1,0 +1,13 @@
+quarkus:
+  http:
+    port: 38082
+  grpc:
+    server:
+      port: 49091
+  log:
+    level: DEBUG
+    console:
+      enable: true
+    category:
+      "com.rokkon":
+        level: DEBUG
