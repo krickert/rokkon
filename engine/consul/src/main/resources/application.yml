@@ -7,23 +7,30 @@ quarkus:
     grpc:
       scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
   
+  # gRPC Server configuration
+  grpc:
+    server:
+      port: ${ENGINE_GRPC_PORT:48081}  # Override with ENGINE_GRPC_PORT env var
+      host: ${ENGINE_GRPC_HOST:0.0.0.0}
+      max-inbound-message-size: ${ENGINE_GRPC_MAX_MESSAGE_SIZE:4194304}
+  
   # Consul Config - Load configuration from Consul KV store
   consul-config:
-    enabled: true
-    agent:
-      host: ${CONSUL_HOST:localhost}
-      port: ${CONSUL_PORT:8500}
+    enabled: ${ENGINE_CONSUL_CONFIG_ENABLED:true}
+    # agent:
+    #   host: ${CONSUL_HOST:localhost}
+    #   port: ${CONSUL_PORT:8500}
     properties-value-keys:
       - config/application  # Load from /config/application in Consul KV
       - config/${quarkus.profile}  # Profile-specific config
-    format: yaml  # Support YAML format in Consul
-    watch: true   # Enable hot reload of config changes
-    watch-period: 10s  # Check for changes every 10 seconds
+    # format: yaml  # Support YAML format in Consul
+    # watch: true   # Enable hot reload of config changes
+    # watch-period: 10s  # Check for changes every 10 seconds
 
   # HTTP configuration
   http:
-    port: 38091
-    host: 0.0.0.0
+    port: ${ENGINE_HTTP_PORT:38081}  # Override with ENGINE_HTTP_PORT env var
+    host: ${ENGINE_HTTP_HOST:0.0.0.0}
 
   # Swagger UI
   swagger-ui:
@@ -70,6 +77,7 @@ quarkus:
     com-rokkon-pipeline-engine-models:
       group-id: com.rokkon.pipeline
       artifact-id: engine-models
+
 
 # Consul configuration
 consul:

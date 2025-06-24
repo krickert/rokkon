@@ -13,16 +13,6 @@ MAX_RETRIES=${MAX_RETRIES:-3}
 STARTUP_TIMEOUT=${STARTUP_TIMEOUT:-60}
 CHECK_INTERVAL=${CHECK_INTERVAL:-5}
 
-# Function to check if module is ready
-check_module_ready() {
-  # Use grpcurl to check health
-  if grpcurl -plaintext ${MODULE_HOST}:${MODULE_PORT} grpc.health.v1.Health/Check &>/dev/null; then
-    return 0
-  else
-    return 1
-  fi
-}
-
 # Function to register module with retries
 register_module() {
   local retry_count=0
@@ -66,32 +56,15 @@ register_module() {
   return 0
 }
 
-# Start the module in the background
+# Start the module in the background with port overrides
 echo "Starting module..."
-java ${JAVA_OPTS} -jar /deployments/quarkus-run.jar &
+java ${JAVA_OPTS} ${JAVA_OPTS_APPEND} -Dquarkus.http.port=${MODULE_PORT:-8080} -Dquarkus.grpc.server.port=${MODULE_PORT} -jar /deployments/quarkus-run.jar &
 MODULE_PID=$!
 
-# Wait for module to be ready
-echo "Waiting for module to be ready (timeout: ${STARTUP_TIMEOUT}s)..."
-elapsed=0
-while [ $elapsed -lt $STARTUP_TIMEOUT ]; do
-  if check_module_ready; then
-    echo "Module is ready!"
-    break
-  fi
-  
-  sleep $CHECK_INTERVAL
-  elapsed=$((elapsed + CHECK_INTERVAL))
-  echo "Waiting for module to be ready... ($elapsed/${STARTUP_TIMEOUT}s)"
-done
+# Give the module a moment to start up
+sleep 5
 
-if [ $elapsed -ge $STARTUP_TIMEOUT ]; then
-  echo "Timeout waiting for module to be ready."
-  kill $MODULE_PID
-  exit 1
-fi
-
-# Register the module
+# Register the module (CLI will handle health checks)
 if register_module; then
   # Keep the module running in foreground
   wait $MODULE_PID

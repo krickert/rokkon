@@ -6,8 +6,7 @@ services:
     container_name: rokkon-consul
     command: "consul agent -dev -ui -client=0.0.0.0 -bind=0.0.0.0 -data-dir=/consul/data"
     ports:
-      - "8500:8500"  # HTTP API & UI
-      - "8600:8600"  # DNS
+      - "8500:8500"  # Temporarily exposed for seeding configuration
     networks:
       - rokkon-network
     healthcheck:
@@ -24,10 +23,23 @@ services:
       consul:
         condition: service_healthy
     environment:
-      # Quarkus Configuration
+      # Set Quarkus profile
+      QUARKUS_PROFILE: "prod"
+      
+      # Quarkus Configuration - Override application.yml values
       QUARKUS_CONSUL_CONFIG_AGENT_HOST_PORT: "consul:8500"
+      CONSUL_HOST: "consul"
+      CONSUL_PORT: 8500
+      
+      # Vertx Consul client configuration
       QUARKUS_VERTX_CONSUL_CLIENT_HOST: "consul"
       QUARKUS_VERTX_CONSUL_CLIENT_PORT: 8500
+      
+      # Override HTTP and gRPC settings
+      QUARKUS_HTTP_HOST: "0.0.0.0"
+      QUARKUS_HTTP_PORT: 8080
+      QUARKUS_GRPC_SERVER_HOST: "0.0.0.0"
+      QUARKUS_GRPC_SERVER_PORT: 48081
       
       # Rokkon Configuration
       ROKKON_ENGINE_NAME: "rokkon-engine"
@@ -36,8 +48,8 @@ services:
       # Java options for container
       JAVA_OPTS: "-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
     ports:
-      - "8080:8080"  # HTTP API & Dashboard
-      - "8081:8081"  # gRPC port
+      - "18080:8080"  # HTTP API & Dashboard on non-conflicting port
+      - "48081:48081"  # gRPC port
     networks:
       - rokkon-network
     healthcheck:
@@ -50,9 +62,9 @@ services:
   test-module:
     image: rokkon/test-module:latest
     container_name: rokkon-test-module
-    depends_on:
-      engine:
-        condition: service_healthy
+    # depends_on:
+    #   engine:
+    #     condition: service_healthy
     environment:
       # Module configuration
       MODULE_HOST: "0.0.0.0"
@@ -60,7 +72,7 @@ services:
       
       # Engine connection for registration
       ENGINE_HOST: "engine"
-      ENGINE_PORT: 8081
+      ENGINE_PORT: 48081
       
       # Consul connection (optional)
       CONSUL_HOST: "consul"
@@ -74,8 +86,7 @@ services:
       
       # Java options
       JAVA_OPTS: "-Dquarkus.http.host=0.0.0.0"
-    ports:
-      - "9090:9090"  # gRPC port
+    # No ports exposed - internal only
     networks:
       - rokkon-network
 

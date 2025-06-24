@@ -31,6 +31,12 @@ quarkus:
     group: rokkon
     # Use docker builder
     builder: docker
+    # Additional files to include
+    docker:
+      dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
+      # Build context includes the files we need
+      additional-build-args:
+        - "--progress=plain"
 
 # Module specific configuration
 test:

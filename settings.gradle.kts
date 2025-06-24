@@ -28,6 +28,7 @@ include("engine:cli-register")
 
 // Module subprojects
 include("modules:test-module")
+include("modules:proxy-module")
 
 
 // Ensure dependencyResolutionManagement is present, especially if you plan to use version catalogs later.

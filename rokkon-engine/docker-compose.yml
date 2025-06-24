@@ -1,6 +1,7 @@
 version: '3.8'
 
 services:
+  # Consul service for service discovery and configuration
   consul:
     image: hashicorp/consul:1.21.1
     container_name: rokkon-consul-dev
@@ -12,3 +13,51 @@ services:
       - CONSUL_BIND_INTERFACE=eth0
     labels:
       - "quarkus-dev-service-consul=true"
+    networks:
+      - rokkon-network
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Rokkon Engine service
+  engine:
+    build:
+      context: ..
+      dockerfile: rokkon-engine/src/main/docker/Dockerfile.dev
+    container_name: rokkon-engine-dev
+    ports:
+      - "38090:38090"  # HTTP port
+      - "49000:49000"  # gRPC port
+      - "5005:5005"    # Debug port
+    environment:
+      - CONSUL_HOST=consul
+      - CONSUL_PORT=8500
+      - QUARKUS_PROFILE=docker-dev
+      - JAVA_ENABLE_DEBUG=true
+    depends_on:
+      consul:
+        condition: service_healthy
+    networks:
+      - rokkon-network
+    volumes:
+      # Mount source code for live coding
+      - ../rokkon-engine:/app/rokkon-engine
+      - ../rokkon-commons:/app/rokkon-commons
+      - ../rokkon-protobuf:/app/rokkon-protobuf
+      - ../engine:/app/engine
+      - ../modules:/app/modules
+      - ../test-utilities:/app/test-utilities
+      # Mount Gradle cache for faster builds
+      - gradle-cache:/home/gradle/.gradle
+
+
+networks:
+  rokkon-network:
+    name: rokkon-network
+    driver: bridge
+
+volumes:
+  gradle-cache:
+    name: gradle-cache

@@ -1,0 +1,53 @@
+####
+# This Dockerfile is used to build a container that runs the Quarkus application in JVM mode
+#
+# Before building the container image run:
+#
+# ./gradlew build
+#
+# Then, build the image with:
+#
+# docker build -f src/main/docker/Dockerfile.jvm -t rokkon/proxy-module .
+#
+# Then run the container using:
+#
+# docker run -i --rm -p 9090:9090 -e MODULE_HOST=host.docker.internal rokkon/proxy-module
+#
+###
+FROM registry.access.redhat.com/ubi8/openjdk-21:1.18
+
+ENV LANGUAGE='en_US:en'
+
+# Install grpcurl for health checks
+RUN curl -sSL https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/grpcurl_1.8.7_linux_x86_64.tar.gz | tar -xz -C /usr/local/bin
+
+# We make four distinct layers so if there are application changes the library layers can be reused
+COPY --chown=185 build/quarkus-app/lib/ /deployments/lib/
+COPY --chown=185 build/quarkus-app/*.jar /deployments/
+COPY --chown=185 build/quarkus-app/app/ /deployments/app/
+COPY --chown=185 build/quarkus-app/quarkus/ /deployments/quarkus/
+
+# Copy the CLI tool for module registration
+COPY --chown=185 build/rokkon-cli.jar /deployments/rokkon-cli.jar
+
+# Create a wrapper script for the CLI
+RUN echo '#!/bin/bash' > /usr/local/bin/rokkon && \
+    echo 'java -jar /deployments/rokkon-cli.jar "$@"' >> /usr/local/bin/rokkon && \
+    chmod +x /usr/local/bin/rokkon
+
+# Copy the module entrypoint script (for starting the backend module)
+COPY --chown=185 build/module-entrypoint.sh /deployments/module-entrypoint.sh
+RUN chmod +x /deployments/module-entrypoint.sh
+
+# Copy the proxy entrypoint script
+COPY --chown=185 proxy-entrypoint.sh /deployments/proxy-entrypoint.sh
+RUN chmod +x /deployments/proxy-entrypoint.sh
+
+# Configure the JAVA_OPTS
+ENV JAVA_OPTS="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+
+# Make sure to expose both the proxy and module gRPC ports
+EXPOSE 9090 9091
+
+# Use the proxy entrypoint script
+ENTRYPOINT ["/deployments/proxy-entrypoint.sh"]

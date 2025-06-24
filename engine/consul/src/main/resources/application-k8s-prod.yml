@@ -1,0 +1,176 @@
+# ============================================================================
+# KUBERNETES PRODUCTION PROFILE CONFIGURATION
+# ============================================================================
+# This profile is specifically for Kubernetes deployments where:
+# - Configuration comes from ConfigMaps and Secrets
+# - Service discovery uses Kubernetes DNS
+# - Health checks integrate with K8s probes
+# - Metrics are scraped by Prometheus
+# 
+# DEPLOYMENT REQUIREMENTS:
+# 1. Create ConfigMap with Consul configuration
+# 2. Create Secret with sensitive values (tokens, certs)
+# 3. Configure ServiceMonitor for Prometheus scraping
+# 4. Set up NetworkPolicies for security
+# 5. Configure PodDisruptionBudget for availability
+# ============================================================================
+
+quarkus:
+  # ==== KUBERNETES INTEGRATION ====
+  kubernetes:
+    # Let Kubernetes handle the deployment
+    deployment-target: kubernetes
+    # Use service account for permissions
+    service-account: ${ENGINE_SERVICE_ACCOUNT:rokkon-engine}
+  
+  # ==== NETWORK CONFIGURATION ====
+  # In K8s, use standard container ports - Service handles external mapping
+  grpc:
+    server:
+      port: ${ENGINE_GRPC_PORT:50051}  # Standard gRPC port
+      host: 0.0.0.0  # Must listen on all interfaces in container
+      # TLS termination can be handled by service mesh or ingress
+      ssl:
+        certificate: ${ENGINE_GRPC_CERT_FILE:}
+        key: ${ENGINE_GRPC_KEY_FILE:}
+      max-inbound-message-size: ${ENGINE_GRPC_MAX_MESSAGE_SIZE:4194304}
+  
+  http:
+    port: ${ENGINE_HTTP_PORT:8080}  # Standard HTTP port
+    host: 0.0.0.0
+    # Let ingress handle CORS
+    cors:
+      ~: false
+  
+  # ==== LOGGING FOR K8S ====
+  # Structured logging for Fluentd/Fluentbit collection
+  log:
+    level: ${ENGINE_LOG_LEVEL:INFO}
+    category:
+      "com.rokkon": ${ENGINE_APP_LOG_LEVEL:INFO}
+      "io.quarkus": WARN
+      "io.vertx": WARN
+      "io.netty": WARN
+    console:
+      # JSON format for log collectors
+      json:
+        ~: true
+        # Include K8s metadata
+        fields:
+          service: rokkon-engine
+          version: ${quarkus.application.version}
+          pod: ${HOSTNAME:unknown}
+          namespace: ${KUBERNETES_NAMESPACE:default}
+  
+  # ==== HEALTH CHECKS FOR K8S PROBES ====
+  smallrye-health:
+    # Separate liveness and readiness
+    liveness-path: /q/health/live
+    readiness-path: /q/health/ready
+    # Include detailed health info
+    ui:
+      enable: false
+    extensions:
+      enabled: true
+  
+  # ==== METRICS FOR PROMETHEUS ====
+  micrometer:
+    export:
+      prometheus:
+        enabled: true
+        path: /metrics
+    binder:
+      # Enable JVM metrics for monitoring
+      jvm: true
+      system: true
+      http-server: true
+      grpc-server: true
+  
+  # ==== CONSUL CONFIGURATION ====
+  consul-config:
+    enabled: ${ENGINE_CONSUL_CONFIG_ENABLED:true}
+    fail-on-missing-key: true
+    agent:
+      # In K8s, Consul is typically a service
+      host: ${CONSUL_HOST:consul.consul.svc.cluster.local}
+      port: ${CONSUL_PORT:8500}
+      # Token from K8s Secret
+      token: ${CONSUL_TOKEN:}
+      # mTLS for Consul communication
+      use-https: ${CONSUL_USE_HTTPS:true}
+      trust-store: ${CONSUL_TRUST_STORE:/etc/consul/certs/ca.crt}
+      key-store: ${CONSUL_KEY_STORE:/etc/consul/certs/client.p12}
+      key-store-password: ${CONSUL_KEY_STORE_PASSWORD:}
+
+# ============================================================================
+# ROKKON ENGINE K8S CONFIGURATION
+# ============================================================================
+rokkon:
+  engine:
+    # Use downward API for instance identification
+    instance-id: ${HOSTNAME:${random.uuid}}
+    grpc-port: 50051
+    rest-port: 8080
+    debug: false
+    # K8s-specific metadata
+    metadata:
+      pod-name: ${HOSTNAME:}
+      pod-namespace: ${KUBERNETES_NAMESPACE:default}
+      pod-ip: ${POD_IP:}
+      node-name: ${NODE_NAME:}
+  
+  consul:
+    # K8s handles cleanup via garbage collection
+    cleanup:
+      enabled: ${ENGINE_CLEANUP_ENABLED:true}
+      interval: ${ENGINE_CLEANUP_INTERVAL:5m}
+      zombie-threshold: ${ENGINE_ZOMBIE_THRESHOLD:2m}
+      # Clean up terminated pods
+      cleanup-stale-whitelist: true
+    
+    health:
+      # Faster checks in K8s environment
+      check-interval: ${ENGINE_HEALTH_CHECK_INTERVAL:5s}
+      deregister-after: ${ENGINE_HEALTH_DEREGISTER_AFTER:30s}
+      timeout: ${ENGINE_HEALTH_TIMEOUT:3s}
+  
+  modules:
+    # Strict security in K8s
+    require-whitelist: true
+    auto-discover: false
+    # Use K8s service naming
+    service-prefix: "rokkon-module-"
+    connection-timeout: ${ENGINE_MODULE_TIMEOUT:30s}
+    # Scale based on HPA instead of fixed limit
+    max-instances-per-module: ${ENGINE_MAX_MODULE_INSTANCES:50}
+  
+  default-cluster:
+    # Cluster per namespace or environment
+    name: ${ENGINE_CLUSTER_NAME:${KUBERNETES_NAMESPACE:production}}
+    auto-create: false
+    description: "K8s cluster in ${KUBERNETES_NAMESPACE:default} namespace"
+
+# ============================================================================
+# KUBERNETES SERVICE DISCOVERY
+# ============================================================================
+kubernetes:
+  # Service discovery configuration
+  client:
+    namespace: ${KUBERNETES_NAMESPACE:default}
+    # Use in-cluster config
+    trust-certs: true
+  
+  # Consul service endpoint
+  consul:
+    service-name: consul
+    service-port: 8500
+    
+# ============================================================================
+# DISTRIBUTED TRACING (OPTIONAL)
+# ============================================================================
+quarkus:
+  jaeger:
+    enabled: ${ENGINE_TRACING_ENABLED:false}
+    endpoint: ${JAEGER_ENDPOINT:http://jaeger-collector.istio-system.svc.cluster.local:14268/api/traces}
+    sampler-type: ${JAEGER_SAMPLER_TYPE:probabilistic}
+    sampler-param: ${JAEGER_SAMPLER_PARAM:0.1}

@@ -82,8 +82,7 @@ FROM registry.access.redhat.com/ubi9/openjdk-21:1.21
 
 ENV LANGUAGE='en_US:en'
 
-# Install grpcurl for health checks
-RUN curl -sSL https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/grpcurl_1.8.7_linux_x86_64.tar.gz | tar -xz -C /usr/local/bin
+# No additional tools needed - using netstat which is already available
 
 # We make four distinct layers so if there are application changes the library layers can be re-used
 COPY --chown=185 build/quarkus-app/lib/ /deployments/lib/
@@ -91,17 +90,17 @@ COPY --chown=185 build/quarkus-app/*.jar /deployments/
 COPY --chown=185 build/quarkus-app/app/ /deployments/app/
 COPY --chown=185 build/quarkus-app/quarkus/ /deployments/quarkus/
 
-# Copy the CLI tool
-COPY --chown=185 rokkon-cli.jar /deployments/rokkon-cli.jar
+# Copy the CLI tool and entrypoint from build directory
+COPY --chown=185 build/docker/rokkon-cli.jar /deployments/rokkon-cli.jar
+COPY --chown=185 src/main/bash/module-entrypoint.sh /deployments/module-entrypoint.sh
 
-# Create a wrapper script for the CLI
-RUN echo '#!/bin/bash' > /usr/local/bin/rokkon && \
-    echo 'java -jar /deployments/rokkon-cli.jar "$@"' >> /usr/local/bin/rokkon && \
-    chmod +x /usr/local/bin/rokkon
+# Create CLI wrapper and make scripts executable
+RUN echo '#!/bin/bash' > /deployments/rokkon && \
+    echo 'java -jar /deployments/rokkon-cli.jar "$@"' >> /deployments/rokkon && \
+    chmod +x /deployments/rokkon /deployments/module-entrypoint.sh
 
-# Copy the entrypoint script
-COPY --chown=185 module-entrypoint.sh /deployments/module-entrypoint.sh
-RUN chmod +x /deployments/module-entrypoint.sh
+# Set PATH to include the deployments directory
+ENV PATH="/deployments:${PATH}"
 
 EXPOSE 8080
 EXPOSE 9090

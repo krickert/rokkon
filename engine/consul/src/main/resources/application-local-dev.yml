@@ -1,0 +1,49 @@
+# Local development profile - for running on developer machine
+quarkus:
+  # Local dev ports - avoid conflicts with other services
+  grpc:
+    server:
+      port: ${ENGINE_GRPC_PORT:48081}
+  
+  http:
+    port: ${ENGINE_HTTP_PORT:38081}
+    cors:
+      ~: true  # Enable CORS for local development
+  
+  # Enhanced logging for local dev
+  log:
+    level: DEBUG
+    category:
+      "com.rokkon": TRACE
+      "io.quarkus.grpc": DEBUG
+    console:
+      format: "%d{HH:mm:ss} %-5p [%c{2.}] (%t) %s%e%n"
+      color: true
+  
+  # Live reload with instrumentation
+  live-reload:
+    instrumentation: true
+    watched-resources: src/main/resources
+  
+  # Disable Consul config - use local application.yml
+  consul-config:
+    enabled: false
+
+# Local dev Rokkon config
+rokkon:
+  engine:
+    grpc-port: 48081
+    rest-port: 38081
+    debug: true
+    instance-id: "local-dev-${user.name}"
+  
+  consul:
+    cleanup:
+      enabled: false  # No cleanup in local dev
+    health:
+      check-interval: 30s  # Longer intervals for local dev
+  
+  modules:
+    require-whitelist: false
+    auto-discover: true
+    connection-timeout: 60s  # Longer timeout for debugging

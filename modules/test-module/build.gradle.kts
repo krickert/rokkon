@@ -61,22 +61,30 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-// Copy module entrypoint script and CLI jar for Docker build
-tasks.register<Copy>("copyModuleEntrypoint") {
-    from(rootProject.file("scripts/module-entrypoint.sh"))
-    into(layout.buildDirectory)
-    rename { "module-entrypoint.sh" }
+// Copy CLI jar for Docker build
+tasks.register<Copy>("copyDockerAssets") {
+    dependsOn(":engine:cli-register:quarkusBuild")
+    from(project(":engine:cli-register").file("build/quarkus-app/quarkus-run.jar")) {
+        rename { "rokkon-cli.jar" }
+    }
+    into(layout.buildDirectory.dir("docker"))
 }
 
-tasks.register<Copy>("copyRokkonCli") {
-    from(project(":engine:cli-register").tasks.named("quarkusBuild").map { it.outputs.files.singleFile })
-    into(layout.buildDirectory)
-    rename { "rokkon-cli.jar" }
-}
-
+// Hook the copy task before Docker build
 tasks.named("quarkusBuild") {
-    finalizedBy("copyModuleEntrypoint", "copyRokkonCli")
+    dependsOn("copyDockerAssets")
 }
+
+// Fix task dependencies
+tasks.named("quarkusGenerateCode") {
+    dependsOn("copyDockerAssets")
+}
+
+tasks.named("processResources") {
+    dependsOn("copyDockerAssets")
+}
+
+// Clean task will automatically clean build directory including docker assets
 
 publishing {
     publications {

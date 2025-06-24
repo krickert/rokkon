@@ -1,0 +1,52 @@
+# Docker development profile - for running in Docker with local services
+quarkus:
+  # Docker dev ports - internal to container
+  grpc:
+    server:
+      port: ${ENGINE_GRPC_PORT:48081}
+      host: 0.0.0.0  # Listen on all interfaces in container
+  
+  http:
+    port: ${ENGINE_HTTP_PORT:38081}
+    host: 0.0.0.0
+  
+  # Moderate logging for Docker
+  log:
+    level: INFO
+    category:
+      "com.rokkon": DEBUG
+    console:
+      format: "%d{HH:mm:ss} %-5p [%c{2.}] %s%e%n"
+      json: false  # Human-readable logs for dev
+  
+  # Enable Consul config from Docker Consul
+  consul-config:
+    enabled: ${CONSUL_CONFIG_ENABLED:true}
+    # Use Docker service names
+    agent:
+      host: ${CONSUL_HOST:consul}
+      port: ${CONSUL_PORT:8500}
+
+# Docker dev specific config
+rokkon:
+  engine:
+    grpc-port: 48081
+    rest-port: 38081
+    debug: true
+    instance-id: "docker-dev-${hostname}"
+  
+  consul:
+    cleanup:
+      enabled: true
+      interval: 2m  # More frequent cleanup in Docker
+      zombie-threshold: 1m
+  
+  modules:
+    require-whitelist: false
+    auto-discover: true
+    service-prefix: "rokkon-module-"
+
+# Docker service discovery
+consul:
+  host: ${CONSUL_HOST:consul}
+  port: ${CONSUL_PORT:8500}

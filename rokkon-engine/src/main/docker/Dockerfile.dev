@@ -1,0 +1,77 @@
+####
+# This Dockerfile is used in order to build a container that runs the Quarkus application in dev mode
+#
+# Before building the container image run:
+#
+# ./gradlew build
+#
+# Then, build the image with:
+#
+# docker build -f src/main/docker/Dockerfile.dev -t quarkus/rokkon-engine-dev .
+#
+# Then run the container using:
+#
+# docker run -i --rm -p 38090:38090 -p 49000:49000 -p 5005:5005 \
+#   -e CONSUL_HOST=consul \
+#   -e CONSUL_PORT=8500 \
+#   -e QUARKUS_PROFILE=docker-dev \
+#   quarkus/rokkon-engine-dev
+#
+# This image uses Quarkus dev mode which supports live coding.
+# You can configure the behavior using the following environment properties:
+# - JAVA_OPTS_APPEND: JVM options to be appended to generated options
+# - QUARKUS_PROFILE: The Quarkus profile to activate (default: docker-dev)
+# - CONSUL_HOST: Consul server hostname (default: consul)
+# - CONSUL_PORT: Consul server port (default: 8500)
+#
+####
+FROM registry.access.redhat.com/ubi9/openjdk-21:1.21
+
+USER root
+
+# Install required tools
+RUN microdnf install -y findutils curl && \
+    microdnf clean all
+
+# Set up gradle user and permissions
+RUN useradd -m -u 1000 gradle && \
+    mkdir -p /home/gradle/.gradle && \
+    chown -R gradle:gradle /home/gradle
+
+USER gradle
+
+# Set working directory
+WORKDIR /app
+
+# Copy gradle wrapper
+COPY --chown=gradle:gradle gradlew /app/
+COPY --chown=gradle:gradle gradle /app/gradle
+
+# Copy build files
+COPY --chown=gradle:gradle settings.gradle.kts /app/
+COPY --chown=gradle:gradle build.gradle.kts /app/
+COPY --chown=gradle:gradle gradle.properties /app/
+
+# Copy project structure
+COPY --chown=gradle:gradle rokkon-protobuf /app/rokkon-protobuf
+COPY --chown=gradle:gradle rokkon-commons /app/rokkon-commons
+COPY --chown=gradle:gradle engine /app/engine
+COPY --chown=gradle:gradle test-utilities /app/test-utilities
+COPY --chown=gradle:gradle rokkon-engine /app/rokkon-engine
+COPY --chown=gradle:gradle modules /app/modules
+
+# Expose ports
+# 38090: HTTP port
+# 49000: gRPC port
+# 5005: Debug port
+EXPOSE 38090 49000 5005
+
+# Set environment variables
+ENV CONSUL_HOST=consul
+ENV CONSUL_PORT=8500
+ENV QUARKUS_PROFILE=docker-dev
+ENV JAVA_ENABLE_DEBUG=true
+ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
+
+# Run Quarkus in dev mode
+CMD ["./gradlew", ":rokkon-engine:quarkusDev", "-Dquarkus.http.host=0.0.0.0"]

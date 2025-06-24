@@ -68,7 +68,7 @@ quarkus:
       enabled: true
     liveness:
       enabled: true
-    
+
   # Logging
   log:
     level: INFO
@@ -77,7 +77,7 @@ quarkus:
         level: DEBUG
       "io.grpc":
         level: INFO
-  
+
   # Container image configuration
   container-image:
     build: true
@@ -87,7 +87,7 @@ quarkus:
     registry: nas.rokkon.com:5000
     push: false  # Disable auto-push, we'll do it manually
     insecure: true  # For local registry without TLS
-    
+
   # Dev services configuration
   devservices:
     enabled: true
@@ -172,42 +172,43 @@ smallrye:
           level: INFO
         "io.quarkus.devservices":
           level: DEBUG
-    
+
     # HTTP configuration for dev mode
     http:
       host: 0.0.0.0  # Listen on all interfaces in container
       port: 38090
-      
+
     # gRPC configuration for dev mode  
     grpc:
       server:
         host: 0.0.0.0  # Listen on all interfaces in container
         port: 49000
-        
+
     # Dev Services configuration
     devservices:
       enabled: true
-      
+
     # Container configuration for dev mode
     container-image:
       build: true
       group: rokkon
       name: rokkon-engine-dev
       tag: dev
-      
+
     # Dev mode configuration
     dev:
       instrumentation: true
-      
+
     # In dev mode, enable Consul features if consul.host is configured
     consul-config:
       enabled: false
-        
+
   # Consul configuration for dev mode
   consul:
     host: ${CONSUL_HOST:consul-dev}  # Use container name in dev
     port: ${CONSUL_PORT:8500}
-    
+    enabled: true
+
   # Enable auto-start of Consul container in dev mode
   rokkon:
     dev:

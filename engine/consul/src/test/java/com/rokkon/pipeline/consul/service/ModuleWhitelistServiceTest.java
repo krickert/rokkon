@@ -4,8 +4,8 @@ import com.rokkon.pipeline.config.model.*;
 import com.rokkon.pipeline.consul.model.ModuleWhitelistRequest;
 import com.rokkon.pipeline.consul.model.ModuleWhitelistResponse;
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
+import com.rokkon.pipeline.consul.test.MockTestModuleContainerResource;
 import com.rokkon.pipeline.validation.ValidationResult;
-import com.rokkon.test.containers.TestModuleContainerResource;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
@@ -28,7 +28,7 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @QuarkusTest
 @QuarkusTestResource(ConsulTestResource.class)
-@QuarkusTestResource(TestModuleContainerResource.class)
+@QuarkusTestResource(MockTestModuleContainerResource.class)
 class ModuleWhitelistServiceTest {
     private static final Logger LOG = Logger.getLogger(ModuleWhitelistServiceTest.class);
 

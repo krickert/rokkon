@@ -1,0 +1,51 @@
+version: '3.8'
+
+services:
+  # Nginx proxy to connect Docker network to host services
+  host-proxy:
+    image: nginx:alpine
+    container_name: rokkon-host-proxy
+    volumes:
+      - ./nginx-proxy.conf:/etc/nginx/nginx.conf:ro
+    networks:
+      - rokkon-network
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    ports:
+      - "28500:8500"  # Optional: expose proxied Consul for debugging
+  test-module:
+    image: rokkon/test-module:latest
+    container_name: rokkon-test-module
+    depends_on:
+      - host-proxy
+    environment:
+      # Module configuration
+      MODULE_HOST: "0.0.0.0"
+      MODULE_PORT: 49095
+      
+      # Engine connection via proxy
+      ENGINE_HOST: "host-proxy"
+      ENGINE_PORT: 8081
+      
+      # Consul connection via proxy
+      CONSUL_HOST: "host-proxy"
+      CONSUL_PORT: 8500
+      
+      # Registration settings
+      HEALTH_CHECK: "true"
+      MAX_RETRIES: 5
+      STARTUP_TIMEOUT: 60
+      CHECK_INTERVAL: 5
+      
+      # Java options to override default ports
+      JAVA_OPTS_APPEND: "-Dquarkus.http.host=0.0.0.0 -Dquarkus.http.port=8080 -Dquarkus.grpc.server.port=9090"
+    ports:
+      - "49095:49095"  # Same port mapping for gRPC
+      - "39095:39095"  # Same port mapping for HTTP
+    networks:
+      - rokkon-network
+
+networks:
+  rokkon-network:
+    driver: bridge
+    name: rokkon-network

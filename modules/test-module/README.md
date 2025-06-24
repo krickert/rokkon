@@ -1,324 +1,370 @@
-# Test Module
+# Test Module - Comprehensive Testing Harness for Rokkon Pipeline
 
 ## Overview
 
-The Test Module is a reference implementation of a Rokkon Engine pipeline module. It demonstrates how to build a "dumb" gRPC service that can be registered and orchestrated by the engine. This module is used for integration testing and serves as a template for new module development.
+The Test Module is a feature-rich implementation of the PipeStepProcessor interface designed to serve as both a reference implementation and a comprehensive testing harness for the Rokkon pipeline system. It provides configurable behaviors, error simulation, performance testing capabilities, and extensive validation features.
+
+## Key Features
+
+### 1. **Configurable Processing Behaviors**
+- **Echo Mode**: Returns input data unchanged for pass-through testing
+- **Transform Mode**: Applies configurable transformations to data
+- **Validate Mode**: Performs data validation without transformation
+- **Simulate Mode**: Generates synthetic data for load testing
+
+### 2. **Error Simulation**
+- Configurable error rates for testing error handling
+- Different error types: validation errors, processing errors, timeout errors
+- Deterministic or random error generation
+- Error injection at specific data patterns
+
+### 3. **Performance Testing**
+- Configurable processing delays to simulate real workloads
+- Memory usage simulation
+- CPU-intensive operation simulation
+- Throughput limiting for rate testing
+
+### 4. **Validation Framework**
+- JSON schema validation
+- Custom validation rules
+- Field-level validation with detailed error reporting
+- Support for complex nested data structures
+
+### 5. **Metrics and Monitoring**
+- Processing time metrics
+- Success/failure counters
+- Data volume tracking
+- Custom business metrics
+- Health check endpoint with detailed status
 
 ## Architecture
 
-This module exemplifies the key principles:
-- **No Consul dependency** - Module doesn't know about service discovery
-- **Pure gRPC service** - Implements `PipeStepProcessor` interface
-- **Container-friendly** - Includes CLI tool for self-registration
-- **Language-agnostic pattern** - Can be replicated in any language
-
-## Core Implementation
-
-### PipeStepProcessor Service
-
-```java
-@GrpcService
-@Singleton
-public class TestProcessorService implements PipeStepProcessor {
-    
-    @Override
-    public Uni<ProcessResponse> processData(ProcessRequest request) {
-        // Simple echo behavior with optional delay
-        return Uni.createFrom().item(() -> {
-            // Process the document
-            PipeDoc outputDoc = processDocument(request.getDocument());
-            
-            return ProcessResponse.newBuilder()
-                .setSuccess(true)
-                .setOutputDoc(outputDoc)
-                .addProcessorLogs("Test module processed document")
-                .build();
-        });
-    }
-    
-    @Override
-    public Uni<ServiceRegistrationData> getServiceRegistration(Empty request) {
-        return Uni.createFrom().item(
-            ServiceRegistrationData.newBuilder()
-                .setModuleName("test-module")
-                .setJsonConfigSchema(getConfigSchema())
-                .build()
-        );
-    }
-    
-    @Override
-    public Uni<ProcessResponse> registrationCheck(ProcessRequest request) {
-        // Lightweight test to verify module is working
-        return Uni.createFrom().item(
-            ProcessResponse.newBuilder()
-                .setSuccess(true)
-                .addProcessorLogs("Registration check passed")
-                .build()
-        );
-    }
-}
+```
+┌─────────────────────────────────────────────────────────────┐
+│                        Test Module                          │
+├─────────────────────────────────────────────────────────────┤
+│                                                             │
+│  ┌─────────────────┐    ┌─────────────────┐               │
+│  │  gRPC Service   │    │  Configuration  │               │
+│  │  Implementation │◄───┤   Manager       │               │
+│  └────────┬────────┘    └─────────────────┘               │
+│           │                                                 │
+│           ▼                                                 │
+│  ┌─────────────────┐    ┌─────────────────┐               │
+│  │   Processing    │    │   Validation    │               │
+│  │     Engine      │◄───┤   Engine        │               │
+│  └────────┬────────┘    └─────────────────┘               │
+│           │                                                 │
+│           ▼                                                 │
+│  ┌─────────────────┐    ┌─────────────────┐               │
+│  │    Metrics      │    │  Health Check   │               │
+│  │   Collector     │    │    Service      │               │
+│  └─────────────────┘    └─────────────────┘               │
+│                                                             │
+└─────────────────────────────────────────────────────────────┘
 ```
 
-## Container Structure
+## Building and Deployment
 
-### Dockerfile
-```dockerfile
-FROM openjdk:21-slim
+### Prerequisites
+- Java 21 or higher
+- Docker (for containerized deployment)
+- Gradle 8.0+
 
-# Copy module JAR
-COPY build/quarkus-app /app
+### Building the Module
 
-# Copy registration CLI
-COPY rokkon-cli /usr/local/bin/
-
-# Make CLI executable
-RUN chmod +x /usr/local/bin/rokkon-cli
-
-# Module runs on port 9090 (gRPC) and 8080 (HTTP/health)
-EXPOSE 9090 8080
-
-# Start script handles registration
-COPY docker-entrypoint.sh /
-ENTRYPOINT ["/docker-entrypoint.sh"]
-```
-
-### docker-entrypoint.sh
 ```bash
-#!/bin/bash
+# Build the module
+./gradlew :modules:test-module:build
 
-# Start the module in background
-java -jar /app/quarkus-run.jar &
-MODULE_PID=$!
+# Build with native compilation
+./gradlew :modules:test-module:build -Dquarkus.native.enabled=true
+```
 
-# Wait for module to be ready
-echo "Waiting for module to start..."
-sleep 10
+### Docker Build
 
-# Register with engine if ENGINE_HOST is set
-if [ ! -z "$ENGINE_HOST" ]; then
-    echo "Registering with engine at $ENGINE_HOST:$ENGINE_PORT"
-    rokkon-cli register \
-        --module-port=9090 \
-        --engine-host=$ENGINE_HOST \
-        --engine-port=$ENGINE_PORT
-    
-    if [ $? -eq 0 ]; then
-        echo "Registration successful"
-    else
-        echo "Registration failed, but module will continue running"
-    fi
-fi
+```bash
+# Build Docker image
+./docker-build.sh
 
-# Keep module running
-wait $MODULE_PID
+# Or manually
+docker build -f src/main/docker/Dockerfile.jvm -t rokkon/test-module:latest .
+```
+
+### Running Locally
+
+```bash
+# Development mode with live reload
+./gradlew :modules:test-module:quarkusDev
+
+# Run the JAR directly
+java -jar build/quarkus-app/quarkus-run.jar
+```
+
+### Docker Deployment
+
+```bash
+# Run with default configuration
+docker run -p 48095:48095 rokkon/test-module:latest
+
+# Run with custom configuration
+docker run -p 48095:48095 \
+  -e PROCESSING_MODE=transform \
+  -e ERROR_RATE=0.1 \
+  -e PROCESSING_DELAY_MS=100 \
+  rokkon/test-module:latest
 ```
 
 ## Configuration
 
-### application.yml
-```yaml
-quarkus:
-  application:
-    name: test-module
-  grpc:
-    server:
-      port: 9090
-      host: 0.0.0.0
-      enable-reflection-service: true
-      max-inbound-message-size: 1073741824  # 1GB
-    clients:
-      testService:
-        max-inbound-message-size: 1073741824  # 1GB
-        
-# Module-specific configuration
-test:
-  processor:
-    # Configurable processing delay for testing
-    delay-ms: ${TEST_DELAY_MS:0}
-    # Behavior mode: echo, transform, error
-    mode: ${TEST_MODE:echo}
-    
-# Health check endpoint
-quarkus:
-  health:
-    enabled: true
-    path: /q/health
-```
+### Environment Variables
 
-## Module Behavior Modes
+| Variable | Description | Default | Options |
+|----------|-------------|---------|---------|
+| `PROCESSING_MODE` | Processing behavior mode | echo | echo, transform, validate, simulate |
+| `ERROR_RATE` | Probability of error (0.0-1.0) | 0.0 | 0.0 to 1.0 |
+| `ERROR_TYPE` | Type of errors to generate | random | random, validation, processing, timeout |
+| `PROCESSING_DELAY_MS` | Artificial delay in milliseconds | 0 | 0-10000 |
+| `VALIDATION_STRICT` | Enable strict validation | false | true/false |
+| `METRICS_ENABLED` | Enable metrics collection | true | true/false |
+| `TRANSFORM_TYPE` | Type of transformation | uppercase | uppercase, lowercase, reverse, base64 |
+| `MEMORY_SIMULATION_MB` | Memory to allocate during processing | 0 | 0-1000 |
+| `CPU_SIMULATION_ITERATIONS` | CPU-intensive iterations | 0 | 0-1000000 |
 
-### Echo Mode (Default)
-- Returns the input document unchanged
-- Adds a processing timestamp
-- Useful for testing pipeline flow
+### Configuration File (application.properties)
 
-### Transform Mode
-- Modifies document content
-- Adds test metadata
-- Simulates real processing
-
-### Error Mode
-- Returns configurable errors
-- Tests error handling in pipeline
-- Validates DLQ behavior
-
-## Testing the Module
-
-### Unit Tests
-```java
-@QuarkusTest
-class TestProcessorServiceTest {
-    @GrpcClient
-    PipeStepProcessor processor;
-    
-    @Test
-    void testProcessData() {
-        ProcessRequest request = createTestRequest();
-        ProcessResponse response = processor.processData(request)
-            .await().indefinitely();
-            
-        assertThat(response.getSuccess()).isTrue();
-        assertThat(response.hasOutputDoc()).isTrue();
-    }
-    
-    @Test
-    void testRegistrationCheck() {
-        ProcessRequest request = createMinimalRequest();
-        ProcessResponse response = processor.registrationCheck(request)
-            .await().indefinitely();
-            
-        assertThat(response.getSuccess()).isTrue();
-    }
-}
-```
-
-### Integration Tests
-```java
-@QuarkusIntegrationTest
-class TestModuleIntegrationTest {
-    @Test
-    void testModuleRegistration() {
-        // Test full registration flow with engine
-        // Verify Consul registration
-        // Test health checks
-    }
-}
-```
-
-## Running the Module
-
-### Standalone Development
-```bash
-# Run with Quarkus dev mode
-./gradlew quarkusDev
-
-# Access at localhost:9090 (gRPC)
-# Health check at localhost:8080/q/health
-```
-
-### Docker Compose
-```yaml
-version: '3.8'
-services:
-  test-module:
-    image: rokkon/test-module:latest
-    environment:
-      ENGINE_HOST: rokkon-engine
-      ENGINE_PORT: 9099
-      TEST_MODE: echo
-      TEST_DELAY_MS: 100
-    networks:
-      - rokkon-network
-    depends_on:
-      - rokkon-engine
-      - consul
-```
-
-### Kubernetes
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: test-module
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: test-module
-  template:
-    metadata:
-      labels:
-        app: test-module
-    spec:
-      containers:
-      - name: test-module
-        image: rokkon/test-module:latest
-        env:
-        - name: ENGINE_HOST
-          value: rokkon-engine-service
-        - name: ENGINE_PORT
-          value: "9099"
-        ports:
-        - containerPort: 9090
-          name: grpc
-        - containerPort: 8080
-          name: http
-```
-
-## Monitoring
-
-### Health Endpoints
-- `/q/health` - Overall health
-- `/q/health/live` - Liveness probe
-- `/q/health/ready` - Readiness probe
-
-### Metrics
-- `grpc_server_requests_total` - Total gRPC requests
-- `grpc_server_request_duration_seconds` - Request latency
-- `test_module_documents_processed_total` - Documents processed
-
-### Logging
 ```properties
-# Detailed logging for debugging
-quarkus.log.category."com.rokkon.testmodule".level=DEBUG
-quarkus.log.category."io.grpc".level=INFO
+# gRPC Configuration
+quarkus.grpc.server.port=48095
+quarkus.grpc.server.host=0.0.0.0
+quarkus.grpc.server.max-inbound-message-size=4194304
+
+# HTTP Configuration
+quarkus.http.port=38095
+quarkus.http.host=0.0.0.0
+
+# Health Check Configuration
+quarkus.health.extensions.enabled=true
+
+# Metrics Configuration
+quarkus.micrometer.export.prometheus.enabled=true
+quarkus.micrometer.export.prometheus.path=/metrics
+```
+
+## Usage Examples
+
+### Basic Echo Test
+
+```bash
+# Send a simple echo request
+grpcurl -plaintext -d '{
+  "data": {"message": "Hello, World!"},
+  "metadata": {"source": "test"}
+}' localhost:48095 com.rokkon.pipeline.grpc.PipeStepProcessor/processData
+```
+
+### Transform Test
+
+```bash
+# Configure for transformation
+export PROCESSING_MODE=transform
+export TRANSFORM_TYPE=uppercase
+
+# Send data to transform
+grpcurl -plaintext -d '{
+  "data": {"text": "transform me"},
+  "metadata": {"operation": "uppercase"}
+}' localhost:48095 com.rokkon.pipeline.grpc.PipeStepProcessor/processData
+```
+
+### Error Simulation Test
+
+```bash
+# Configure 50% error rate
+export ERROR_RATE=0.5
+export ERROR_TYPE=validation
+
+# Send multiple requests to see errors
+for i in {1..10}; do
+  grpcurl -plaintext -d '{
+    "data": {"iteration": '$i'},
+    "metadata": {"test": "error-simulation"}
+  }' localhost:48095 com.rokkon.pipeline.grpc.PipeStepProcessor/processData
+done
+```
+
+### Performance Test
+
+```bash
+# Configure performance simulation
+export PROCESSING_DELAY_MS=500
+export MEMORY_SIMULATION_MB=100
+export CPU_SIMULATION_ITERATIONS=100000
+
+# Run performance test
+time grpcurl -plaintext -d '{
+  "data": {"test": "performance"},
+  "metadata": {"scenario": "load-test"}
+}' localhost:48095 com.rokkon.pipeline.grpc.PipeStepProcessor/processData
+```
+
+## Testing Scenarios
+
+### 1. **Integration Testing**
+- Verify pipeline connectivity
+- Test data flow through multiple modules
+- Validate error propagation
+
+### 2. **Load Testing**
+- Configure delays and resource usage
+- Generate high volumes of requests
+- Monitor performance metrics
+
+### 3. **Chaos Engineering**
+- Random error injection
+- Timeout simulation
+- Resource exhaustion testing
+
+### 4. **Validation Testing**
+- Schema validation
+- Business rule validation
+- Data quality checks
+
+## Monitoring and Observability
+
+### Health Check Endpoint
+
+```bash
+# Check module health
+curl http://localhost:38095/q/health
+
+# Response example:
+{
+  "status": "UP",
+  "checks": [{
+    "name": "test-module-health",
+    "status": "UP",
+    "data": {
+      "mode": "echo",
+      "errorRate": 0.0,
+      "requestsProcessed": 1234,
+      "errorsGenerated": 0
+    }
+  }]
+}
+```
+
+### Metrics Endpoint
+
+```bash
+# Get Prometheus metrics
+curl http://localhost:38095/q/metrics
+
+# Key metrics:
+# - test_module_requests_total
+# - test_module_errors_total
+# - test_module_processing_duration_seconds
+# - test_module_active_requests
+```
+
+## Module Registration
+
+The test module supports automatic registration with the Rokkon engine using the included CLI tool:
+
+```bash
+# Manual registration
+java -jar rokkon-cli.jar register \
+  --host engine-host \
+  --port 48081 \
+  --module-name test-module \
+  --module-host localhost \
+  --module-port 48095
+
+# Automatic registration on startup (Docker)
+# Set in docker-compose.yml or kubernetes deployment
+environment:
+  - AUTO_REGISTER=true
+  - ENGINE_HOST=rokkon-engine
+  - ENGINE_PORT=48081
 ```
 
 ## Development Guide
 
-### Creating a New Module
+### Adding New Processing Modes
 
-1. **Copy this module** as a template
-2. **Implement processing logic** in `processData()`
-3. **Update module name** in `getServiceRegistration()`
-4. **Configure ports** to avoid conflicts
-5. **Add to whitelist** in engine-registration
-6. **Build container** with CLI tool included
-7. **Test registration** with integration tests
+1. Create a new processor class implementing `DataProcessor`:
+```java
+@ApplicationScoped
+public class MyCustomProcessor implements DataProcessor {
+    @Override
+    public ProcessResponse process(ProcessRequest request) {
+        // Implementation
+    }
+}
+```
 
-### Best Practices
+2. Register in `ProcessingEngine`:
+```java
+@ApplicationScoped
+public class ProcessingEngine {
+    @Inject
+    MyCustomProcessor myProcessor;
+    
+    public ProcessResponse process(ProcessRequest request, String mode) {
+        return switch (mode) {
+            case "my-custom" -> myProcessor.process(request);
+            // ... other cases
+        };
+    }
+}
+```
 
-1. **Keep it simple** - Modules should do one thing well
-2. **Handle errors gracefully** - Return proper error responses
-3. **Log appropriately** - Help with debugging
-4. **Test thoroughly** - Unit and integration tests
-5. **Document behavior** - Clear README and examples
+### Adding Custom Metrics
+
+```java
+@Inject
+MeterRegistry registry;
+
+// Counter
+Counter customCounter = Counter.builder("test_module_custom_total")
+    .description("Custom metric description")
+    .register(registry);
+
+// Timer
+Timer customTimer = Timer.builder("test_module_custom_duration")
+    .description("Custom operation duration")
+    .register(registry);
+```
 
 ## Troubleshooting
 
-### Registration Failures
-- Check ENGINE_HOST and ENGINE_PORT are set
-- Verify module is in engine whitelist
-- Ensure gRPC port is accessible
-- Check registrationCheck implementation
+### Common Issues
 
-### Processing Errors
-- Review processor logs in response
-- Check document size limits (1GB max)
-- Verify configuration is valid
-- Monitor memory usage
+1. **Module fails to start**
+   - Check port availability: `lsof -i :48095`
+   - Verify Java version: `java -version` (requires 21+)
+   - Check logs: `docker logs <container-id>`
 
-### Health Check Issues
-- Ensure HTTP port 8080 is exposed
-- Check Quarkus health extensions are included
-- Verify no startup errors in logs
+2. **Registration fails**
+   - Ensure engine is running and accessible
+   - Verify network connectivity
+   - Check firewall rules
+
+3. **High memory usage**
+   - Reduce `MEMORY_SIMULATION_MB`
+   - Check for memory leaks in custom processors
+   - Monitor with: `docker stats <container-id>`
+
+## Contributing
+
+When adding features to the test module:
+
+1. Ensure backward compatibility
+2. Add appropriate configuration options
+3. Update this README with examples
+4. Add unit tests for new functionality
+5. Test with the full pipeline
+
+## License
+
+This module is part of the Rokkon Pipeline project and follows the same licensing terms.

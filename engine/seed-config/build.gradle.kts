@@ -15,13 +15,17 @@ val quarkusPlatformVersion: String by project
 dependencies {
     // Use our BOM
     implementation(platform(project(":rokkon-bom")))
-    
+
     implementation("io.quarkus:quarkus-picocli")
     implementation("io.quarkus:quarkus-arc")
-    
+
     // Vert.x Consul client for interacting with Consul
     implementation("io.vertx:vertx-consul-client")
-    
+
+    // Jackson for JSON and YAML support
+    implementation("com.fasterxml.jackson.core:jackson-databind")
+    implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+
     // Test dependencies
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation(project(":test-utilities"))

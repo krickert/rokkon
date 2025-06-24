@@ -1,0 +1,144 @@
+# ============================================================================
+# PRODUCTION PROFILE CONFIGURATION
+# ============================================================================
+# This profile is for production deployments where:
+# - Security is paramount
+# - Performance is optimized
+# - Logging is structured for monitoring systems
+# - All features are locked down and require explicit configuration
+# 
+# DEPLOYMENT CHECKLIST:
+# 1. Set CONSUL_HOST and CONSUL_PORT environment variables
+# 2. Configure ACL tokens if Consul security is enabled
+# 3. Set up TLS certificates for gRPC if required
+# 4. Configure monitoring endpoints
+# 5. Set appropriate JVM heap sizes
+# ============================================================================
+
+quarkus:
+  # ==== NETWORK CONFIGURATION ====
+  # Production uses standard ports that can be overridden via environment
+  grpc:
+    server:
+      port: ${ENGINE_GRPC_PORT:8081}
+      host: ${ENGINE_GRPC_HOST:0.0.0.0}
+      # Production should use TLS - configure certificates
+      ssl:
+        certificate: ${ENGINE_GRPC_CERT_FILE:}
+        key: ${ENGINE_GRPC_KEY_FILE:}
+      # Enforce message size limits to prevent abuse
+      max-inbound-message-size: ${ENGINE_GRPC_MAX_MESSAGE_SIZE:4194304}  # 4MB default
+  
+  http:
+    port: ${ENGINE_HTTP_PORT:8080}
+    host: ${ENGINE_HTTP_HOST:0.0.0.0}
+    # CORS should be explicitly configured for production
+    cors:
+      ~: ${CORS_ENABLED:false}
+      origins: ${CORS_ORIGINS:}
+    # Enable HTTP/2 for better performance
+    http2: true
+  
+  # ==== LOGGING CONFIGURATION ====
+  # Production uses structured JSON logging for log aggregation
+  log:
+    level: ${LOG_LEVEL:INFO}
+    category:
+      "com.rokkon": ${APP_LOG_LEVEL:INFO}
+      "io.quarkus": WARN
+      "io.vertx": WARN
+    console:
+      format: "%d{yyyy-MM-dd HH:mm:ss,SSS} %-5p [%c{3.}] (%t) %s%e%n"
+      json: ${LOG_JSON:true}  # JSON format for log aggregators
+  
+  # ==== CONSUL CONFIGURATION ====
+  # Production MUST use Consul for configuration management
+  consul-config:
+    enabled: ${CONSUL_CONFIG_ENABLED:true}
+    fail-on-missing-key: true  # Fail fast if config is missing
+    # agent:
+    #   host: ${CONSUL_HOST:consul}
+    #   port: ${CONSUL_PORT:8500}
+    #   # ACL token for secured Consul clusters
+    #   token: ${CONSUL_TOKEN:}
+    #   # TLS configuration for Consul
+    #   use-https: ${CONSUL_USE_HTTPS:false}
+    #   trust-store: ${CONSUL_TRUST_STORE:}
+    #   trust-store-password: ${CONSUL_TRUST_STORE_PASSWORD:}
+  
+  # ==== HEALTH & METRICS ====
+  # Enable production monitoring
+  smallrye-health:
+    ui:
+      enable: false  # Disable UI in production
+  
+  # Metrics for Prometheus
+  micrometer:
+    export:
+      prometheus:
+        enabled: true
+        path: /metrics
+
+# ============================================================================
+# ROKKON ENGINE CONFIGURATION
+# ============================================================================
+rokkon:
+  engine:
+    # Production uses environment variables for all settings
+    grpc-port: ${ENGINE_GRPC_PORT:8081}
+    rest-port: ${ENGINE_REST_PORT:8080}
+    debug: false  # NEVER enable debug in production
+    # Unique instance ID for distributed systems
+    instance-id: ${INSTANCE_ID:${hostname}-${random.uuid}}
+  
+  consul:
+    cleanup:
+      enabled: ${CLEANUP_ENABLED:true}
+      interval: ${CLEANUP_INTERVAL:5m}
+      zombie-threshold: ${ZOMBIE_THRESHOLD:2m}
+      cleanup-stale-whitelist: true
+    
+    health:
+      check-interval: ${HEALTH_CHECK_INTERVAL:10s}
+      deregister-after: ${HEALTH_DEREGISTER_AFTER:1m}
+      timeout: ${HEALTH_TIMEOUT:5s}
+  
+  modules:
+    # Production requires explicit whitelisting
+    require-whitelist: true
+    auto-discover: false  # No auto-discovery in production
+    service-prefix: "rokkon-module-"
+    connection-timeout: ${MODULE_TIMEOUT:30s}
+    max-instances-per-module: ${MAX_MODULE_INSTANCES:10}
+  
+  default-cluster:
+    name: ${CLUSTER_NAME:production}
+    auto-create: false  # Clusters must be explicitly created
+    description: "Production cluster"
+
+# ============================================================================
+# CONSUL CONNECTION CONFIGURATION
+# ============================================================================
+consul:
+  host: ${CONSUL_HOST:consul}
+  port: ${CONSUL_PORT:8500}
+  # Datacenter configuration for multi-DC deployments
+  datacenter: ${CONSUL_DATACENTER:dc1}
+  # ACL token for API access
+  token: ${CONSUL_TOKEN:}
+  
+# ============================================================================
+# SECURITY CONFIGURATION
+# ============================================================================
+# Configure these via environment variables or secrets management
+security:
+  # JWT configuration for API authentication
+  jwt:
+    issuer: ${JWT_ISSUER:}
+    audience: ${JWT_AUDIENCE:}
+  
+  # mTLS for service-to-service communication
+  mtls:
+    enabled: ${MTLS_ENABLED:false}
+    trust-store: ${MTLS_TRUST_STORE:}
+    key-store: ${MTLS_KEY_STORE:}

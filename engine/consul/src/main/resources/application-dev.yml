@@ -1,0 +1,41 @@
+# Development profile configuration
+quarkus:
+  # Development ports - different from production
+  grpc:
+    server:
+      port: ${GRPC_PORT:48081}
+  
+  http:
+    port: ${HTTP_PORT:38081}
+  
+  # Enable dev services
+  log:
+    level: DEBUG
+    console:
+      format: "%d{HH:mm:ss} %-5p [%c{2.}] (%t) %s%e%n"
+      color: true
+  
+  # Live reload for development
+  live-reload:
+    instrumentation: true
+  
+  # Disable Consul config in dev by default (use local config)
+  consul-config:
+    enabled: ${CONSUL_CONFIG_ENABLED:false}
+
+# Development-specific Rokkon config
+rokkon:
+  engine:
+    grpc-port: 48081
+    rest-port: 38081
+    debug: true
+  
+  consul:
+    cleanup:
+      enabled: false  # Don't cleanup in dev
+      interval: 5m
+      zombie-threshold: 2m
+  
+  modules:
+    require-whitelist: false  # Allow any module in dev
+    auto-discover: true  # Auto-discover modules in dev

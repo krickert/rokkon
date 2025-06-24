@@ -92,3 +92,5 @@ dependency-reduced-pom.xml
 .mvn/wrapper/maven-wrapper.jar
 
 backup-hosed-modules
+
+old_*
