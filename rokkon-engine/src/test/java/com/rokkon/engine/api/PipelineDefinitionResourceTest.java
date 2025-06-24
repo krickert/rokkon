@@ -20,15 +20,15 @@ import java.util.Map;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.Matchers.hasSize;
-import static org.mockito.ArgumentMatchers.*;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 @QuarkusTest
 class PipelineDefinitionResourceTest {
-    
+
     @InjectMock
     PipelineDefinitionService pipelineDefinitionService;
-    
+
     @InjectMock
     GlobalModuleRegistryService moduleRegistryService;
 
@@ -48,8 +48,8 @@ class PipelineDefinitionResourceTest {
             "pipeline-2", "Test Pipeline 2", "ETL pipeline", 
             3, "2024-01-16T10:00:00Z", "2024-01-16T12:00:00Z", 1
         );
-        
-        org.mockito.Mockito.when(pipelineDefinitionService.listDefinitions())
+
+        when(pipelineDefinitionService.listDefinitions())
             .thenReturn(Uni.createFrom().item(List.of(def1, def2)));
 
         // List pipeline definitions
@@ -68,16 +68,16 @@ class PipelineDefinitionResourceTest {
     @Test
     void testGetDefinition() {
         String pipelineId = "test-pipeline-123";
-        
+
         // Create a mock pipeline config using record constructor
         PipelineConfig mockConfig = new PipelineConfig(
             "Test Pipeline",
             Map.of() // Empty pipeline steps for this test
         );
-        
-        org.mockito.Mockito.when(pipelineDefinitionService.getDefinition(pipelineId))
+
+        when(pipelineDefinitionService.getDefinition(pipelineId))
             .thenReturn(Uni.createFrom().item(mockConfig));
-        
+
         given()
             .when()
             .get("/api/v1/pipelines/definitions/" + pipelineId)
@@ -90,10 +90,10 @@ class PipelineDefinitionResourceTest {
     @Test
     void testGetNonExistentDefinition() {
         String pipelineId = "non-existent-pipeline";
-        
-        org.mockito.Mockito.when(pipelineDefinitionService.getDefinition(pipelineId))
+
+        when(pipelineDefinitionService.getDefinition(pipelineId))
             .thenReturn(Uni.createFrom().nullItem());
-        
+
         given()
             .when()
             .get("/api/v1/pipelines/definitions/" + pipelineId)
@@ -105,7 +105,7 @@ class PipelineDefinitionResourceTest {
     @Test
     void testCreateDefinition() {
         String pipelineId = "new-pipeline";
-        
+
         // Create a pipeline config to send
         Map<String, Object> pipelineConfig = Map.of(
             "name", "New Pipeline",
@@ -113,10 +113,10 @@ class PipelineDefinitionResourceTest {
             "version", "1.0.0",
             "steps", List.of()
         );
-        
+
         ValidationResult successResult = new ValidationResult(true, List.of(), List.of());
-        
-        org.mockito.Mockito.when(pipelineDefinitionService.createDefinition(
+
+        when(pipelineDefinitionService.createDefinition(
             org.mockito.ArgumentMatchers.eq(pipelineId),
             org.mockito.ArgumentMatchers.any(PipelineConfig.class)
         )).thenReturn(Uni.createFrom().item(successResult));
@@ -135,20 +135,20 @@ class PipelineDefinitionResourceTest {
     @Test
     void testCreateDuplicateDefinition() {
         String pipelineId = "existing-pipeline";
-        
+
         Map<String, Object> pipelineConfig = Map.of(
             "name", "Existing Pipeline",
             "description", "An existing pipeline",
             "version", "1.0.0"
         );
-        
+
         ValidationResult failureResult = new ValidationResult(
             false, 
             List.of("Pipeline definition already exists"), 
             List.of()
         );
-        
-        org.mockito.Mockito.when(pipelineDefinitionService.createDefinition(
+
+        when(pipelineDefinitionService.createDefinition(
             org.mockito.ArgumentMatchers.eq(pipelineId),
             org.mockito.ArgumentMatchers.any(PipelineConfig.class)
         )).thenReturn(Uni.createFrom().item(failureResult));
@@ -168,16 +168,16 @@ class PipelineDefinitionResourceTest {
     @Test
     void testUpdateDefinition() {
         String pipelineId = "update-pipeline";
-        
+
         Map<String, Object> pipelineConfig = Map.of(
             "name", "Updated Pipeline",
             "description", "An updated pipeline definition",
             "version", "2.0.0"
         );
-        
+
         ValidationResult successResult = new ValidationResult(true, List.of(), List.of());
-        
-        org.mockito.Mockito.when(pipelineDefinitionService.updateDefinition(
+
+        when(pipelineDefinitionService.updateDefinition(
             org.mockito.ArgumentMatchers.eq(pipelineId),
             org.mockito.ArgumentMatchers.any(PipelineConfig.class)
         )).thenReturn(Uni.createFrom().item(successResult));
@@ -196,19 +196,19 @@ class PipelineDefinitionResourceTest {
     @Test
     void testUpdateNonExistentDefinition() {
         String pipelineId = "non-existent-pipeline";
-        
+
         Map<String, Object> pipelineConfig = Map.of(
             "name", "Updated Pipeline",
             "version", "2.0.0"
         );
-        
+
         ValidationResult failureResult = new ValidationResult(
             false, 
             List.of("Pipeline definition not found"), 
             List.of()
         );
-        
-        org.mockito.Mockito.when(pipelineDefinitionService.updateDefinition(
+
+        when(pipelineDefinitionService.updateDefinition(
             org.mockito.ArgumentMatchers.eq(pipelineId),
             org.mockito.ArgumentMatchers.any(PipelineConfig.class)
         )).thenReturn(Uni.createFrom().item(failureResult));
@@ -228,10 +228,10 @@ class PipelineDefinitionResourceTest {
     @Test
     void testDeleteDefinition() {
         String pipelineId = "delete-pipeline";
-        
+
         ValidationResult successResult = new ValidationResult(true, List.of(), List.of());
-        
-        org.mockito.Mockito.when(pipelineDefinitionService.deleteDefinition(pipelineId))
+
+        when(pipelineDefinitionService.deleteDefinition(pipelineId))
             .thenReturn(Uni.createFrom().item(successResult));
 
         given()
@@ -244,14 +244,14 @@ class PipelineDefinitionResourceTest {
     @Test
     void testDeleteNonExistentDefinition() {
         String pipelineId = "non-existent-pipeline";
-        
+
         ValidationResult failureResult = new ValidationResult(
             false, 
             List.of("Pipeline definition not found"), 
             List.of()
         );
-        
-        org.mockito.Mockito.when(pipelineDefinitionService.deleteDefinition(pipelineId))
+
+        when(pipelineDefinitionService.deleteDefinition(pipelineId))
             .thenReturn(Uni.createFrom().item(failureResult));
 
         given()
@@ -267,14 +267,14 @@ class PipelineDefinitionResourceTest {
     @Test
     void testDeleteDefinitionWithActiveInstances() {
         String pipelineId = "active-pipeline";
-        
+
         ValidationResult failureResult = new ValidationResult(
             false, 
             List.of("Cannot delete: pipeline has active instances"), 
             List.of()
         );
-        
-        org.mockito.Mockito.when(pipelineDefinitionService.deleteDefinition(pipelineId))
+
+        when(pipelineDefinitionService.deleteDefinition(pipelineId))
             .thenReturn(Uni.createFrom().item(failureResult));
 
         given()
@@ -347,10 +347,10 @@ class PipelineDefinitionResourceTest {
 
         // Then: Verify the pipeline was created with correct transformation
         ArgumentCaptor<PipelineConfig> configCaptor = ArgumentCaptor.forClass(PipelineConfig.class);
-        org.mockito.Mockito.verify(pipelineDefinitionService).createDefinition(
+        verify(pipelineDefinitionService).createDefinition(
                 org.mockito.ArgumentMatchers.eq("test-pipeline"), 
                 configCaptor.capture());
-        
+
         PipelineConfig capturedConfig = configCaptor.getValue();
         assert capturedConfig.name().equals("test-pipeline");
         assert capturedConfig.pipelineSteps().containsKey("step1");
