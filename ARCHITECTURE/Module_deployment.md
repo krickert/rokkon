@@ -148,8 +148,8 @@ sequenceDiagram
     loop Health Check Loop
         EntrypointScript ->> ModuleApp: Check Health (e.g., gRPC Health/Check)
         ModuleApp -->> EntrypointScript: Health Status
-        break Module Healthy
     end
+    note right of EntrypointScript: Loop breaks once module is healthy
     EntrypointScript ->> RokkonCLI: Execute `register` command with module details
     RokkonCLI ->> RokkonEngine: gRPC Call: RegisterModuleRequest (module IP, port, type, etc.)
 

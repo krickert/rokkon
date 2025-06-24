@@ -45,18 +45,18 @@ graph TD
 
     subgraph "Pipeline Modules (gRPC Services)"
         direction LR
-        Connector1[Connector Module 1<br>(e.g., Python)]
-        Connector2[Connector Module 2<br>(e.g., Go)]
-        StepA[Processing Step A<br>(e.g., Java)]
-        StepB[Processing Step B<br>(e.g., Python)]
-        StepC[Processing Step C<br>(e.g., Node.js)]
-        Sink1[Sink Module 1<br>(e.g., Java)]
-        Sink2[Sink Module 2<br>(e.g., Go)]
+        Connector1["Connector Module 1<br>(e.g., Python)"]
+        Connector2["Connector Module 2<br>(e.g., Go)"]
+        StepA["Processing Step A<br>(e.g., Java)"]
+        StepB["Processing Step B<br>(e.g., Python)"]
+        StepC["Processing Step C<br>(e.g., Node.js)"]
+        Sink1["Sink Module 1<br>(e.g., Java)"]
+        Sink2["Sink Module 2<br>(e.g., Go)"]
     end
 
     User[User/API Client] -- Defines/Controls Pipeline --> Engine
 
-    %% Data Flow Example
+%% Data Flow Example
     Connector1 -- gRPC/Kafka --> StepA
     Connector2 -- gRPC/Kafka --> StepA
     StepA -- gRPC/Kafka --> StepB
@@ -156,36 +156,37 @@ Let's consider a realistic scenario where we want to ingest documents from the G
 ```mermaid
 graph LR
     subgraph "Data Sources (Connectors)"
-        Gutenberg[Gutenberg Library Connector]
-        Wikipedia[Wikipedia Connector]
+        Gutenberg["Gutenberg Library Connector"]
+        Wikipedia["Wikipedia Connector"]
     end
 
     subgraph "Processing Steps"
-        Parser[Parser]
-        Chunker1[Chunker]
-        Chunker2[Chunker 2 (Refiner/Specializer)]
-        Embedder1[Embedder (Model A)]
-        Embedder2[Embedder 2 (Model B)]
+        Parser["Parser"]
+        Chunker1["Chunker"]
+        Chunker2["Chunker 2 (Refiner/Specializer)"]
+        Embedder1["Embedder (Model A)"]
+        Embedder2["Embedder 2 (Model B)"]
     end
 
     subgraph "Data Destinations (Sinks)"
-        OpenSearch1[OpenSearch Sink (Index A)]
-        OpenSearch2[OpenSearch Sink 2 (Index B for A/B Test)]
+        OpenSearch1["OpenSearch Sink (Index A)"]
+        OpenSearch2["OpenSearch Sink 2 (Index B for A/B Test)"]
     end
 
-    %% Data Flow
-    Gutenberg -- Raw Docs --> Parser
-    Wikipedia -- Raw Docs --> Parser
-    Parser -- Structured Docs --> Chunker1
-    Chunker1 -- Chunks --> Chunker2
-    Chunker2 -- Refined Chunks --> Embedder1
-    Chunker2 -- Refined Chunks --> Embedder2 %% Fan-out to parallel embedders
+%% Data Flow
+    Gutenberg -- "Raw Docs" --> Parser
+    Wikipedia -- "Raw Docs" --> Parser
+    Parser -- "Structured Docs" --> Chunker1
+    Chunker1 -- "Chunks" --> Chunker2
+    Chunker2 -- "Refined Chunks" --> Embedder1
+%% Fan-out to parallel embedders
+    Chunker2 -- "Refined Chunks" --> Embedder2
 
-    Embedder1 -- Chunks + Embedding A --> OpenSearch1
-    Embedder2 -- Chunks + Embedding B --> OpenSearch2
+    Embedder1 -- "Chunks + Embedding A" --> OpenSearch1
+    Embedder2 -- "Chunks + Embedding B" --> OpenSearch2
 
-    %% Illustrating potential direct path for A/B testing if Embedder2 output is also sent to OS1
-    %% Embedder2 -- Chunks + Embedding B --> OpenSearch1 %% Option for combined index
+%% Illustrating potential direct path for A/B testing if Embedder2 output is also sent to OS1
+%% Embedder2 -- "Chunks + Embedding B" --> OpenSearch1 %% Option for combined index
 
     classDef connector fill:#lightblue,stroke:#333,stroke-width:2px;
     classDef processor fill:#lightgreen,stroke:#333,stroke-width:2px;

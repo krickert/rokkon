@@ -15,11 +15,11 @@ graph TD
     Pipeline2 -- Composed of --> Step2B[Pipeline Step 2B]
     Pipeline2 -- Composed of --> Step3B[Pipeline Step 3B]
 
-    Step1A -- Executed by --> ModuleX[Module X (e.g., Parser)]
-    Step2A -- Executed by --> ModuleY[Module Y (e.g., Chunker)]
-    Step1B -- Executed by --> ModuleX[Module X (e.g., Parser)]
-    Step2B -- Executed by --> ModuleZ[Module Z (e.g., Embedder)]
-    Step3B -- Executed by --> ModuleW[Module W (e.g., OpenSearch Sink)]
+    Step1A -- "Executed by" --> ModuleX["Module X (e.g., Parser)"]
+    Step2A -- "Executed by" --> ModuleY["Module Y (e.g., Chunker)"]
+    Step1B -- "Executed by" --> ModuleX["Module X (e.g., Parser)"]
+    Step2B -- "Executed by" --> ModuleZ["Module Z (e.g., Embedder)"]
+    Step3B -- "Executed by" --> ModuleW["Module W (e.g., OpenSearch Sink)"]
 
     subgraph "Logical Configuration"
         Cluster
@@ -103,6 +103,7 @@ A cornerstone of the Rokkon Engine's flexibility is its dynamic configuration sy
 *   **Decoupling:** The dynamic configuration system decouples the pipeline logic (defined in Consul) from the engine's core code and the module implementations. This allows for rapid iteration on pipeline designs.
 
 ```mermaid
+
 sequenceDiagram
     participant User/Admin as User/Admin
     participant RokkonCLI as Rokkon CLI/UI

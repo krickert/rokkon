@@ -50,19 +50,23 @@ graph TD
         ConsulServer[Consul <br> HTTP:8500]
         KafkaServer[Kafka <br> TCP:9092]
 
-        RokkonEngine -- localhost/docker_ip --> ConsulServer
-        RokkonEngine -- localhost/docker_ip --> KafkaServer
-        RokkonEngine -- localhost/docker_ip:9090 --> Module1
-        RokkonEngine -- localhost/docker_ip:9091 --> Module2
+        RokkonEngine -- "localhost/docker_ip" --> ConsulServer
+        RokkonEngine -- "localhost/docker_ip" --> KafkaServer
+        RokkonEngine -- "localhost/docker_ip:9090" --> Module1
+        RokkonEngine -- "localhost/docker_ip:9091" --> Module2
 
-        Module1 -- localhost/docker_ip:49000 --> RokkonEngine %% Registration
-        Module2 -- localhost/docker_ip:49000 --> RokkonEngine %% Registration
-        Module1 -- localhost/docker_ip --> ConsulServer %% Health checks (polled by Consul)
-        Module2 -- localhost/docker_ip --> ConsulServer %% Health checks
-        Module1 -- localhost/docker_ip --> KafkaServer
-        Module2 -- localhost/docker_ip --> KafkaServer
+        Module1 -- "localhost/docker_ip:49000" --> RokkonEngine
+    %% Registration
+        Module2 -- "localhost/docker_ip:49000" --> RokkonEngine
+    %% Registration
+        Module1 -- "localhost/docker_ip" --> ConsulServer
+    %% Health checks (polled by Consul)
+        Module2 -- "localhost/docker_ip" --> ConsulServer
+    %% Health checks
+        Module1 -- "localhost/docker_ip" --> KafkaServer
+        Module2 -- "localhost/docker_ip" --> KafkaServer
     end
-    User[User/Browser/CLI] -- localhost:38090 --> RokkonEngine
+    User[User/Browser/CLI] -- "localhost:38090" --> RokkonEngine
 
     classDef component fill:#lightblue,stroke:#333,stroke-width:2px;
     classDef external fill:#lightgrey,stroke:#333,stroke-width:2px;
@@ -80,6 +84,7 @@ graph TD
     *   Network Policies can be used to enforce stricter communication rules between pods.
 
 ```mermaid
+
 graph TD
     subgraph "Kubernetes Cluster"
         subgraph "Namespace: rokkon"
@@ -138,54 +143,48 @@ graph TD
 
 ```mermaid
 graph TD
-    subgraph "Cloud Region 1 / Datacenter A (e.g., Core Services)"
-        RokkonEngineCluster[Rokkon Engine Cluster]
-        ConsulDC1[Consul Datacenter 1 (Servers)]
-        KafkaCluster1[Kafka Cluster 1]
+    subgraph "Kubernetes Cluster"
+        subgraph "Namespace: rokkon"
+            RokkonEngineService[K8s Service: rokkon-engine] --> RokkonEnginePods["Rokkon Engine Pods <br> (Deployment)"]
+            Module1Service[K8s Service: module1] --> Module1Pods["Module 1 Pods <br> (Deployment)"]
+            Module2Service[K8s Service: module2] --> Module2Pods["Module 2 Pods <br> (Deployment)"]
+        end
+        subgraph "Namespace: data-services (or shared)"
+            ConsulService[K8s Service: consul] --> ConsulPods["Consul Server Pods <br> (StatefulSet)"]
+            KafkaService[K8s Service: kafka] --> KafkaPods["Kafka Broker Pods <br> (StatefulSet)"]
+        end
 
-        RokkonEngineCluster -- Connects to --> ConsulDC1
-        RokkonEngineCluster -- Connects to --> KafkaCluster1
+        RokkonEnginePods -- "K8s DNS: consul.data-services..." --> ConsulPods
+        RokkonEnginePods -- "K8s DNS: kafka.data-services..." --> KafkaPods
+
+    %% Module registration to Engine
+        Module1Pods -- "K8s DNS: rokkon-engine.rokkon..." --> RokkonEnginePods
+        Module2Pods -- "K8s DNS: rokkon-engine.rokkon..." --> RokkonEnginePods
+
+    %% Engine to Module communication (via Consul discovered Pod IPs or K8s Service for module type)
+        RokkonEnginePods -- "Pod IPs (via Consul) or K8s Service" --> Module1Pods
+        RokkonEnginePods -- "Pod IPs (via Consul) or K8s Service" --> Module2Pods
+
+    %% Modules to Consul/Kafka
+        Module1Pods -- "K8s DNS: consul.data-services..." --> ConsulPods
+        Module1Pods -- "K8s DNS: kafka.data-services..." --> KafkaPods
+        Module2Pods -- "K8s DNS: consul.data-services..." --> ConsulPods
+        Module2Pods -- "K8s DNS: kafka.data-services..." --> KafkaPods
+
+    %% External Access
+        Ingress[Kubernetes Ingress/LoadBalancer] --> RokkonEngineService
     end
 
-    subgraph "Cloud Region 2 / Datacenter B (e.g., Specialized Modules)"
-        ModuleClusterX[Module X Cluster]
-        ConsulDC2[Consul Datacenter 2 (Servers)] %% Could be clients pointing to DC1 or federated servers
-        KafkaCluster2[Kafka Cluster 2 (Optional, or Replicated)]
+    User[User/Browser/CLI] -- "Public IP/DNS" --> Ingress
 
-        ModuleClusterX -- Registers with/Discovered by --> ConsulDC2
-        ModuleClusterX -- Connects to --> KafkaCluster2
-    end
+    classDef k8sService fill:#lightblue,stroke:#333,stroke-width:2px;
+    classDef k8sPods fill:#ccf,stroke:#333,stroke-width:2px;
+    classDef external fill:#lightgrey,stroke:#333,stroke-width:2px;
 
-    subgraph "On-Premises Datacenter C (e.g., Legacy Connectors)"
-        LegacyConnectorModule[Legacy Connector Module]
-        ConsulAgentOnPrem[Consul Agent (Client)]
-    end
+    class RokkonEngineService,Module1Service,Module2Service,ConsulService,KafkaService k8sService;
+    class RokkonEnginePods,Module1Pods,Module2Pods,ConsulPods,KafkaPods k8sPods;
+    class Ingress,User external;
 
-    %% Inter-Datacenter Communication
-    ConsulDC1 <-- WAN Federation --> ConsulDC2
-    ConsulDC1 <-- WAN Federation / Client Mode --> ConsulAgentOnPrem
-
-    KafkaCluster1 <-- MirrorMaker/Replication --> KafkaCluster2 %% Optional
-
-    RokkonEngineCluster -- Secure Connection (VPN/Service Mesh/mTLS) <br> Discovers via Federated Consul --> ModuleClusterX
-    ModuleClusterX -- Secure Connection (VPN/Service Mesh/mTLS) <br> Registers via Engine in DC1 or Federated Consul --> RokkonEngineCluster
-
-    RokkonEngineCluster -- Secure Connection (VPN/Service Mesh/mTLS) <br> Discovers via Federated Consul --> LegacyConnectorModule
-    LegacyConnectorModule -- Secure Connection (VPN/Service Mesh/mTLS) <br> Registers via Engine in DC1 or Federated Consul --> RokkonEngineCluster
-
-
-    %% User Access
-    User[User/Browser/CLI] -- Internet --> PublicEndpoint[Public Endpoint for Rokkon Engine API/UI <br> (e.g., Cloud Load Balancer in DC1)]
-    PublicEndpoint --> RokkonEngineCluster
-
-    classDef mainCluster fill:#lightblue,stroke:#333,stroke-width:2px;
-    classDef remoteCluster fill:#lightgreen,stroke:#333,stroke-width:2px;
-    classDef onPrem fill:#lightcoral,stroke:#333,stroke-width:2px;
-    classDef networkLink fill:#eee,stroke:#000,stroke-width:1px,color:black;
-
-    class RokkonEngineCluster,ConsulDC1,KafkaCluster1 mainCluster;
-    class ModuleClusterX,ConsulDC2,KafkaCluster2 remoteCluster;
-    class LegacyConnectorModule,ConsulAgentOnPrem onPrem;
 ```
 **Key Considerations for Hybrid/Multi-Cluster:**
 *   **Latency:** Network latency between components in different regions/datacenters can significantly impact performance, especially for synchronous gRPC calls. Asynchronous communication via Kafka becomes even more critical.

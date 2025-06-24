@@ -17,12 +17,12 @@ Connectors are specialized modules responsible for ingesting data from external 
 graph TD
     subgraph "Data Sources"
         direction LR
-        DBs[Databases <br> (JDBC)]
-        CloudStorage[Cloud Storage <br> (S3, GCS, Azure Blob)]
-        FileServers[File Servers <br> (FTP, SFTP, SMB, NFS)]
-        CodeRepos[Code Repositories <br> (GitLab, GitHub)]
-        WebCorpora[Web Corpora <br> (Wikipedia, Gutenberg)]
-        LiveFeeds[Live Feeds <br> (Weather, News)]
+        DBs["Databases <br> (JDBC)"]
+        CloudStorage["Cloud Storage <br> (S3, GCS, Azure Blob)"]
+        FileServers["File Servers <br> (FTP, SFTP, SMB, NFS)"]
+        CodeRepos["Code Repositories <br> (GitLab, GitHub)"]
+        WebCorpora["Web Corpora <br> (Wikipedia, Gutenberg)"]
+        LiveFeeds["Live Feeds <br> (Weather, News)"]
     end
 
     subgraph "Rokkon Connectors (Modules)"
@@ -37,14 +37,14 @@ graph TD
         WeatherFeedConnector[Weather Feed Connector]
     end
 
-    DBs -- Ingested by --> JdbcConnector
-    CloudStorage -- Ingested by --> S3Connector
-    FileServers -- Ingested by --> FtpConnector
-    FileServers -- Ingested by --> NfsConnector
-    CodeRepos -- Ingested by --> GitConnector
-    WebCorpora -- Ingested by --> WikipediaConnector
-    WebCorpora -- Ingested by --> GutenbergConnector
-    LiveFeeds -- Ingested by --> WeatherFeedConnector
+    DBs -- "Ingested by" --> JdbcConnector
+    CloudStorage -- "Ingested by" --> S3Connector
+    FileServers -- "Ingested by" --> FtpConnector
+    FileServers -- "Ingested by" --> NfsConnector
+    CodeRepos -- "Ingested by" --> GitConnector
+    WebCorpora -- "Ingested by" --> WikipediaConnector
+    WebCorpora -- "Ingested by" --> GutenbergConnector
+    LiveFeeds -- "Ingested by" --> WeatherFeedConnector
 
     JdbcConnector -- PipeDocs --> RokkonPipeline[Rokkon Pipeline]
     S3Connector -- PipeDocs --> RokkonPipeline
@@ -110,19 +110,19 @@ Pipeline steps are modules that transform, enrich, or analyze data as it flows t
 
 ```mermaid
 graph TD
-    InputPipeDoc[PipeDoc In] --> VideoImageParse[Video/Image Parsing <br> (AI/Text Conversion)]
+    InputPipeDoc[PipeDoc In] --> VideoImageParse["Video/Image Parsing <br> (AI/Text Conversion)"]
     InputPipeDoc --> OcrPdf[OCR PDFs]
-    InputPipeDoc --> Nlp[NLP Tasks <br> (NER, Categorization, Keywords)]
+    InputPipeDoc --> Nlp["NLP Tasks <br> (NER, Categorization, Keywords)"]
     InputPipeDoc --> ChartId[Chart Identification]
     InputPipeDoc --> SummarizerStep[Summarizer]
     InputPipeDoc --> CodeAnalysisStep[Code Analysis]
 
-    VideoImageParse -- Processed PipeDoc --> OutputPipeDoc[PipeDoc Out]
-    OcrPdf -- Processed PipeDoc --> OutputPipeDoc
-    Nlp -- Processed PipeDoc --> OutputPipeDoc
-    ChartId -- Processed PipeDoc --> OutputPipeDoc
-    SummarizerStep -- Processed PipeDoc --> OutputPipeDoc
-    CodeAnalysisStep -- Processed PipeDoc --> OutputPipeDoc
+    VideoImageParse -- "Processed PipeDoc" --> OutputPipeDoc[PipeDoc Out]
+    OcrPdf -- "Processed PipeDoc" --> OutputPipeDoc
+    Nlp -- "Processed PipeDoc" --> OutputPipeDoc
+    ChartId -- "Processed PipeDoc" --> OutputPipeDoc
+    SummarizerStep -- "Processed PipeDoc" --> OutputPipeDoc
+    CodeAnalysisStep -- "Processed PipeDoc" --> OutputPipeDoc
 
     classDef step fill:#ccf,stroke:#333,stroke-width:2px;
     classDef data fill:#ffc,stroke:#333,stroke-width:2px;
@@ -174,14 +174,14 @@ Sinks are modules responsible for writing processed data from Rokkon pipelines t
 ```mermaid
 graph TD
     RokkonPipeline[Rokkon Pipeline] -- PipeDocs --> OpenSearchSink[OpenSearch Sink]
-    RokkonPipeline -- PipeDocs --> MongoSink[MongoDB/DocumentDB Sink]
-    RokkonPipeline -- PipeDocs --> VectorStoreSink[Pinecone/Other Vector Stores Sink]
-    RokkonPipeline -- PipeDocs --> PostgresSink[PostgreSQL Sink (Relational/JSONB)]
+    RokkonPipeline -- PipeDocs --> MongoSink["MongoDB/DocumentDB Sink"]
+    RokkonPipeline -- PipeDocs --> VectorStoreSink["Pinecone/Other Vector Stores Sink"]
+    RokkonPipeline -- PipeDocs --> PostgresSink["PostgreSQL Sink (Relational/JSONB)"]
 
-    OpenSearchSink -- Writes Data --> OpenSearchCluster[OpenSearch Cluster]
-    MongoSink -- Writes Data --> MongoCluster[MongoDB / DocumentDB]
-    VectorStoreSink -- Writes Data --> VectorDB[Vector Database]
-    PostgresSink -- Writes Data --> PostgresDB[PostgreSQL Database]
+    OpenSearchSink -- "Writes Data" --> OpenSearchCluster[OpenSearch Cluster]
+    MongoSink -- "Writes Data" --> MongoCluster["MongoDB / DocumentDB"]
+    VectorStoreSink -- "Writes Data" --> VectorDB[Vector Database]
+    PostgresSink -- "Writes Data" --> PostgresDB[PostgreSQL Database]
 
     classDef sink fill:#ffcc99,stroke:#333,stroke-width:2px;
     classDef pipeline fill:#lightcoral,stroke:#333,stroke-width:2px;

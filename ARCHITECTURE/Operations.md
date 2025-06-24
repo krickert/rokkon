@@ -52,11 +52,11 @@ graph TD
     subgraph "Rokkon Frontend (Web UI)"
         direction LR
         PipelineDesigner[Pipeline Visual Designer]
-        PipelineController[Pipeline Controls <br>(Deploy, Start, Stop, Pause)]
-        MonitoringDashboard[Monitoring Dashboard <br>(Status, Metrics, Logs)]
-        ModuleMgmt[Module Management <br>(List, Whitelist)]
-        ServerMgmt[Server/Instance Management]
-        TestInterface[Test & Debug Interface]
+        PipelineController["Pipeline Controls <br>(Deploy, Start, Stop, Pause)"]
+        MonitoringDashboard["Monitoring Dashboard <br>(Status, Metrics, Logs)"]
+        ModuleMgmt["Module Management <br>(List, Whitelist)"]
+        ServerMgmt["Server/Instance Management"]
+        TestInterface["Test & Debug Interface"]
     end
 
     FrontendAPI[Frontend REST/WebSocket API on Rokkon Engine]
@@ -67,23 +67,23 @@ graph TD
     Operator -- Uses --> ServerMgmt
     Operator -- Uses --> TestInterface
     Admin -- Uses --> ModuleMgmt
-    Admin -- Has all permissions --> PipelineDesigner
-    Admin -- Has all permissions --> PipelineController
-    Admin -- Has all permissions --> MonitoringDashboard
-    Admin -- Has all permissions --> ServerMgmt
+    Admin -- "Has all permissions" --> PipelineDesigner
+    Admin -- "Has all permissions" --> PipelineController
+    Admin -- "Has all permissions" --> MonitoringDashboard
+    Admin -- "Has all permissions" --> ServerMgmt
 
-    PipelineDesigner -- CRUD Pipeline Configs --> FrontendAPI
-    PipelineController -- Control Commands --> FrontendAPI
-    MonitoringDashboard -- Reads Data --> FrontendAPI
-    ModuleMgmt -- Manages Modules --> FrontendAPI
-    ServerMgmt -- Issues Commands --> FrontendAPI
-    TestInterface -- Sends Test Data/Gets Results --> FrontendAPI
+    PipelineDesigner -- "CRUD Pipeline Configs" --> FrontendAPI
+    PipelineController -- "Control Commands" --> FrontendAPI
+    MonitoringDashboard -- "Reads Data" --> FrontendAPI
+    ModuleMgmt -- "Manages Modules" --> FrontendAPI
+    ServerMgmt -- "Issues Commands" --> FrontendAPI
+    TestInterface -- "Sends Test Data/Gets Results" --> FrontendAPI
 
-    FrontendAPI -- Interacts with --> RokkonEngineCore[Rokkon Engine Core Logic]
-    RokkonEngineCore -- Interacts with --> Consul
-    RokkonEngineCore -- Interacts with --> Kafka
-    RokkonEngineCore -- Interacts with --> PipelineModules[Pipeline Modules]
-    RokkonEngineCore -- Reports to / Fetches from --> MonitoringSystem[Monitoring System (Prometheus/Grafana)]
+    FrontendAPI -- "Interacts with" --> RokkonEngineCore[Rokkon Engine Core Logic]
+    RokkonEngineCore -- "Interacts with" --> Consul
+    RokkonEngineCore -- "Interacts with" --> Kafka
+    RokkonEngineCore -- "Interacts with" --> PipelineModules[Pipeline Modules]
+    RokkonEngineCore -- "Reports to / Fetches from" --> MonitoringSystem["Monitoring System (Prometheus/Grafana)"]
 
 
     classDef role fill:#c9f,stroke:#333,stroke-width:2px;

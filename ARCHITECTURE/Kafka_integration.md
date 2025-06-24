@@ -15,29 +15,29 @@ Apache Kafka plays a vital role in the Rokkon Engine ecosystem, primarily as a h
 ```mermaid
 graph TD
     subgraph "Pipeline Segment with Kafka"
-        ProducerStep[Producer Pipeline Step (Module A)] -- Produces PipeDocs --> KafkaTopic[Kafka Topic: step-A-output]
+        ProducerStep["Producer Pipeline Step (Module A)"] -- "Produces PipeDocs" --> KafkaTopic["Kafka Topic: step-A-output"]
 
         subgraph "Consumer Group 1 (for Module B)"
-            ConsumerStepB1[Consumer Instance 1 (Module B)]
-            ConsumerStepB2[Consumer Instance 2 (Module B)]
+            ConsumerStepB1["Consumer Instance 1 (Module B)"]
+            ConsumerStepB2["Consumer Instance 2 (Module B)"]
         end
-        KafkaTopic -- Consumed by (Partition 0) --> ConsumerStepB1
-        KafkaTopic -- Consumed by (Partition 1) --> ConsumerStepB2
+        KafkaTopic -- "Consumed by (Partition 0)" --> ConsumerStepB1
+        KafkaTopic -- "Consumed by (Partition 1)" --> ConsumerStepB2
 
         subgraph "Consumer Group 2 (for Module C - e.g., Archiving)"
-            ConsumerStepC1[Consumer Instance 1 (Module C)]
+            ConsumerStepC1["Consumer Instance 1 (Module C)"]
         end
-        KafkaTopic -- Consumed by (All Partitions) --> ConsumerStepC1
+        KafkaTopic -- "Consumed by (All Partitions)" --> ConsumerStepC1
 
-        ConsumerStepB1 -- Processed Data (e.g., via gRPC or another Kafka Topic) --> DownstreamStepX[Downstream Step X]
-        ConsumerStepB2 -- Processed Data (e.g., via gRPC or another Kafka Topic) --> DownstreamStepX
-        ConsumerStepC1 -- Processed Data --> Archive[Data Archive]
+        ConsumerStepB1 -- "Processed Data (e.g., via gRPC or another Kafka Topic)" --> DownstreamStepX["Downstream Step X"]
+        ConsumerStepB2 -- "Processed Data (e.g., via gRPC or another Kafka Topic)" --> DownstreamStepX
+        ConsumerStepC1 -- "Processed Data" --> Archive["Data Archive"]
     end
 
-    RokkonEngine[Rokkon Engine] -- Manages/Monitors --> ProducerStep
-    RokkonEngine -- Manages/Monitors --> ConsumerStepB1
-    RokkonEngine -- Manages/Monitors --> ConsumerStepB2
-    RokkonEngine -- Manages/Monitors --> ConsumerStepC1
+    RokkonEngine["Rokkon Engine"] -- "Manages/Monitors" --> ProducerStep
+    RokkonEngine -- "Manages/Monitors" --> ConsumerStepB1
+    RokkonEngine -- "Manages/Monitors" --> ConsumerStepB2
+    RokkonEngine -- "Manages/Monitors" --> ConsumerStepC1
 
     classDef kafka fill:#f9f,stroke:#333,stroke-width:2px;
     classDef module fill:#ccf,stroke:#333,stroke-width:2px;

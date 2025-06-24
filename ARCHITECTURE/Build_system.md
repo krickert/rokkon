@@ -28,7 +28,7 @@ Key sub-projects typically include:
 
 ```mermaid
 graph TD
-    RootProject[Root Gradle Project <br> (settings.gradle.kts, build.gradle.kts)]
+    RootProject["Root Gradle Project <br> (settings.gradle.kts, build.gradle.kts)"]
 
     subgraph "Core Engine Projects"
         Engine[rokkon-engine]

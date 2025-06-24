@@ -140,7 +140,7 @@ The "seeding" process ensures that Consul has the necessary foundational configu
 ```mermaid
 graph TD
     subgraph "Seeding Process"
-        SeedDataSource[Seed Data Source <br>(e.g., seed-data.json, .properties file)] -- Input --> SeedConfigUtil[seed-config Utility]
+        SeedDataSource["Seed Data Source <br>(e.g., seed-data.json, .properties file)"] -- Input --> SeedConfigUtil[seed-config Utility]
         SeedConfigUtil -- Writes Config --> ConsulKV[(Consul KV Store)]
     end
 

@@ -24,21 +24,32 @@ The vision is not for Rokkon Engine itself to become a search engine, but to:
 ```mermaid
 graph TD
     subgraph "Search Application Layer"
-        SearchUI[Search UI / API] -- User Queries --> SearchBackend[Search Backend <br> (e.g., OpenSearch, Vector DB)]
-        SearchBackend -- Search Results --> SearchUI
-        SearchUI -- Logs Search Events (Queries, Clicks) --> SearchEventLogger[Search Event Logger/Stream]
+        SearchUI["Search UI / API"]
+        SearchBackend["Search Backend <br> (e.g., OpenSearch, Vector DB)"]
+        SearchEventLogger["Search Event Logger/Stream"]
+
+        SearchUI -- "User Queries" --> SearchBackend
+        SearchBackend -- "Search Results" --> SearchUI
+        SearchUI -- "Logs Search Events (Queries, Clicks)" --> SearchEventLogger
     end
 
-    SearchEventLogger -- Search Interaction Data --> AnalyticsPlatform[Analytics Platform <br> (e.g., ELK, Data Warehouse)]
+    AnalyticsPlatform["Analytics Platform <br> (e.g., ELK, Data Warehouse)"]
+    SearchEventLogger -- "Search Interaction Data" --> AnalyticsPlatform
 
     subgraph "Rokkon Ecosystem"
-        DataProcessingPipeline[Rokkon Data Processing Pipeline] -- Processed & Indexed Data --> SearchBackend
-        AnalyticsPipeline[Rokkon Analytics Pipeline (Optional)] -- Ingests & Processes --> SearchEventLogger
-        AnalyticsPipeline -- Enriched Analytics --> AnalyticsPlatform
+        DataProcessingPipeline["Rokkon Data Processing Pipeline"]
+        AnalyticsPipeline["Rokkon Analytics Pipeline (Optional)"]
+
+        DataProcessingPipeline -- "Processed & Indexed Data" --> SearchBackend
+        AnalyticsPipeline -- "Ingests & Processes" --> SearchEventLogger
+        AnalyticsPipeline -- "Enriched Analytics" --> AnalyticsPlatform
     end
 
-    Operator[Operator/Analyst] -- Analyzes Data --> AnalyticsPlatform
-    Operator -- Gains Insights --> FeedbackLoop[Feedback for Data Processing Pipeline & Search Tuning]
+    Operator["Operator/Analyst"]
+    FeedbackLoop["Feedback for Data Processing Pipeline & Search Tuning"]
+
+    Operator -- "Analyzes Data" --> AnalyticsPlatform
+    Operator -- "Gains Insights" --> FeedbackLoop
 
     classDef searchApp fill:#lightblue,stroke:#333,stroke-width:2px;
     classDef analytics fill:#lightgreen,stroke:#333,stroke-width:2px;
@@ -93,26 +104,26 @@ sequenceDiagram
     participant RokkonEngine as Rokkon Engine / Pipeline
     participant PipelineConfig as Pipeline Configuration (in Consul)
 
-    User ->> SearchApp: Performs Search & Clicks Results
-    SearchApp ->> SearchBackend: Query
-    SearchBackend -->> SearchApp: Results
-    SearchApp ->> SearchAnalytics: Log User Interaction (Query, Clicks, Feedback)
+    User->>SearchApp: Performs Search & Clicks Results
+    SearchApp->>SearchBackend: Query
+    SearchBackend-->>SearchApp: Results
+    SearchApp->>SearchAnalytics: Log User Interaction (Query, Clicks, Feedback)
 
     loop Analysis & Insight
-        SearchAnalytics ->> SearchAnalytics: Aggregate & Analyze Data
-        SearchAnalytics -- Insights (e.g., "Topic X has poor results") --> Operator/Admin
+        SearchAnalytics->>SearchAnalytics: Aggregate & Analyze Data
+        SearchAnalytics-->>Operator/Admin: Insights (e.g., "Topic X has poor results")
     end
 
-    Operator/Admin ->> PipelineConfig: Adjust Pipeline Config for Topic X (e.g., re-process with new embedder)
-    PipelineConfig -- Notifies --> RokkonEngine: Configuration Updated
-    RokkonEngine ->> RokkonEngine: Re-processes data for Topic X
-    RokkonEngine -- Updated Indexed Data --> SearchBackend: Store new/updated data
+    Operator/Admin->>PipelineConfig: Adjust Pipeline Config for Topic X (e.g., re-process with new embedder)
+    PipelineConfig-->>RokkonEngine: Configuration Updated
+    RokkonEngine->>RokkonEngine: Re-processes data for Topic X
+    RokkonEngine-->>SearchBackend: Store new/updated data
 
     %% Future: Automated Feedback
     alt Automated Feedback Loop
-        SearchAnalytics -- Actionable Insights (e.g., "Model B outperforms Model A") --> RokkonEngine: (via API/Trigger)
-        RokkonEngine ->> PipelineConfig: Automatically adjust config (e.g., switch default embedder to Model B)
-        RokkonEngine ->> RokkonEngine: Orchestrate changes
+        SearchAnalytics-->>RokkonEngine: Actionable Insights (e.g., "Model B outperforms Model A") via API/Trigger
+        RokkonEngine->>PipelineConfig: Automatically adjust config (e.g., switch default embedder to Model B)
+        RokkonEngine->>RokkonEngine: Orchestrate changes
     end
 ```
 
