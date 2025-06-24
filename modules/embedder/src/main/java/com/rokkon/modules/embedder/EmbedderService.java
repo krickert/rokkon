@@ -222,8 +222,15 @@ public class EmbedderService implements PipeStepProcessor {
     private Uni<Boolean> processDocumentFieldsReactive(PipeDoc inputDoc, PipeDoc.Builder outputDocBuilder,
                                                         EmbedderOptions options, String pipeStepName) {
 
-        // Process each field
-        boolean fieldsProcessed = false;
+        // If no document fields to process, return false immediately
+        if (options.documentFields() == null || options.documentFields().isEmpty()) {
+            return Uni.createFrom().item(false);
+        }
+
+        // Create a list to hold all the field processing Uni tasks
+        List<Uni<Boolean>> fieldProcessingTasks = new ArrayList<>();
+
+        // Process each field reactively
         for (String fieldName : options.documentFields()) {
             String fieldText = extractFieldText(inputDoc, fieldName);
 
@@ -232,27 +239,46 @@ public class EmbedderService implements PipeStepProcessor {
                 continue;
             }
 
-            // Generate embedding (blocking for now, can be made async later)
-            float[] embedding = vectorizer.embeddings(fieldText).await().indefinitely();
+            // Create a reactive task for this field
+            Uni<Boolean> fieldTask = vectorizer.embeddings(fieldText)
+                .map(embedding -> {
+                    // Create embedding object
+                    Embedding.Builder embeddingBuilder = Embedding.newBuilder()
+                            .setModelId(vectorizer.getModelId());
+                    for (float value : embedding) {
+                        embeddingBuilder.addVector(value);
+                    }
 
-            // Create embedding object
-            Embedding.Builder embeddingBuilder = Embedding.newBuilder()
-                    .setModelId(vectorizer.getModelId());
-            for (float value : embedding) {
-                embeddingBuilder.addVector(value);
-            }
+                    // Add embedding to the document
+                    String embeddingName = fieldName + "_" + vectorizer.getModelId().toLowerCase();
+                    outputDocBuilder.putNamedEmbeddings(embeddingName, embeddingBuilder.build());
 
-            // Add embedding to the document
-            String embeddingName = fieldName + "_" + vectorizer.getModelId().toLowerCase();
-            outputDocBuilder.putNamedEmbeddings(embeddingName, embeddingBuilder.build());
-            fieldsProcessed = true;
+                    log.info("{}Added embedding for field {} using model {} for document ID: {}", 
+                            options.logPrefix() != null ? options.logPrefix() : "", 
+                            fieldName, vectorizer.getModelId(), inputDoc.getId());
 
-            log.info("{}Added embedding for field {} using model {} for document ID: {}", 
-                    options.logPrefix() != null ? options.logPrefix() : "", 
-                    fieldName, vectorizer.getModelId(), inputDoc.getId());
+                    return true;
+                });
+
+            fieldProcessingTasks.add(fieldTask);
         }
 
-        return Uni.createFrom().item(fieldsProcessed);
+        // If no tasks were created, return false
+        if (fieldProcessingTasks.isEmpty()) {
+            return Uni.createFrom().item(false);
+        }
+
+        // Combine all field processing tasks and return true if any field was processed
+        return Uni.combine().all().unis(fieldProcessingTasks)
+            .with(results -> {
+                // Check if any field was processed successfully
+                for (Object result : results) {
+                    if ((Boolean) result) {
+                        return true;
+                    }
+                }
+                return false;
+            });
     }
 
     private String extractFieldText(PipeDoc document, String fieldName) {
@@ -321,7 +347,7 @@ public class EmbedderService implements PipeStepProcessor {
             return Uni.createFrom().item(responseBuilder.build());
         }
     }
-    
+
     @Override
     public Uni<ProcessResponse> testProcessData(ProcessRequest request) {
         log.debug("TestProcessData called - proxying to processData");
