@@ -1,0 +1,324 @@
+syntax = "proto3";
+
+package com.rokkon.connector.coordinator;
+
+option java_package = "com.rokkon.connector.coordinator";
+option java_multiple_files = true;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/duration.proto";
+import "google/protobuf/struct.proto";
+import "google/rpc/status.proto"; // Added for structured error details
+
+// ADDED: Enum for common deletion reasons for better analytics and automation
+enum DeletionReasonType {
+  DELETION_REASON_UNSPECIFIED = 0;
+  DELETION_REASON_USER_REQUESTED = 1; // Deletion initiated by a user/admin
+  DELETION_REASON_ORPHAN_DETECTED = 2; // Resource detected as missing by the system
+  DELETION_REASON_POLICY_VIOLATION = 3; // Deleted due to a policy (e.g., expiration)
+  DELETION_REASON_ADMIN_ACTION = 4; // General administrative action
+  DELETION_REASON_CUSTOM = 5; // Use with custom_reason_details
+}
+
+
+// --- Connector Management Messages (ADDED) ---
+
+// Request to register a new connector instance with the Coordinator
+message RegisterConnectorRequest {
+  string connector_type = 1; // e.g., "gutenberg"
+  string endpoint = 2;       // The gRPC/HTTP endpoint of the connector implementation
+  ConnectorCapabilities capabilities = 3;
+  // Configuration for the connector (e.g., API keys, source paths).
+  // Sensitive data should be handled securely (e.g., encryption at rest).
+  google.protobuf.Struct configuration = 4;
+  // Optional: Initial policy, if not using system defaults
+  optional ConnectorPolicy initial_policy = 5;
+}
+
+message RegisterConnectorResponse {
+  string connector_id = 1; // The unique ID assigned by the Coordinator
+  bool success = 2;
+  string message = 3;
+  // ADDED: Optional structured error details if registration failed.
+  optional google.rpc.Status error_details = 4;
+}
+
+// Request to update an existing connector instance's details or configuration
+message UpdateConnectorRequest {
+  string connector_id = 1; // REQUIRED
+  optional string endpoint = 2;
+  optional ConnectorCapabilities capabilities = 3;
+  // Update to the configuration. Consider using patch semantics (e.g., null implies delete, or separate fields).
+  // For simplicity, here it implies replacing or merging depending on server logic.
+  optional google.protobuf.Struct configuration = 4;
+}
+
+message UpdateConnectorResponse {
+  bool success = 1;
+  string message = 2;
+  optional google.rpc.Status error_details = 3;
+}
+
+// Request to delete a connector instance from the Coordinator
+message DeleteConnectorRequest {
+  string connector_id = 1; // REQUIRED
+  bool force = 2; // If true, attempts to delete even if active syncs/pending deletions exist
+}
+
+message DeleteConnectorResponse {
+  bool success = 1;
+  string message = 2;
+  optional google.rpc.Status error_details = 3;
+}
+
+// Request to get detailed information about a single connector
+message GetConnectorRequest {
+  string connector_id = 1;
+  // Optional: A flag to request sensitive configuration (e.g., for admin tools).
+  // Server must enforce strict authorization for this.
+  optional bool include_sensitive_config = 2;
+}
+
+// --- Sync Control Messages (ADDED) ---
+message TriggerSyncRequest {
+  string connector_id = 1;
+  bool full_sync = 2; // True to request a full re-scan, false for incremental (if supported by capabilities)
+}
+
+message TriggerSyncResponse {
+  bool accepted = 1;
+  string sync_id = 2; // The ID of the triggered sync operation, if accepted
+  string message = 3;
+  optional google.rpc.Status error_details = 4;
+}
+
+// --- Ledger Query Response (MODIFIED) ---
+// Represents a single entry in the resource ledger
+message LedgerEntry {
+  string resource_id = 1;
+  string source_id = 2;
+  string event_type = 3; // e.g., "CREATED", "UPDATED", "DELETED", "SYNC_SUCCESS", "SYNC_FAILED"
+  google.protobuf.Timestamp timestamp = 4;
+  optional string sync_id = 5; // Optional: ID of the sync operation that led to this entry
+  // Specific details about the event, e.g., diff for an update, error message for a failure.
+  google.protobuf.Struct event_details = 6;
+}
+
+// Response for QueryLedger, now with structured ledger entries and pagination
+message QueryLedgerResponse {
+  repeated LedgerEntry entries = 1;
+  string next_page_token = 2;
+}
+
+// --- Existing Messages (with minor tweaks) ---
+message ListConnectorsRequest {
+  string connector_type = 1;
+  string status = 2;  // "active", "inactive", "error"
+  int32 page_size = 3;
+  string page_token = 4;
+}
+
+message ListConnectorsResponse {
+  repeated ConnectorInfo connectors = 1;
+  string next_page_token = 2;
+}
+
+message ConnectorInfo {
+  string connector_id = 1;
+  string connector_type = 2;
+  string endpoint = 3;
+  ConnectorCapabilities capabilities = 4;
+  string status = 5;
+  google.protobuf.Timestamp registered_at = 6;
+  google.protobuf.Timestamp last_sync_at = 7;
+  // ADDED: Store connector-specific configuration here.
+  // Sensitive values should be redacted or encrypted when stored/returned generally.
+  google.protobuf.Struct configuration = 8;
+}
+
+message GetConnectorStatusRequest {
+  string connector_id = 1;
+}
+
+message ConnectorStatus {
+  string connector_id = 1;
+  string status = 2;  // "active", "syncing", "error", "inactive"
+
+  // Current sync status
+  string current_sync_id = 3;
+  google.protobuf.Timestamp current_sync_started = 4;
+  int64 items_processed_current_sync = 5;
+
+  // Historical stats
+  int64 total_items_processed = 6;
+  int64 total_errors = 7;
+  google.protobuf.Timestamp last_successful_sync = 8;
+  // ADDED: Optional field for structured last error details
+  optional string last_error_message = 9;
+  optional google.rpc.Status last_error_details = 12; // New field number
+
+  // Health
+  bool is_healthy = 10;
+  repeated HealthCheck health_checks = 11;
+}
+
+message HealthCheck {
+  string check_name = 1;
+  bool passed = 2;
+  optional string message = 3; // Changed to optional
+  google.protobuf.Timestamp checked_at = 4;
+  // ADDED: Optional structured details for health check failures
+  optional google.protobuf.Struct details = 5;
+}
+
+message AckProcessedRequest {
+  string sync_id = 1;
+  string resource_id = 2;
+  bool success = 3;
+  string stream_id = 4;  // From engine if successful
+  // ADDED: Optional field for structured error details if success is false
+  optional string error_message = 5;
+  optional google.rpc.Status error_details = 6; // New field number
+}
+
+message AckProcessedResponse {
+  bool acknowledged = 1;
+  optional string message = 2; // Added for more context on acknowledgement
+  optional google.rpc.Status error_details = 3; // Added for cases where acknowledgement fails
+}
+
+message GetResourceStateRequest {
+  string resource_id = 1;
+  string source_id = 2;
+}
+
+// NOTE: QueryLedgerRequest is unchanged, but its response type is now QueryLedgerResponse
+message QueryLedgerRequest {
+  string resource_id = 1;
+  string source_id = 2;
+  google.protobuf.Timestamp since = 3;
+  google.protobuf.Timestamp until = 4;
+  repeated string event_types = 5;  // Filter by event types
+  int32 limit = 6;
+  optional string page_token = 7; // ADDED: For pagination
+}
+
+message SetPolicyRequest {
+  ConnectorPolicy policy = 1;
+}
+
+message SetPolicyResponse {
+  bool success = 1;
+  string message = 2;
+  optional google.rpc.Status error_details = 3;
+}
+
+message GetPolicyRequest {
+  string connector_id = 1;
+}
+
+message DiscoveryError {
+  string error_code = 1;
+  string message = 2;
+  bool retryable = 3;
+  google.protobuf.Struct details = 4;
+}
+
+// Additional message for deletion tracking
+message ResourceDeletionRecord {
+  string resource_id = 1;
+  google.protobuf.Timestamp detected_missing_at = 2;
+  google.protobuf.Timestamp scheduled_for_deletion = 3;
+  // MODIFIED: Use enum for deletion reason, with optional custom details
+  DeletionReasonType deletion_reason_type = 4;
+  optional string custom_deletion_reason_details = 6; // New field number
+  enum DeletionState {
+    PENDING_GRACE_PERIOD = 0;
+    SCHEDULED = 1;
+    DELETED = 2;
+    CANCELLED = 3;  // Resource reappeared
+  }
+  DeletionState state = 5;
+}
+
+// For explicit deletion requests
+message RequestDeletionRequest {
+  repeated string resource_ids = 1;
+  string source_id = 2;
+  // MODIFIED: Use enum for deletion reason, with optional custom details
+  DeletionReasonType reason_type = 3;
+  optional string custom_reason_details = 5; // New field number
+  bool immediate = 4;  // Skip grace period
+}
+
+message RequestDeletionResponse {
+  map<string, bool> results = 1;  // resource_id -> success
+  string message = 2;
+  optional google.rpc.Status error_details = 3;
+}
+
+message GetPendingDeletionsRequest {
+  string source_id = 1;
+  bool include_cancelled = 2;
+  optional int32 page_size = 3;    // ADDED for pagination
+  optional string page_token = 4; // ADDED for pagination
+}
+
+message GetPendingDeletionsResponse {
+  repeated ResourceDeletionRecord deletions = 1;
+  optional string next_page_token = 2; // ADDED for pagination
+}
+
+message ConnectorCapabilities {
+  bool supports_incremental = 1;
+  bool supports_deletion_detection = 2;
+  bool supports_metadata_only = 3;
+  bool supports_partial_fetch = 4;
+  repeated string supported_protocols = 5;  // ["http", "ftp", "s3", etc]
+}
+
+message ConnectorPolicy {
+  string connector_id = 1;
+
+  // Failure handling
+  google.protobuf.Duration grace_period = 2;          // e.g., 72 hours
+  int32 max_consecutive_failures = 3;                 // e.g., 3
+  google.protobuf.Duration retry_backoff_initial = 4; // e.g., 1 hour
+  double retry_backoff_multiplier = 5;                // e.g., 2.0
+
+  // Data lifecycle
+  google.protobuf.Duration expiration_time = 6;       // e.g., 90 days
+  bool detect_orphans = 7;
+  google.protobuf.Duration orphan_grace_period = 8;   // e.g., 30 days
+
+  // Sync behavior
+  string cron_schedule = 9;                            // e.g., "0 2 * * *"
+  bool deduplication_enabled = 10;
+  google.protobuf.Duration min_sync_interval = 11;    // Rate limiting
+}
+
+// ConnectorCoordinator service manages the lifecycle and operational policies of connectors.
+service ConnectorCoordinator {
+  // --- Connector Management RPCs (ADDED) ---
+  rpc RegisterConnector(RegisterConnectorRequest) returns (RegisterConnectorResponse);
+  rpc UpdateConnector(UpdateConnectorRequest) returns (UpdateConnectorResponse);
+  rpc DeleteConnector(DeleteConnectorRequest) returns (DeleteConnectorResponse);
+  rpc GetConnector(GetConnectorRequest) returns (ConnectorInfo); // Use ConnectorInfo for detailed response
+
+  // --- Existing RPCs (with potential response type changes) ---
+  rpc ListConnectors(ListConnectorsRequest) returns (ListConnectorsResponse);
+  rpc GetConnectorStatus(GetConnectorStatusRequest) returns (ConnectorStatus);
+  rpc AckProcessed(AckProcessedRequest) returns (AckProcessedResponse);
+  rpc GetResourceState(GetResourceStateRequest) returns (google.protobuf.Struct);
+  // MODIFIED: QueryLedger now returns a specific LedgerEntry list
+  rpc QueryLedger(QueryLedgerRequest) returns (QueryLedgerResponse);
+  rpc SetPolicy(SetPolicyRequest) returns (SetPolicyResponse);
+  rpc GetPolicy(GetPolicyRequest) returns (ConnectorPolicy);
+
+  // --- Sync Control RPCs (ADDED) ---
+  rpc TriggerSync(TriggerSyncRequest) returns (TriggerSyncResponse);
+
+  // --- Deletion Management RPCs ---
+  rpc RequestDeletion(RequestDeletionRequest) returns (RequestDeletionResponse);
+  rpc GetPendingDeletions(GetPendingDeletionsRequest) returns (GetPendingDeletionsResponse);
+}

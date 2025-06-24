@@ -1,6 +1,8 @@
 plugins {
     java
+    `java-library`
     `maven-publish`
+    idea
 }
 
 group = "com.rokkon.pipeline"
@@ -17,6 +19,12 @@ java {
 }
 
 dependencies {
+    // Import the BOM for version management
+    implementation(platform("com.rokkon.pipeline:rokkon-bom:${project.version}"))
+    
+    // Google common protos for Status and other types - exposed as transitive dependency
+    api("com.google.api.grpc:proto-google-common-protos")
+    
     // Test dependencies
     testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
     testImplementation("org.assertj:assertj-core:3.26.3")

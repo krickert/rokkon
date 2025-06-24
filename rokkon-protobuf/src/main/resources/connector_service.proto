@@ -7,7 +7,7 @@ option java_package = "com.rokkon.search.engine";
 option java_outer_classname = "ConnectorServiceProto";
 
 import "rokkon_core_types.proto"; // This should define com.rokkon.search.model.PipeDoc
-
+import "google/rpc/status.proto"; // Import for structured error details
 
 // --- Messages for the Connector RPC ---
 message ConnectorRequest {
@@ -15,27 +15,31 @@ message ConnectorRequest {
   // Examples: "gutenberg", "wikipedia", "arxiv", "gdelt"
   // The engine uses this to determine pipeline routing
   string connector_type = 1;
-  
+
+  // ADDED: REQUIRED. The unique ID of the specific connector instance sending this data.
+  // This helps link ingested data back to its managing ConnectorCoordinator entity.
+  string connector_id = 9; // Moved to a new field number to avoid breaking existing assignments
+
   // REQUIRED. The document to be processed
   com.rokkon.search.model.PipeDoc document = 2;
-  
+
   // RECOMMENDED. Tags for categorization, filtering, and routing
   // Examples: ["english", "public-domain", "2024", "literature", "fiction"]
   repeated string tags = 3;
-  
+
   // Optional. If this document is part of a batch operation
   optional com.rokkon.search.model.BatchInfo batch_info = 4;
-  
+
   // Optional. Additional context that will be passed through the pipeline
   // Replaces initial_context_params
   map<string, string> context_params = 5;
-  
+
   // Optional. Connector can suggest a stream_id (engine may override)
   optional string suggested_stream_id = 6;
-  
+
   // Optional. Processing priority: 0=low, 1=normal (default), 2=high
   optional int32 priority = 7;
-  
+
   // Optional. Version of the connector sending this request
   optional string connector_version = 8;
 }
@@ -51,7 +55,12 @@ message ConnectorResponse {
 
   // Optional message, e.g., "Ingestion accepted for stream ID [stream_id], targeting configured pipeline."
   string message = 3;
+
+  // ADDED: Optional structured error details if 'accepted' is false.
+  // Uses Google's standard Status message for rich error reporting.
+  optional google.rpc.Status error_details = 4;
 }
+
 // PipeStreamEngine service orchestrates pipeline execution.
 service ConnectorEngine {
   // Ingests new data (as a PipeDoc identified by a source_identifier) into the system

@@ -55,6 +55,9 @@ dependencies {
         api("org.apache.commons:commons-collections4:4.4")
         api("org.apache.commons:commons-text:1.12.0")
         
+        // Google common protos for protobuf definitions
+        api("com.google.api.grpc:proto-google-common-protos:2.58.2")
+        
         // Any other non-Quarkus managed dependencies can go here
     }
 }
