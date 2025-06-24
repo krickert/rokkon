@@ -1,0 +1,144 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Parser Module Configuration Schema",
+  "description": "Configuration schema for the Rokkon document parser module",
+  "type": "object",
+  "properties": {
+    "parsingOptions": {
+      "type": "object",
+      "description": "Core document parsing configuration",
+      "properties": {
+        "maxContentLength": {
+          "type": "integer",
+          "description": "Maximum content length to extract (-1 for unlimited)",
+          "default": -1
+        },
+        "extractMetadata": {
+          "type": "boolean",
+          "description": "Whether to extract document metadata",
+          "default": true
+        },
+        "maxMetadataValueLength": {
+          "type": "integer",
+          "description": "Maximum length for metadata values (-1 for unlimited)",
+          "default": 10000
+        },
+        "parseTimeoutSeconds": {
+          "type": "integer",
+          "description": "Timeout for document parsing in seconds",
+          "minimum": 1,
+          "maximum": 300,
+          "default": 60
+        }
+      },
+      "additionalProperties": false
+    },
+    "advancedOptions": {
+      "type": "object",
+      "description": "Advanced parsing features",
+      "properties": {
+        "enableGeoTopicParser": {
+          "type": "boolean",
+          "description": "Enable geographic location extraction",
+          "default": false
+        },
+        "disableEmfParser": {
+          "type": "boolean", 
+          "description": "Disable EMF parser for problematic Office files",
+          "default": false
+        },
+        "extractEmbeddedDocs": {
+          "type": "boolean",
+          "description": "Extract content from embedded documents",
+          "default": true
+        },
+        "maxRecursionDepth": {
+          "type": "integer",
+          "description": "Maximum depth for parsing nested documents",
+          "minimum": 0,
+          "maximum": 10,
+          "default": 3
+        }
+      },
+      "additionalProperties": false
+    },
+    "contentTypeHandling": {
+      "type": "object",
+      "description": "Content type specific processing options",
+      "properties": {
+        "enableTitleExtraction": {
+          "type": "boolean",
+          "description": "Enable document title extraction and post-processing",
+          "default": true
+        },
+        "fallbackToFilename": {
+          "type": "boolean",
+          "description": "Use filename as title fallback when no title found",
+          "default": true
+        },
+        "supportedMimeTypes": {
+          "type": "array",
+          "description": "List of supported MIME types (empty = all supported)",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false
+    },
+    "errorHandling": {
+      "type": "object", 
+      "description": "Error handling and resilience options",
+      "properties": {
+        "ignoreTikaException": {
+          "type": "boolean",
+          "description": "Continue processing even if Tika throws exceptions",
+          "default": false
+        },
+        "fallbackToPlainText": {
+          "type": "boolean",
+          "description": "Fall back to plain text extraction on parsing failure",
+          "default": true
+        },
+        "logParsingErrors": {
+          "type": "boolean",
+          "description": "Log detailed parsing error information",
+          "default": true
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "examples": [
+    {
+      "parsingOptions": {
+        "maxContentLength": 1048576,
+        "extractMetadata": true,
+        "maxMetadataValueLength": 5000,
+        "parseTimeoutSeconds": 30
+      },
+      "advancedOptions": {
+        "enableGeoTopicParser": false,
+        "disableEmfParser": true,
+        "extractEmbeddedDocs": true,
+        "maxRecursionDepth": 2
+      },
+      "contentTypeHandling": {
+        "enableTitleExtraction": true,
+        "fallbackToFilename": true,
+        "supportedMimeTypes": [
+          "application/pdf",
+          "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+          "text/plain"
+        ]
+      },
+      "errorHandling": {
+        "ignoreTikaException": false,
+        "fallbackToPlainText": true,
+        "logParsingErrors": true
+      }
+    }
+  ]
+}

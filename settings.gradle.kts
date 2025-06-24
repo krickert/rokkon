@@ -30,6 +30,8 @@ include("engine:cli-register")
 include("modules:test-module")
 include("modules:proxy-module")
 include("modules:chunker")
+include("modules:echo")
+include("modules:parser")
 
 
 // Ensure dependencyResolutionManagement is present, especially if you plan to use version catalogs later.

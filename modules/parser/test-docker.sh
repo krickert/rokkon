@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# This script tests the echo module Docker container by running it with test parameters
+# This script tests the parser module Docker container by running it with test parameters
 # It assumes you've already built the Docker image with docker-build.sh
 
 # Default to dev mode for testing
@@ -10,21 +10,21 @@ TAG=${2:-latest}
 
 if [ "$MODE" = "dev" ]; then
     # Run in dev mode with host networking
-    echo "Testing echo module in DEV mode..."
+    echo "Testing parser module in DEV mode..."
     docker run -i --rm --network=host \
         -e QUARKUS_LOG_LEVEL=INFO \
         -e QUARKUS_LOG_CATEGORY__COM_ROKKON__LEVEL=DEBUG \
-        rokkon/echo-module:dev \
+        rokkon/parser-module:dev \
         --test-mode
 else
     # Run in prod mode with port mapping
-    echo "Testing echo module in PROD mode..."
+    echo "Testing parser module in PROD mode..."
     docker run -i --rm -p 49095:49095 \
         -e QUARKUS_LOG_LEVEL=INFO \
         -e QUARKUS_LOG_CATEGORY__COM_ROKKON__LEVEL=DEBUG \
         -e ENGINE_HOST=localhost \
         -e CONSUL_HOST=localhost \
-        rokkon/echo-module:$TAG \
+        rokkon/parser-module:$TAG \
         --test-mode
 fi
 

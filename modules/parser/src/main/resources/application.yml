@@ -1,0 +1,49 @@
+quarkus:
+  application:
+    name: parser-module
+  http:
+    port: 39091
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+  grpc:
+    server:
+      port: 49091
+      host: 0.0.0.0
+      enable-reflection-service: true
+    clients:
+      # Add gRPC client configurations here if needed
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+  container-image:
+    build: false  # Set to true when you want to build the image
+    push: false   # Set to true when you want to push to registry
+    registry: "registry.rokkon.com:8443"
+    image: "rokkon/parser-module:${quarkus.application.version}"
+    dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
+    group: rokkon
+    # Credentials should be provided via environment variables:
+    # QUARKUS_CONTAINER_IMAGE_USERNAME
+    # QUARKUS_CONTAINER_IMAGE_PASSWORD
+
+# Processing buffer configuration
+processing:
+  buffer:
+    enabled: false  # Enable for test data generation
+    capacity: 200
+    directory: "build/test-data"
+    prefix: "parser"
+
+# Test profile configuration
+"%test":
+  quarkus:
+    grpc:
+      server:
+        port: 0  # Use random port for tests
+  processing:
+    buffer:
+      enabled: true  # Enable buffer in test mode
+      directory: "build/test-data"

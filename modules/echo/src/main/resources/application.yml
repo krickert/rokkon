@@ -1,0 +1,63 @@
+quarkus:
+  application:
+    name: echo-module
+  http:
+    port: 39090
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+  smallrye-openapi:
+    path: /q/openapi
+    info-title: Echo Module API
+    info-version: 1.0.0
+    info-description: REST API for the Echo gRPC Module
+  swagger-ui:
+    always-include: true
+    path: /q/swagger-ui
+  grpc:
+    server:
+      port: 49090
+      host: 0.0.0.0
+      enable-reflection-service: true
+      max-inbound-message-size: 1073741824  # 1GB
+      max-outbound-message-size: 1073741824  # 1GB for responses
+    clients:
+      echoService:
+        host: localhost
+        port: 49090
+        max-inbound-message-size: 1073741824  # 1GB
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+  container-image:
+    build: false  # Set to true when you want to build the image
+    push: false   # Set to true when you want to push to registry
+    registry: "registry.rokkon.com:8443"
+    image: "rokkon/echo-module:${quarkus.application.version}"
+    dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
+    group: rokkon
+    # Credentials should be provided via environment variables:
+    # QUARKUS_CONTAINER_IMAGE_USERNAME
+    # QUARKUS_CONTAINER_IMAGE_PASSWORD
+
+# Test profile configuration
+"%test":
+  quarkus:
+    grpc:
+      server:
+        port: 0  # Use random port for tests
+        max-inbound-message-size: 1073741824  # 1GB for tests
+      clients:
+        echoService:
+          max-inbound-message-size: 1073741824  # 1GB
+
+# Dev profile - easy local Docker builds
+"%dev":
+  quarkus:
+    container-image:
+      build: true    # Auto-build image in dev mode
+      push: false    # Don't push to registry
+      image: "rokkon/echo-module:dev"
+      registry: ""   # Use local Docker

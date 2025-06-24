@@ -1,0 +1,129 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Rokkon Parser Module</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        h1 {
+            color: #2c3e50;
+            border-bottom: 2px solid #3498db;
+            padding-bottom: 10px;
+        }
+        h2 {
+            color: #2980b9;
+            margin-top: 30px;
+        }
+        code {
+            background-color: #f8f8f8;
+            padding: 2px 5px;
+            border-radius: 3px;
+            font-family: 'Courier New', Courier, monospace;
+        }
+        pre {
+            background-color: #f8f8f8;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+        }
+        .status {
+            padding: 10px;
+            border-radius: 5px;
+            margin: 20px 0;
+        }
+        .status.running {
+            background-color: #d4edda;
+            border: 1px solid #c3e6cb;
+            color: #155724;
+        }
+        .status.error {
+            background-color: #f8d7da;
+            border: 1px solid #f5c6cb;
+            color: #721c24;
+        }
+    </style>
+</head>
+<body>
+    <h1>Rokkon Parser Module</h1>
+    
+    <div id="status" class="status running">
+        <strong>Status:</strong> Module is running
+    </div>
+    
+    <h2>Overview</h2>
+    <p>
+        The Parser Module is a document processing service that extracts text and metadata from various document formats.
+        It uses Apache Tika to parse documents and extract their content, making them available for further processing
+        in the Rokkon pipeline.
+    </p>
+    
+    <h2>Supported Document Types</h2>
+    <p>
+        The Parser Module supports a wide range of document formats, including:
+    </p>
+    <ul>
+        <li>PDF documents</li>
+        <li>Microsoft Office documents (Word, Excel, PowerPoint)</li>
+        <li>OpenDocument formats</li>
+        <li>HTML and XML</li>
+        <li>Plain text</li>
+        <li>Images with OCR (when configured)</li>
+        <li>And many more formats supported by Apache Tika</li>
+    </ul>
+    
+    <h2>API</h2>
+    <p>
+        The Parser Module implements the standard Rokkon <code>PipeStepProcessor</code> gRPC service interface.
+        It receives documents through gRPC and returns the parsed content and metadata.
+    </p>
+    
+    <h2>Configuration</h2>
+    <p>
+        The Parser Module can be configured with various options to control the parsing process:
+    </p>
+    <pre>
+{
+  "maxContentLength": 10000000,
+  "extractMetadata": true,
+  "enableTitleExtraction": true,
+  "disableEmfParser": false,
+  "enableGeoTopicParser": false,
+  "logParsingErrors": true
+}
+    </pre>
+    
+    <script>
+        // Simple status check
+        function checkStatus() {
+            fetch('/q/health')
+                .then(response => {
+                    if (response.ok) {
+                        document.getElementById('status').className = 'status running';
+                        document.getElementById('status').innerHTML = '<strong>Status:</strong> Module is running';
+                    } else {
+                        document.getElementById('status').className = 'status error';
+                        document.getElementById('status').innerHTML = '<strong>Status:</strong> Module is experiencing issues';
+                    }
+                })
+                .catch(error => {
+                    document.getElementById('status').className = 'status error';
+                    document.getElementById('status').innerHTML = '<strong>Status:</strong> Unable to check module status';
+                });
+        }
+        
+        // Check status on page load
+        checkStatus();
+        
+        // Check status every 30 seconds
+        setInterval(checkStatus, 30000);
+    </script>
+</body>
+</html>
