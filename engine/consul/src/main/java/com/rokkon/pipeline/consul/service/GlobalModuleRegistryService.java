@@ -247,7 +247,7 @@ public class GlobalModuleRegistryService {
                 
                 ServiceOptions serviceOptions = new ServiceOptions()
                     .setId(moduleId)
-                    .setName("module-" + moduleName)
+                    .setName(moduleName)
                     .setTags(List.of("module", "global", serviceType, "version:" + version))
                     .setAddress(host)
                     .setPort(port)
@@ -293,9 +293,9 @@ public class GlobalModuleRegistryService {
             client.localServices().toCompletionStage()
         )
         .onItem().transformToUni(services -> {
-            // Filter for module services  
+            // Filter for module services using tags instead of name prefix
             List<Service> moduleServices = services.stream()
-                .filter(service -> service.getName().startsWith("module-"))
+                .filter(service -> service.getTags() != null && service.getTags().contains("module"))
                 .toList();
             
             // Convert to ModuleRegistration objects
@@ -965,7 +965,7 @@ public class GlobalModuleRegistryService {
      * Check module health using Consul health checks
      */
     private Uni<ServiceHealthStatus> checkModuleHealth(ConsulClient client, ModuleRegistration module) {
-        String serviceName = "module-" + module.moduleName();
+        String serviceName = module.moduleName();
         
         return Uni.createFrom().completionStage(
             client.healthServiceNodes(serviceName, false).toCompletionStage()

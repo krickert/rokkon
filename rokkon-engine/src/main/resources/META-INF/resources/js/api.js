@@ -27,14 +27,43 @@ const API = {
 
             if (!response.ok) {
                 // For 404s, check if it's an empty collection
-                if (response.status === 404 && url.includes('/pipelines/definitions')) {
+                if (response.status === 404 && url.includes('/pipelines/definitions') && options.method === 'GET') {
                     return []; // Return empty array for pipelines
                 }
-                const error = await response.json().catch(() => ({ message: response.statusText }));
-                throw new Error(error.message || `HTTP ${response.status}`);
+                
+                // Try to get error details from response body
+                let errorMessage = response.statusText || `HTTP ${response.status}`;
+                try {
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        const error = await response.json();
+                        errorMessage = error.message || errorMessage;
+                    }
+                } catch (e) {
+                    // If JSON parsing fails, use the default error message
+                }
+                
+                throw new Error(errorMessage);
             }
 
-            return await response.json();
+            // Handle 204 No Content (typical for DELETE operations)
+            if (response.status === 204) {
+                return { success: true };
+            }
+
+            // Handle empty response body
+            const text = await response.text();
+            if (!text) {
+                return { success: true };
+            }
+
+            // Parse JSON response
+            try {
+                return JSON.parse(text);
+            } catch (e) {
+                console.warn('Response is not JSON:', text);
+                return { success: true, message: text };
+            }
         } catch (error) {
             console.error(`API Error (${url}):`, error);
             throw error;
