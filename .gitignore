@@ -94,3 +94,4 @@ dependency-reduced-pom.xml
 backup-hosed-modules
 
 old_*
+old_rokkon-to-migrate/**

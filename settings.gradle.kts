@@ -32,6 +32,7 @@ include("modules:proxy-module")
 include("modules:chunker")
 include("modules:echo")
 include("modules:parser")
+include("modules:embedder")
 
 
 // Ensure dependencyResolutionManagement is present, especially if you plan to use version catalogs later.

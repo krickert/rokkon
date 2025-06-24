@@ -1,0 +1,88 @@
+quarkus:
+  application:
+    name: embedder-module
+  http:
+    port: 39093
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+  grpc:
+    server:
+      port: 49093  # Different port from parser (49091) and chunker (49092)
+      host: 0.0.0.0
+      enable-reflection-service: true
+      max-inbound-message-size: 1073741824  # 1GB
+      max-outbound-message-size: 1073741824  # 1GB for responses
+    clients:
+      embedderService:
+        max-inbound-message-size: 1073741824  # 1GB
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+  container-image:
+    build: false  # Set to true when you want to build the image
+    push: false   # Set to true when you want to push to registry
+    registry: "registry.rokkon.com:8443"
+    image: "rokkon/embedder-module:${quarkus.application.version}"
+    dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
+    group: rokkon
+    # Credentials should be provided via environment variables:
+    # QUARKUS_CONTAINER_IMAGE_USERNAME
+    # QUARKUS_CONTAINER_IMAGE_PASSWORD
+
+  # Health and metrics
+  smallrye-health:
+    root-path: /health
+  micrometer:
+    export:
+      prometheus:
+        path: /metrics
+
+  # OpenTelemetry configuration
+  opentelemetry:
+    enabled: true
+    tracer:
+      exporter:
+        otlp:
+          endpoint: http://${OTEL_COLLECTOR_HOST:localhost}:${OTEL_COLLECTOR_PORT:4317}
+
+# DJL configuration for ML models
+djl:
+  engine:
+    default-engine: PyTorch
+  pytorch:
+    # Use GPU if available, otherwise fallback to CPU
+    use-gpu: true
+    # Number of threads for CPU inference
+    num-threads: 4
+    # Memory management
+    memory-management: ON_SYSTEM_MEMORY_PRESSURE
+
+# Processing buffer configuration
+processing:
+  buffer:
+    enabled: ${PROCESSING_BUFFER_ENABLED:false}
+    capacity: ${PROCESSING_BUFFER_CAPACITY:100}
+    directory: ${PROCESSING_BUFFER_DIRECTORY:}
+    prefix: ${PROCESSING_BUFFER_PREFIX:embedder_output}
+
+# Test profile configuration
+"%test":
+  quarkus:
+    grpc:
+      server:
+        port: 0  # Use random port for tests
+        max-inbound-message-size: 1073741824  # 1GB for tests
+      clients:
+        embedderService:
+          max-inbound-message-size: 1073741824  # 1GB
+  processing:
+    buffer:
+      enabled: true
+      directory: ${java.io.tmpdir}/embedder-test-output
+  # Disable GPU for tests
+  djl:
+    pytorch:
+      use-gpu: false
