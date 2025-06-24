@@ -22,9 +22,16 @@ import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.Matchers.hasSize;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 
+/**
+ * Unit tests for PipelineDefinitionResource using mocks.
+ * Extends PipelineDefinitionResourceTestBase for common test helper methods.
+ */
 @QuarkusTest
-class PipelineDefinitionResourceTest {
+class PipelineDefinitionResourceTest extends PipelineDefinitionResourceTestBase {
 
     @InjectMock
     PipelineDefinitionService pipelineDefinitionService;
@@ -117,8 +124,8 @@ class PipelineDefinitionResourceTest {
         ValidationResult successResult = new ValidationResult(true, List.of(), List.of());
 
         when(pipelineDefinitionService.createDefinition(
-            org.mockito.ArgumentMatchers.eq(pipelineId),
-            org.mockito.ArgumentMatchers.any(PipelineConfig.class)
+            eq(pipelineId),
+            any(PipelineConfig.class)
         )).thenReturn(Uni.createFrom().item(successResult));
 
         given()
@@ -149,8 +156,8 @@ class PipelineDefinitionResourceTest {
         );
 
         when(pipelineDefinitionService.createDefinition(
-            org.mockito.ArgumentMatchers.eq(pipelineId),
-            org.mockito.ArgumentMatchers.any(PipelineConfig.class)
+            eq(pipelineId),
+            any(PipelineConfig.class)
         )).thenReturn(Uni.createFrom().item(failureResult));
 
         given()
@@ -178,8 +185,8 @@ class PipelineDefinitionResourceTest {
         ValidationResult successResult = new ValidationResult(true, List.of(), List.of());
 
         when(pipelineDefinitionService.updateDefinition(
-            org.mockito.ArgumentMatchers.eq(pipelineId),
-            org.mockito.ArgumentMatchers.any(PipelineConfig.class)
+            eq(pipelineId),
+            any(PipelineConfig.class)
         )).thenReturn(Uni.createFrom().item(successResult));
 
         given()
@@ -209,8 +216,8 @@ class PipelineDefinitionResourceTest {
         );
 
         when(pipelineDefinitionService.updateDefinition(
-            org.mockito.ArgumentMatchers.eq(pipelineId),
-            org.mockito.ArgumentMatchers.any(PipelineConfig.class)
+            eq(pipelineId),
+            any(PipelineConfig.class)
         )).thenReturn(Uni.createFrom().item(failureResult));
 
         given()
@@ -315,8 +322,8 @@ class PipelineDefinitionResourceTest {
         // And: Pipeline creation will succeed
         ValidationResult successResult = new ValidationResult(true, List.of(), List.of());
         when(pipelineDefinitionService.createDefinition(
-                org.mockito.ArgumentMatchers.anyString(), 
-                org.mockito.ArgumentMatchers.any(PipelineConfig.class)))
+                anyString(), 
+                any(PipelineConfig.class)))
                 .thenReturn(Uni.createFrom().item(successResult));
 
         // When: We POST a pipeline definition using the new DTO endpoint
@@ -348,7 +355,7 @@ class PipelineDefinitionResourceTest {
         // Then: Verify the pipeline was created with correct transformation
         ArgumentCaptor<PipelineConfig> configCaptor = ArgumentCaptor.forClass(PipelineConfig.class);
         verify(pipelineDefinitionService).createDefinition(
-                org.mockito.ArgumentMatchers.eq("test-pipeline"), 
+                eq("test-pipeline"), 
                 configCaptor.capture());
 
         PipelineConfig capturedConfig = configCaptor.getValue();
@@ -436,8 +443,8 @@ class PipelineDefinitionResourceTest {
                 List.of()
         );
         when(pipelineDefinitionService.createDefinition(
-                org.mockito.ArgumentMatchers.anyString(), 
-                org.mockito.ArgumentMatchers.any(PipelineConfig.class)))
+                anyString(), 
+                any(PipelineConfig.class)))
                 .thenReturn(Uni.createFrom().item(conflictResult));
 
         // When: We try to create a duplicate
