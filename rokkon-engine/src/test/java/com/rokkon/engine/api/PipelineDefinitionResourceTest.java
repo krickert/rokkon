@@ -3,6 +3,8 @@ package com.rokkon.engine.api;
 import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.consul.model.PipelineDefinitionSummary;
 import com.rokkon.pipeline.consul.service.PipelineDefinitionService;
+import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService;
+import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ModuleRegistration;
 import com.rokkon.pipeline.validation.ValidationResult;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
@@ -10,6 +12,7 @@ import io.restassured.http.ContentType;
 import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.mockito.ArgumentCaptor;
 
 import java.util.List;
 import java.util.Map;
@@ -17,12 +20,17 @@ import java.util.Map;
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
 import static org.hamcrest.Matchers.hasSize;
+import static org.mockito.ArgumentMatchers.*;
+import static org.mockito.Mockito.*;
 
 @QuarkusTest
 class PipelineDefinitionResourceTest {
     
     @InjectMock
     PipelineDefinitionService pipelineDefinitionService;
+    
+    @InjectMock
+    GlobalModuleRegistryService moduleRegistryService;
 
     @BeforeEach
     void setup() {
@@ -277,5 +285,182 @@ class PipelineDefinitionResourceTest {
             .body("success", is(false))
             .body("message", equalTo("Cannot delete pipeline with active instances"))
             .body("errors[0]", equalTo("Cannot delete: pipeline has active instances"));
+    }
+
+    // Tests for the new DTO endpoint
+    @Test
+    void testCreatePipelineFromDTO() {
+        // Given: A module is registered
+        ModuleRegistration mockModule = new ModuleRegistration(
+                "test-module-id",      // moduleId
+                "test-module",         // moduleName
+                "impl-1",              // implementationId
+                "test-hostname",       // host
+                8080,                  // port
+                "PIPELINE",            // serviceType
+                "1.0.0",               // version
+                Map.of(),              // metadata
+                System.currentTimeMillis(), // registeredAt
+                "localhost",           // engineHost
+                18080,                 // enginePort
+                null,                  // jsonSchema
+                true,                  // enabled
+                null,                  // containerId
+                null,                  // containerName
+                "test-hostname"        // hostname
+        );
+        when(moduleRegistryService.getModule("test-module"))
+                .thenReturn(Uni.createFrom().item(mockModule));
+
+        // And: Pipeline creation will succeed
+        ValidationResult successResult = new ValidationResult(true, List.of(), List.of());
+        when(pipelineDefinitionService.createDefinition(
+                org.mockito.ArgumentMatchers.anyString(), 
+                org.mockito.ArgumentMatchers.any(PipelineConfig.class)))
+                .thenReturn(Uni.createFrom().item(successResult));
+
+        // When: We POST a pipeline definition using the new DTO endpoint
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                    {
+                        "name": "test-pipeline",
+                        "description": "Test pipeline for DTO endpoint",
+                        "steps": [
+                            {
+                                "name": "step1",
+                                "module": "test-module",
+                                "config": {
+                                    "param1": "value1",
+                                    "param2": 42
+                                }
+                            }
+                        ]
+                    }
+                    """)
+                .when()
+                .post("/api/v1/pipelines/definitions")
+                .then()
+                .statusCode(201)
+                .body("success", is(true))
+                .body("message", equalTo("Pipeline definition created successfully."));
+
+        // Then: Verify the pipeline was created with correct transformation
+        ArgumentCaptor<PipelineConfig> configCaptor = ArgumentCaptor.forClass(PipelineConfig.class);
+        org.mockito.Mockito.verify(pipelineDefinitionService).createDefinition(
+                org.mockito.ArgumentMatchers.eq("test-pipeline"), 
+                configCaptor.capture());
+        
+        PipelineConfig capturedConfig = configCaptor.getValue();
+        assert capturedConfig.name().equals("test-pipeline");
+        assert capturedConfig.pipelineSteps().containsKey("step1");
+        assert capturedConfig.pipelineSteps().get("step1").processorInfo().grpcServiceName().equals("test-module");
+    }
+
+    @Test
+    void testCreatePipelineFromDTO_MissingName() {
+        // When: We POST without a name
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                    {
+                        "description": "Test pipeline",
+                        "steps": []
+                    }
+                    """)
+                .when()
+                .post("/api/v1/pipelines/definitions")
+                .then()
+                .statusCode(400)
+                .body("success", is(false))
+                .body("message", containsString("Pipeline name is required"));
+    }
+
+    @Test
+    void testCreatePipelineFromDTO_ModuleNotFound() {
+        // Given: Module is not registered
+        when(moduleRegistryService.getModule("nonexistent-module"))
+                .thenReturn(Uni.createFrom().nullItem());
+
+        // When: We POST with a non-existent module
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                    {
+                        "name": "test-pipeline",
+                        "description": "Test pipeline",
+                        "steps": [
+                            {
+                                "name": "step1",
+                                "module": "nonexistent-module",
+                                "config": {}
+                            }
+                        ]
+                    }
+                    """)
+                .when()
+                .post("/api/v1/pipelines/definitions")
+                .then()
+                .statusCode(400)
+                .body("message", containsString("Module nonexistent-module not found"));
+    }
+
+    @Test
+    void testCreatePipelineFromDTO_PipelineAlreadyExists() {
+        // Given: Module exists
+        ModuleRegistration mockModule = new ModuleRegistration(
+                "test-module-id",      // moduleId
+                "test-module",         // moduleName
+                "impl-1",              // implementationId
+                "test-hostname",       // host
+                8080,                  // port
+                "PIPELINE",            // serviceType
+                "1.0.0",               // version
+                Map.of(),              // metadata
+                System.currentTimeMillis(), // registeredAt
+                "localhost",           // engineHost
+                18080,                 // enginePort
+                null,                  // jsonSchema
+                true,                  // enabled
+                null,                  // containerId
+                null,                  // containerName
+                "test-hostname"        // hostname
+        );
+        when(moduleRegistryService.getModule("test-module"))
+                .thenReturn(Uni.createFrom().item(mockModule));
+
+        // And: Pipeline already exists
+        ValidationResult conflictResult = new ValidationResult(
+                false, 
+                List.of("Pipeline 'test-pipeline' already exists"),
+                List.of()
+        );
+        when(pipelineDefinitionService.createDefinition(
+                org.mockito.ArgumentMatchers.anyString(), 
+                org.mockito.ArgumentMatchers.any(PipelineConfig.class)))
+                .thenReturn(Uni.createFrom().item(conflictResult));
+
+        // When: We try to create a duplicate
+        given()
+                .contentType(ContentType.JSON)
+                .body("""
+                    {
+                        "name": "test-pipeline",
+                        "description": "Duplicate pipeline",
+                        "steps": [
+                            {
+                                "name": "step1",
+                                "module": "test-module",
+                                "config": {}
+                            }
+                        ]
+                    }
+                    """)
+                .when()
+                .post("/api/v1/pipelines/definitions")
+                .then()
+                .statusCode(409)
+                .body("success", is(false))
+                .body("errors", hasItem(containsString("already exists")));
     }
 }

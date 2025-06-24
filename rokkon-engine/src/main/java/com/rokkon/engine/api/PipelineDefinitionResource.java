@@ -77,7 +77,12 @@ public class PipelineDefinitionResource {
             .map(dtoStep -> moduleRegistryService.getModule(dtoStep.module())
                     .onItem().ifNull().failWith(() -> {
                         LOG.warn("Module '{}' not found in registry for step '{}'", dtoStep.module(), dtoStep.name());
-                        return new WebApplicationException("Module " + dtoStep.module() + " not found for step " + dtoStep.name(), Status.BAD_REQUEST);
+                        return new WebApplicationException(
+                            Response.status(Status.BAD_REQUEST)
+                                .entity(new ApiResponse(false, "Module " + dtoStep.module() + " not found for step " + dtoStep.name(), null, null))
+                                .type(MediaType.APPLICATION_JSON)
+                                .build()
+                        );
                     })
                     .onItem().transform(moduleRegistration -> {
                         StepType stepType = convertServiceTypeToStepType(moduleRegistration.serviceType(), dtoStep.module());
@@ -109,12 +114,12 @@ public class PipelineDefinitionResource {
                                 processorInfo
                         );
                     })
-                    .onFailure().invoke(e -> LOG.errorf(e, "Failed to process step %s (module %s)", dtoStep.name(), dtoStep.module()))
+                    .onFailure().invoke(e -> LOG.error("Failed to process step {} (module {})", dtoStep.name(), dtoStep.module(), e))
             )
             .collect(Collectors.toList());
 
         return Uni.combine().all().unis(stepConfigsUnis)
-            .combinedWith(listOfStepConfigs -> {
+            .with(listOfStepConfigs -> {
                 Map<String, PipelineStepConfig> pipelineStepsMap = new HashMap<>();
                 for (Object stepConfigObj : listOfStepConfigs) {
                     PipelineStepConfig stepConfig = (PipelineStepConfig) stepConfigObj;
@@ -144,7 +149,7 @@ public class PipelineDefinitionResource {
                     });
             })
             .onFailure().recoverWithItem(e -> {
-                LOG.errorf(e, "Error creating pipeline definition '%s' from DTO", pipelineRequest.name());
+                LOG.error("Error creating pipeline definition '{}' from DTO", pipelineRequest.name(), e);
                 if (e instanceof WebApplicationException wae) {
                     return wae.getResponse();
                 }
