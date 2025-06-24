@@ -38,19 +38,17 @@ public class ParserServiceComprehensiveTest {
     // No longer need test-utilities classes - using Apache Commons loader instead
 
     @Test
-    @org.junit.jupiter.api.Disabled("Temporarily disabled - need to fix test data loading")
     public void testProcessAllAvailableDocumentsQuality() {
         LOG.info("=== Testing All Available Documents with Quarkus ParserService ===");
 
         // Load test documents using the test data helper - parser needs documents with blobs
-        // Let's use the sample documents that have blobs for testing
+        // Use parser output documents which have already been processed
         ProtobufTestDataHelper helper = new ProtobufTestDataHelper();
-        List<PipeDoc> testDocs = new ArrayList<>(helper.getSamplePipeDocuments());
-        
-        // Filter to only include documents that have blobs (raw binary content)
-        testDocs = testDocs.stream()
-                .filter(doc -> doc.hasBlob() && doc.getBlob().getData().size() > 0)
-                .collect(Collectors.toList());
+        List<PipeDoc> testDocs = new ArrayList<>(helper.getParserOutputDocs());
+
+        // We're using parser output documents which don't have blobs
+        // No need to filter for blobs since these are already processed documents
+        LOG.info("Using parser output documents which have already been processed");
         LOG.infof("Loaded %d test documents for comprehensive testing", testDocs.size());
 
         // Process configuration
@@ -122,7 +120,7 @@ public class ParserServiceComprehensiveTest {
         assertThat(testDocs)
                 .as("No test documents found! Test data is missing.")
                 .isNotEmpty();
-        
+
         // Assert high success rate (at least 90%)
         double successRate = (double) successCount.get() / testDocs.size();
         LOG.infof("Success rate: %.2f%%", successRate * 100);
