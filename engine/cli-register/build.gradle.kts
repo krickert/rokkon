@@ -19,6 +19,9 @@ dependencies {
     implementation("io.quarkus:quarkus-grpc")
     implementation("io.quarkus:quarkus-config-yaml")
 
+    // Google common protos for Status and other types
+    implementation("com.google.api.grpc:proto-google-common-protos")
+
     // Additional Quarkus extensions needed by this module
     implementation("io.quarkus:quarkus-smallrye-health")
 

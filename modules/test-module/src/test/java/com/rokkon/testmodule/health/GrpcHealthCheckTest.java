@@ -4,6 +4,7 @@ import io.grpc.health.v1.HealthGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.quarkus.test.junit.QuarkusTest;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 
@@ -15,16 +16,17 @@ import org.junit.jupiter.api.BeforeEach;
 @QuarkusTest
 class GrpcHealthCheckTest extends GrpcHealthCheckTestBase {
     
+    @ConfigProperty(name = "quarkus.grpc.server.test-port", defaultValue = "9000")
+    int grpcPort;
+    
     private ManagedChannel channel;
     private HealthGrpc.HealthBlockingStub healthService;
     
     @BeforeEach
     void setup() {
-        // Connect to Quarkus test mode gRPC port (configured as 0 = random)
-        // We'll get the actual port from system property
-        String grpcPort = System.getProperty("test.grpc.server.port", "9001");
+        // Connect to Quarkus test mode gRPC port
         channel = ManagedChannelBuilder
-                .forAddress("localhost", Integer.parseInt(grpcPort))
+                .forAddress("localhost", grpcPort)
                 .usePlaintext()
                 .build();
         healthService = HealthGrpc.newBlockingStub(channel);

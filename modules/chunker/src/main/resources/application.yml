@@ -5,7 +5,7 @@ quarkus:
     port: 39092
   generate-code:
     grpc:
-      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
   grpc:
     server:
       port: 49092
@@ -40,4 +40,3 @@ processing:
     capacity: ${PROCESSING_BUFFER_CAPACITY:100}
     directory: ${PROCESSING_BUFFER_DIRECTORY:build/chunker-output}
     prefix: ${PROCESSING_BUFFER_PREFIX:chunker_output}
-

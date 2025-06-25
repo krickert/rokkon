@@ -46,7 +46,7 @@ class GlobalModuleRegistryServiceIT extends ConsulIntegrationTestBase {
         // Given
         String moduleName = "test-module";
         String host = "localhost";
-        int port = 9001;
+        int port = findAvailablePort();
         
         // When - Register module with test-specific naming
         var registration = registryService.registerModule(
@@ -134,12 +134,12 @@ class GlobalModuleRegistryServiceIT extends ConsulIntegrationTestBase {
                 moduleName,
                 "impl-schema-" + testId,
                 "localhost",
-                9002,
+                findAvailablePort(),
                 "GRPC",
                 "1.0.0",
                 null,
                 "localhost",
-                9002,
+                findAvailablePort(),
                 invalidSchema
             ).await().indefinitely();
         });
@@ -155,12 +155,12 @@ class GlobalModuleRegistryServiceIT extends ConsulIntegrationTestBase {
             "toggle-module",
             "impl-toggle-" + testId,
             "localhost",
-            9003,
+            findAvailablePort(),
             "GRPC",
             "1.0.0",
             null,
             "localhost",
-            9003,
+            findAvailablePort(),
             null
         ).await().indefinitely();
         
@@ -201,12 +201,12 @@ class GlobalModuleRegistryServiceIT extends ConsulIntegrationTestBase {
             moduleName,
             "impl-1-" + testId,
             "localhost",
-            9004,
+            findAvailablePort(),
             "GRPC",
             "1.0.0",
             Map.of("instance", "1"),
             "localhost",
-            9004,
+            findAvailablePort(),
             null
         ).await().indefinitely();
         
@@ -214,12 +214,12 @@ class GlobalModuleRegistryServiceIT extends ConsulIntegrationTestBase {
             moduleName,
             "impl-2-" + testId,
             "localhost",
-            9005,
+            findAvailablePort(),
             "GRPC",
             "1.0.0",
             Map.of("instance", "2"),
             "localhost",
-            9005,
+            findAvailablePort(),
             null
         ).await().indefinitely();
         
@@ -248,9 +248,9 @@ class GlobalModuleRegistryServiceIT extends ConsulIntegrationTestBase {
                 .setId(zombieId)
                 .setName(getTestServiceName("zombie-module"))
                 .setAddress("localhost")
-                .setPort(9999)
+                .setPort(findAvailablePort())
                 .setCheckOptions(new io.vertx.ext.consul.CheckOptions()
-                    .setTcp("localhost:9999") // This will fail
+                    .setTcp("localhost:1") // This will fail - port 1 is reserved
                     .setInterval("1s")
                     .setDeregisterAfter("5s"))
         ).await().indefinitely();

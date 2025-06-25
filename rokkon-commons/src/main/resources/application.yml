@@ -8,7 +8,7 @@ quarkus:
     grpc:
       # Scans the 'rokkon-protobuf' dependency for .proto files to generate Java classes from.
       # This is crucial for rokkon-commons to compile its own code that uses protobuf types.
-      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
   grpc:
     codegen:
       # Specifies that Mutiny-style gRPC stubs should be generated for compilation.

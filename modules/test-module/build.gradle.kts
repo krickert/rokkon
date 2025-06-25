@@ -35,7 +35,7 @@ dependencies {
 }
 
 group = "com.rokkon.pipeline"
-version = "1.0.0-SNAPSHOT"
+version = "1.0.0-SNAPSHOT"  // Test module version
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -60,6 +60,9 @@ tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
 }
+
+// Standard processResources configuration
+// If we need project properties in the future, we can add them as standard application properties
 
 // Copy CLI jar for Docker build
 tasks.register<Copy>("copyDockerAssets") {

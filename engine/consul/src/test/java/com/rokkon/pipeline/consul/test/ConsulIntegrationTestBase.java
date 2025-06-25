@@ -16,6 +16,8 @@ import org.jboss.logging.Logger;
 import java.util.UUID;
 import java.time.Duration;
 import java.util.concurrent.TimeUnit;
+import java.net.ServerSocket;
+import java.io.IOException;
 
 /**
  * Base class for Consul integration tests.
@@ -195,5 +197,17 @@ public abstract class ConsulIntegrationTestBase {
     protected Uni<String> getTestKv(String key) {
         return consulClient.getValue(getTestKvKey(key))
             .map(keyValue -> keyValue != null ? keyValue.getValue() : null);
+    }
+    
+    /**
+     * Find an available port for testing.
+     */
+    protected static int findAvailablePort() {
+        try (ServerSocket socket = new ServerSocket(0)) {
+            socket.setReuseAddress(true);
+            return socket.getLocalPort();
+        } catch (IOException e) {
+            throw new RuntimeException("Could not find available port", e);
+        }
     }
 }

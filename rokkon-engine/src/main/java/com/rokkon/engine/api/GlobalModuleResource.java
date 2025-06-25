@@ -1,5 +1,6 @@
 package com.rokkon.engine.api;
 
+import com.fasterxml.jackson.annotation.JsonProperty;
 import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService;
 import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ModuleRegistration;
 import io.smallrye.mutiny.Uni;
@@ -28,15 +29,15 @@ public class GlobalModuleResource {
     GlobalModuleRegistryService moduleRegistry;
 
     public record RegisterModuleRequest(
-        @NotBlank String moduleName,
-        @NotBlank String implementationId,
+        @JsonProperty("module_name") @NotBlank String moduleName,
+        @JsonProperty("implementation_id") @NotBlank String implementationId,
         @NotBlank String host,
         int port,
-        @NotBlank String serviceType,
+        @JsonProperty("service_type") @NotBlank String serviceType,
         String version,
         Map<String, String> metadata,
-        EngineConnectionConfig engineConnection,  // Keep for future extensibility (TLS, auth, etc.)
-        String jsonSchema  // Optional JSON schema from module
+        @JsonProperty("engine_connection") EngineConnectionConfig engineConnection,  // Keep for future extensibility (TLS, auth, etc.)
+        @JsonProperty("json_schema") String jsonSchema  // Optional JSON schema from module
     ) {}
     
     public record EngineConnectionConfig(

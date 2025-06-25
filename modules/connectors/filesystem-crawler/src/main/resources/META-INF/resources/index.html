@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Filesystem Crawler - Rokkon Engine</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        body {
+            padding-top: 20px;
+            padding-bottom: 20px;
+        }
+        .header {
+            padding-bottom: 20px;
+            margin-bottom: 30px;
+            border-bottom: 1px solid #e5e5e5;
+        }
+        .footer {
+            padding-top: 20px;
+            margin-top: 30px;
+            border-top: 1px solid #e5e5e5;
+            text-align: center;
+        }
+        .status-card {
+            margin-bottom: 20px;
+        }
+        .card-header {
+            font-weight: bold;
+        }
+        #statusOutput, #crawlOutput {
+            max-height: 300px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            padding: 10px;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+            margin-top: 10px;
+        }
+        .loader {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #3498db;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 2s linear infinite;
+            display: inline-block;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        .hidden {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>Filesystem Crawler</h1>
+            <p class="lead">Rokkon Engine Connector for crawling filesystem paths</p>
+        </div>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card status-card">
+                    <div class="card-header">Crawler Status</div>
+                    <div class="card-body">
+                        <button id="refreshStatusBtn" class="btn btn-outline-primary mb-3">Refresh Status</button>
+                        <div id="statusLoader" class="loader hidden"></div>
+                        <div id="statusOutput">
+                            <p>Click "Refresh Status" to view the current crawler status.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card status-card">
+                    <div class="card-header">Trigger Crawl</div>
+                    <div class="card-body">
+                        <div class="mb-3">
+                            <label for="customPath" class="form-label">Custom Path (optional)</label>
+                            <input type="text" class="form-control" id="customPath" placeholder="Leave empty to use configured path">
+                        </div>
+                        <button id="triggerCrawlBtn" class="btn btn-primary mb-3">Start Crawl</button>
+                        <div id="crawlLoader" class="loader hidden"></div>
+                        <div id="crawlOutput">
+                            <p>Click "Start Crawl" to begin crawling the filesystem.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">Configuration</div>
+                    <div class="card-body">
+                        <form id="configForm">
+                            <div class="row">
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="rootPath" class="form-label">Root Path</label>
+                                        <input type="text" class="form-control" id="rootPath" disabled>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="fileExtensions" class="form-label">File Extensions</label>
+                                        <input type="text" class="form-control" id="fileExtensions" disabled>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="maxFileSize" class="form-label">Max File Size (bytes)</label>
+                                        <input type="number" class="form-control" id="maxFileSize" disabled>
+                                    </div>
+                                </div>
+                                <div class="col-md-6">
+                                    <div class="mb-3">
+                                        <label for="maxDepth" class="form-label">Max Depth</label>
+                                        <input type="number" class="form-control" id="maxDepth" disabled>
+                                    </div>
+                                    <div class="mb-3">
+                                        <label for="batchSize" class="form-label">Batch Size</label>
+                                        <input type="number" class="form-control" id="batchSize" disabled>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="includeHidden" disabled>
+                                        <label class="form-check-label" for="includeHidden">Include Hidden Files</label>
+                                    </div>
+                                    <div class="mb-3 form-check">
+                                        <input type="checkbox" class="form-check-input" id="deleteOrphans" disabled>
+                                        <label class="form-check-label" for="deleteOrphans">Delete Orphans</label>
+                                    </div>
+                                </div>
+                            </div>
+                            <p class="text-muted">Note: Configuration can only be changed via environment variables or application.yml</p>
+                        </form>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="row mt-4">
+            <div class="col-md-12">
+                <div class="card">
+                    <div class="card-header">API Documentation</div>
+                    <div class="card-body">
+                        <p>The Filesystem Crawler provides a REST API for interacting with the crawler:</p>
+                        <ul>
+                            <li><a href="/swagger-ui" target="_blank">Swagger UI</a> - Interactive API documentation</li>
+                            <li><a href="/openapi" target="_blank">OpenAPI Specification</a> - Raw OpenAPI specification</li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="footer">
+            <p>&copy; 2023 Rokkon Engine - Filesystem Crawler Connector</p>
+        </div>
+    </div>
+
+    <script>
+        document.addEventListener('DOMContentLoaded', function() {
+            // Get elements
+            const refreshStatusBtn = document.getElementById('refreshStatusBtn');
+            const triggerCrawlBtn = document.getElementById('triggerCrawlBtn');
+            const customPath = document.getElementById('customPath');
+            const statusOutput = document.getElementById('statusOutput');
+            const crawlOutput = document.getElementById('crawlOutput');
+            const statusLoader = document.getElementById('statusLoader');
+            const crawlLoader = document.getElementById('crawlLoader');
+            
+            // Form fields
+            const rootPathInput = document.getElementById('rootPath');
+            const fileExtensionsInput = document.getElementById('fileExtensions');
+            const maxFileSizeInput = document.getElementById('maxFileSize');
+            const maxDepthInput = document.getElementById('maxDepth');
+            const batchSizeInput = document.getElementById('batchSize');
+            const includeHiddenInput = document.getElementById('includeHidden');
+            const deleteOrphansInput = document.getElementById('deleteOrphans');
+
+            // Refresh status button click handler
+            refreshStatusBtn.addEventListener('click', function() {
+                statusLoader.classList.remove('hidden');
+                statusOutput.innerHTML = '<p>Loading status...</p>';
+                
+                fetch('/api/crawler/status')
+                    .then(response => response.json())
+                    .then(data => {
+                        // Update status output
+                        let statusHtml = '<h5>Current Status</h5>';
+                        statusHtml += '<ul>';
+                        statusHtml += `<li><strong>Status:</strong> ${data.status}</li>`;
+                        statusHtml += `<li><strong>Root Path:</strong> ${data.rootPath}</li>`;
+                        statusHtml += `<li><strong>Root Path Exists:</strong> ${data.rootPathExists ? 'Yes' : 'No'}</li>`;
+                        statusHtml += '</ul>';
+                        
+                        statusOutput.innerHTML = statusHtml;
+                        
+                        // Update configuration form
+                        rootPathInput.value = data.rootPath;
+                        fileExtensionsInput.value = data.fileExtensions;
+                        maxFileSizeInput.value = data.maxFileSize;
+                        maxDepthInput.value = data.maxDepth;
+                        batchSizeInput.value = data.batchSize;
+                        includeHiddenInput.checked = data.includeHidden;
+                        deleteOrphansInput.checked = data.deleteOrphans;
+                    })
+                    .catch(error => {
+                        statusOutput.innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+                    })
+                    .finally(() => {
+                        statusLoader.classList.add('hidden');
+                    });
+            });
+
+            // Trigger crawl button click handler
+            triggerCrawlBtn.addEventListener('click', function() {
+                crawlLoader.classList.remove('hidden');
+                crawlOutput.innerHTML = '<p>Starting crawl...</p>';
+                
+                const path = customPath.value.trim();
+                let url = '/api/crawler/crawl';
+                
+                if (path) {
+                    url += `/${encodeURIComponent(path)}`;
+                }
+                
+                fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                })
+                    .then(response => response.json())
+                    .then(data => {
+                        if (data.status === 'started') {
+                            crawlOutput.innerHTML = `<p class="text-success">${data.message}</p>`;
+                        } else {
+                            crawlOutput.innerHTML = `<p class="text-danger">${data.message}</p>`;
+                        }
+                    })
+                    .catch(error => {
+                        crawlOutput.innerHTML = `<p class="text-danger">Error: ${error.message}</p>`;
+                    })
+                    .finally(() => {
+                        crawlLoader.classList.add('hidden');
+                    });
+            });
+
+            // Load initial status
+            refreshStatusBtn.click();
+        });
+    </script>
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+</html>

@@ -28,37 +28,23 @@ dependencies {
         api("com.rokkon.pipeline:engine-models:${project.version}")
         api("com.rokkon.pipeline:test-utilities:${project.version}")
         
-        // Dependencies NOT in Quarkus BOM that we want to standardize
-        // (Most Quarkus extensions and common libraries are already managed by quarkus-bom)
+        // Dependencies NOT managed by Quarkus BOM:
         
-        // Testing dependencies
+        // Testing dependencies not in Quarkus
         api("org.assertj:assertj-core:3.26.3")
         api("com.github.marschall:memoryfilesystem:2.8.1")
         
-        // JUnit - ensure consistent versions (Quarkus BOM provides these but we can override if needed)
-        api("org.junit.jupiter:junit-jupiter-api:5.11.0")
-        api("org.junit.jupiter:junit-jupiter-engine:5.11.0")
-        api("org.junit.jupiter:junit-jupiter-params:5.11.0")
-        
-        // Quarkus testing (version from Quarkus BOM, but good to have in constraints)
-        api("io.quarkus:quarkus-test-common:${quarkusPlatformVersion}")
-        api("io.quarkus:quarkus-junit5:${quarkusPlatformVersion}")
-        
-        // Testcontainers - centrally managed version
-        api("org.testcontainers:testcontainers:1.21.2")
-        api("org.testcontainers:junit-jupiter:1.21.2")
-        api("org.testcontainers:consul:1.21.2")
-        
-        // Apache Commons libraries
-        api("org.apache.commons:commons-lang3:3.17.0")
-        api("commons-io:commons-io:2.18.0")
+        // Apache Commons - only what Quarkus doesn't provide
         api("org.apache.commons:commons-collections4:4.4")
-        api("org.apache.commons:commons-text:1.12.0")
         
-        // Google common protos for protobuf definitions
-        api("com.google.api.grpc:proto-google-common-protos:2.58.2")
-        
-        // Any other non-Quarkus managed dependencies can go here
+        // Note: The following ARE managed by Quarkus BOM 3.24.1, so we don't override:
+        // - JUnit (all versions)
+        // - Testcontainers (1.21.2)
+        // - commons-lang3 (3.17.0)
+        // - commons-io (2.19.0)
+        // - commons-text (1.13.1)
+        // - proto-google-common-protos (2.58.0)
+        // - All Quarkus modules (use ${quarkusPlatformVersion})
     }
 }
 

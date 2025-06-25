@@ -1,0 +1,20 @@
+quarkus:
+  http:
+    port: 0  # Use random port for tests
+    test-port: 0
+  application:
+    name: engine-validators-test
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+
+# Ensure beans are discoverable
+  index-dependency:
+    engine-validators:
+      group-id: com.rokkon.pipeline
+      artifact-id: engine-validators

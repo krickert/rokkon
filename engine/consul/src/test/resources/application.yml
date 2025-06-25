@@ -43,6 +43,14 @@ consul:
   port: 8500
 
 # Test configuration values
+# Override any profile-specific values
+"%test":
+  rokkon:
+    engine:
+      grpc-port: 49000
+      rest-port: 8080
+      debug: false
+
 rokkon:
   engine:
     grpc-port: 49000

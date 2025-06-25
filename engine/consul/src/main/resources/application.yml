@@ -5,7 +5,7 @@ quarkus:
   # Generate gRPC code from protobuf
   generate-code:
     grpc:
-      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
   
   # gRPC Server configuration
   grpc:

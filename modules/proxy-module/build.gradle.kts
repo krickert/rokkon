@@ -88,16 +88,24 @@ tasks.register<Copy>("copyRokkonCli") {
     rename { "rokkon-cli.jar" }
 }
 
+// Create a task that runs after all Quarkus tasks are complete
+tasks.register("postQuarkusTasks") {
+    // This task will run after quarkusBuild is complete, but is not part of the dependency chain
+    // This breaks the circular dependency
+    doLast {
+        // This task does nothing itself, but serves as a hook for other tasks
+        println("Running post-Quarkus tasks")
+    }
+}
+
+// Make sure postQuarkusTasks runs after quarkusBuild
 tasks.named("quarkusBuild") {
+    finalizedBy("postQuarkusTasks")
+}
+
+// Make copyModuleEntrypoint and copyRokkonCli run after postQuarkusTasks
+tasks.named("postQuarkusTasks") {
     finalizedBy("copyModuleEntrypoint", "copyRokkonCli")
-}
-
-tasks.named("quarkusGenerateCodeTests") {
-    dependsOn("copyModuleEntrypoint", "copyRokkonCli")
-}
-
-tasks.named("quarkusGenerateCode") {
-    dependsOn("copyModuleEntrypoint", "copyRokkonCli")
 }
 
 publishing {

@@ -17,7 +17,7 @@ class ModuleRegistrationTest extends ModuleRegistrationTestBase {
     @ConfigProperty(name = "quarkus.http.test-port")
     int httpTestPort;
     
-    @ConfigProperty(name = "quarkus.grpc.server.test-port", defaultValue = "9001")
+    @ConfigProperty(name = "quarkus.grpc.server.test-port", defaultValue = "0")
     int grpcTestPort;
     
     @Override

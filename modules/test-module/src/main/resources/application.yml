@@ -3,7 +3,7 @@ quarkus:
     name: test-module
   generate-code:
     grpc:
-      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
   http:
     port: 39095
     test-port: 0  # Random port for tests
@@ -27,7 +27,7 @@ quarkus:
     build: true
     push: false
     name: test-module
-    tag: latest
+    tag: 1.0.0-SNAPSHOT
     group: rokkon
     # Use docker builder
     builder: docker

@@ -22,6 +22,7 @@ class ProtoJarPackagingTest {
         "engine_service.proto",
         "module_registration.proto",
         "pipe_step_processor_service.proto",
+        "rokkon_connector_server.proto",
         "rokkon_core_types.proto",
         "rokkon_service_registration.proto",
         "test_harness.proto",

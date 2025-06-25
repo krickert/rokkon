@@ -22,6 +22,8 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.net.URI;
 import org.jboss.logging.Logger;
+import jakarta.inject.Inject;
+import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.CoreMatchers.*;
@@ -39,6 +41,9 @@ import static org.hamcrest.CoreMatchers.*;
 class ContainerAwareRegistrationTest extends ModuleRegistrationTestBase {
     
     private static final Logger LOG = Logger.getLogger(ContainerAwareRegistrationTest.class);
+    
+    @Inject
+    GlobalModuleRegistryService moduleRegistry;
     
     @ConfigProperty(name = "test.module.container.grpc.port")
     int externalGrpcPort;
@@ -77,6 +82,29 @@ class ContainerAwareRegistrationTest extends ModuleRegistrationTestBase {
     String consulContainerPort;
     
     private ManagedChannel healthCheckChannel;
+    
+    @AfterEach
+    void cleanupRegistrations() {
+        LOG.info("Cleaning up module registrations after test");
+        
+        // Clean up all modules registered with the test container
+        try {
+            // Get all registered modules
+            var modules = moduleRegistry.listRegisteredModules()
+                .await().atMost(java.time.Duration.ofSeconds(5));
+            
+            // Find and deregister any modules that use our test container
+            for (var module : modules) {
+                if (module.containerId() != null && module.containerId().equals(containerId)) {
+                    LOG.infof("Deregistering module %s (container: %s)", module.moduleId(), containerId);
+                    moduleRegistry.deregisterModule(module.moduleId())
+                        .await().atMost(java.time.Duration.ofSeconds(5));
+                }
+            }
+        } catch (Exception e) {
+            LOG.warnf(e, "Failed to cleanup module registrations, this may cause subsequent tests to fail");
+        }
+    }
     
     // === Implementation of abstract methods ===
     

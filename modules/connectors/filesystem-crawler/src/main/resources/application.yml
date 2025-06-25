@@ -1,0 +1,75 @@
+quarkus:
+  application:
+    name: filesystem-crawler-connector
+
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
+
+  http:
+    port: 8080
+    host: 0.0.0.0
+
+  grpc:
+    clients:
+      connector-engine:
+        host: ${ENGINE_HOST:localhost}
+        port: ${ENGINE_PORT:49000}
+
+  log:
+    level: INFO
+    category:
+      "com.rokkon.connectors.filesystem":
+        level: DEBUG
+
+  # Swagger UI / OpenAPI configuration
+  swagger-ui:
+    always-include: true
+    path: /swagger-ui
+    theme: original
+    title: Filesystem Crawler API
+    footer: "Rokkon Engine - Filesystem Crawler Connector"
+
+  smallrye-openapi:
+    path: /openapi
+    info-title: Filesystem Crawler API
+    info-version: 1.0.0
+    info-description: API for the Rokkon Filesystem Crawler Connector
+    info-contact-email: support@rokkon.com
+    info-contact-name: Rokkon Support
+    info-license-name: Apache 2.0
+    info-license-url: https://www.apache.org/licenses/LICENSE-2.0.html
+
+# Filesystem crawler configuration
+filesystem-crawler:
+  # Default root path to crawl
+  root-path: ${CRAWLER_ROOT_PATH:/tmp/crawler-data}
+
+  # Connector type identifier
+  connector-type: filesystem-crawler
+
+  # Connector ID (should be unique)
+  connector-id: ${CONNECTOR_ID:filesystem-crawler-1}
+
+  # File extensions to process (comma-separated)
+  file-extensions: ${CRAWLER_FILE_EXTENSIONS:txt,md,json,xml,html,csv}
+
+  # Maximum file size to process in bytes (default: 10MB)
+  max-file-size: ${CRAWLER_MAX_FILE_SIZE:10485760}
+
+  # Whether to include hidden files and directories
+  include-hidden: ${CRAWLER_INCLUDE_HIDDEN:false}
+
+  # Maximum depth to crawl (0 means no limit)
+  max-depth: ${CRAWLER_MAX_DEPTH:10}
+
+  # Batch size for processing files
+  batch-size: ${CRAWLER_BATCH_SIZE:100}
+
+  # Whether to delete orphaned files
+  delete-orphans: ${CRAWLER_DELETE_ORPHANS:false}
+
+  # Engine configuration
+  engine:
+    host: ${ENGINE_HOST:localhost}
+    port: ${ENGINE_PORT:49000}

@@ -1,0 +1,57 @@
+quarkus:
+  application:
+    name: rokkon-pipestream-mock
+  
+  # Generate Mutiny-based gRPC code
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
+  
+  # gRPC server configuration - both services on same port
+  grpc:
+    server:
+      port: 49000
+      host: 0.0.0.0
+      enable-reflection-service: true
+      max-inbound-message-size: 1073741824  # 1GB
+  
+  # HTTP configuration for REST API
+  http:
+    port: 8080
+    host: 0.0.0.0
+  
+  # Health checks are enabled by default when smallrye-health is included
+  
+  # Logging
+  log:
+    level: INFO
+    category:
+      "com.rokkon.mock":
+        level: DEBUG
+  
+  # Container image configuration (disabled until Dockerfile is created)
+  container-image:
+    build: false
+    group: rokkon
+    name: pipestream-mock
+    tag: latest
+    registry: nas.rokkon.com:5000
+    push: false
+    insecure: true
+
+# Development profile
+"%dev":
+  quarkus:
+    log:
+      console:
+        enable: true
+      level: DEBUG
+    live-reload:
+      instrumentation: true
+
+# Test profile  
+"%test":
+  quarkus:
+    grpc:
+      server:
+        port: 0  # Random port for tests

@@ -21,17 +21,23 @@ java {
 dependencies {
     // Import the BOM for version management
     implementation(platform("com.rokkon.pipeline:rokkon-bom:${project.version}"))
-    
+
     // Google common protos for Status and other types - exposed as transitive dependency
     api("com.google.api.grpc:proto-google-common-protos")
-    
+
+    // Explicitly include protobuf dependencies
+    implementation("com.google.protobuf:protobuf-java")
+    implementation("io.grpc:grpc-protobuf")
+
     // Test dependencies
-    testImplementation("org.junit.jupiter:junit-jupiter:5.10.2")
-    testImplementation("org.assertj:assertj-core:3.26.3")
+    testImplementation("org.junit.jupiter:junit-jupiter")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
+    testImplementation("org.assertj:assertj-core")
 }
 
 tasks.withType<Test> {
     useJUnitPlatform()
+    dependsOn(tasks.jar)
 }
 
 // Create a source jar that includes proto files
@@ -49,16 +55,16 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
-            
+
             artifact(tasks["sourcesJar"])
-            
+
             pom {
                 name.set("Rokkon Protocol Buffers")
                 description.set("Protocol Buffer definitions for Rokkon Engine")
             }
         }
     }
-    
+
     repositories {
         mavenLocal()
     }

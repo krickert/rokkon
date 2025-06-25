@@ -12,28 +12,31 @@ repositories {
 dependencies {
     implementation("io.quarkiverse.docker:quarkus-docker-client:0.0.4")
     implementation(platform(project(":rokkon-bom")))
-    
+
     // Quarkus dependencies come from BOM
     implementation("io.quarkus:quarkus-container-image-docker")
     implementation("io.quarkus:quarkus-test-common")
-    
+
+    // Google common protos for Status and other types
+    implementation("com.google.api.grpc:proto-google-common-protos")
+
     // Test frameworks (versions come from BOM)
     implementation("org.junit.jupiter:junit-jupiter-api")
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("org.junit.jupiter:junit-jupiter-engine")
-    
+
     // Integration test dependencies
     integrationTestImplementation("io.quarkus:quarkus-junit5")
     integrationTestImplementation("org.junit.jupiter:junit-jupiter")
     integrationTestImplementation("org.assertj:assertj-core")
-    
+
     // Assertions (version comes from BOM)
     implementation("org.assertj:assertj-core")
-    
+
     // Commons libraries (versions come from BOM)
     implementation("org.apache.commons:commons-lang3")
     implementation("commons-io:commons-io")
-    
+
     // Container testing (version comes from BOM)
     implementation("org.testcontainers:testcontainers")
 }

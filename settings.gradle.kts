@@ -28,11 +28,15 @@ include("engine:cli-register")
 
 // Module subprojects
 include("modules:test-module")
-include("modules:proxy-module")
+// include("modules:proxy-module") // Excluded from build as per requirements
 include("modules:chunker")
 include("modules:echo")
 include("modules:parser")
 include("modules:embedder")
+include("modules:connectors:filesystem-crawler")
+
+// New Architecture - Mock Engine
+include("rokkon-engine-new:pipestream-mock")
 
 
 // Ensure dependencyResolutionManagement is present, especially if you plan to use version catalogs later.

@@ -8,6 +8,7 @@ import io.grpc.ManagedChannelBuilder;
 import io.quarkus.grpc.GrpcClient;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -21,6 +22,9 @@ import static org.assertj.core.api.Assertions.assertThat;
 @QuarkusTest
 class MixedHealthCheckTest {
     
+    @ConfigProperty(name = "quarkus.grpc.server.test-port", defaultValue = "9000")
+    int grpcPort;
+    
     // Removed Mutiny client since we're testing with standard stubs
     
     private ManagedChannel channel;
@@ -31,7 +35,7 @@ class MixedHealthCheckTest {
     void setup() {
         // Create a channel to the same service
         channel = ManagedChannelBuilder
-                .forAddress("localhost", 0) // Quarkus will use random port
+                .forAddress("localhost", grpcPort)
                 .usePlaintext()
                 .build();
         
@@ -50,70 +54,48 @@ class MixedHealthCheckTest {
     
     @Test
     void testBlockingClientCanCallMutinyService() {
-        // Connect to Quarkus dev server port (usually 9000 or configured)
-        ManagedChannel devChannel = ManagedChannelBuilder
-                .forAddress("localhost", 9000) // Default Quarkus gRPC port
-                .usePlaintext()
-                .build();
+        // Use the already configured channel
+        HealthCheckRequest request = HealthCheckRequest.newBuilder().build();
         
-        try {
-            HealthGrpc.HealthBlockingStub blockingStub = HealthGrpc.newBlockingStub(devChannel);
-            HealthCheckRequest request = HealthCheckRequest.newBuilder().build();
-            
-            // Standard blocking client calling Mutiny service
-            HealthCheckResponse response = blockingStub.check(request);
-            
-            assertThat(response.getStatus()).isEqualTo(HealthCheckResponse.ServingStatus.SERVING);
-        } finally {
-            devChannel.shutdown();
-        }
+        // Standard blocking client calling Mutiny service
+        HealthCheckResponse response = blockingHealthService.check(request);
+        
+        assertThat(response.getStatus()).isEqualTo(HealthCheckResponse.ServingStatus.SERVING);
     }
     
     @Test
-    void testAsyncClientCanCallMutinyService() {
-        // Connect to Quarkus dev server port
-        ManagedChannel devChannel = ManagedChannelBuilder
-                .forAddress("localhost", 9000)
-                .usePlaintext()
-                .build();
+    void testAsyncClientCanCallMutinyService() throws InterruptedException {
+        // Use the already configured channel
+        HealthCheckRequest request = HealthCheckRequest.newBuilder().build();
         
-        try {
-            HealthGrpc.HealthStub asyncStub = HealthGrpc.newStub(devChannel);
-            HealthCheckRequest request = HealthCheckRequest.newBuilder().build();
+        // Use a simple callback to capture the response
+        var responseHolder = new Object() {
+            volatile HealthCheckResponse response = null;
+            volatile Throwable error = null;
+        };
+        
+        asyncHealthService.check(request, new io.grpc.stub.StreamObserver<HealthCheckResponse>() {
+            @Override
+            public void onNext(HealthCheckResponse value) {
+                responseHolder.response = value;
+            }
             
-            // Use a simple callback to capture the response
-            var responseHolder = new Object() {
-                volatile HealthCheckResponse response = null;
-                volatile Throwable error = null;
-            };
+            @Override
+            public void onError(Throwable t) {
+                responseHolder.error = t;
+            }
             
-            asyncStub.check(request, new io.grpc.stub.StreamObserver<HealthCheckResponse>() {
-                @Override
-                public void onNext(HealthCheckResponse value) {
-                    responseHolder.response = value;
-                }
-                
-                @Override
-                public void onError(Throwable t) {
-                    responseHolder.error = t;
-                }
-                
-                @Override
-                public void onCompleted() {
-                    // Nothing to do
-                }
-            });
-            
-            // Wait a bit for the async response
-            Thread.sleep(100);
-            
-            assertThat(responseHolder.error).isNull();
-            assertThat(responseHolder.response).isNotNull();
-            assertThat(responseHolder.response.getStatus()).isEqualTo(HealthCheckResponse.ServingStatus.SERVING);
-        } catch (InterruptedException e) {
-            throw new RuntimeException(e);
-        } finally {
-            devChannel.shutdown();
-        }
+            @Override
+            public void onCompleted() {
+                // Nothing to do
+            }
+        });
+        
+        // Wait a bit for the async response
+        Thread.sleep(100);
+        
+        assertThat(responseHolder.error).isNull();
+        assertThat(responseHolder.response).isNotNull();
+        assertThat(responseHolder.response.getStatus()).isEqualTo(HealthCheckResponse.ServingStatus.SERVING);
     }
 }
