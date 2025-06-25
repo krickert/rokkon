@@ -6,9 +6,15 @@ import org.testcontainers.consul.ConsulContainer;
 import org.testcontainers.containers.Network;
 import org.testcontainers.utility.DockerImageName;
 import com.rokkon.test.containers.SharedNetworkManager;
+import io.vertx.core.Vertx;
+import io.vertx.ext.consul.ConsulClient;
+import io.vertx.ext.consul.ConsulClientOptions;
+import org.awaitility.Awaitility;
 
 import java.util.Map;
 import java.util.Optional;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Testcontainers resource that starts Consul for integration tests.
@@ -45,6 +51,9 @@ public class ConsulTestResource implements QuarkusTestResourceLifecycleManager, 
                     
                     sharedConsul.start();
                     containerStarted = true;
+                    
+                    // Seed Consul with initial configuration
+                    seedConsulConfiguration();
                 }
             }
         }
@@ -67,5 +76,85 @@ public class ConsulTestResource implements QuarkusTestResourceLifecycleManager, 
         // Don't stop the shared container - let it be reused across test runs
         // The container will be cleaned up when the JVM exits or when
         // Testcontainers Ryuk reaper removes it after inactivity
+    }
+    
+    private void seedConsulConfiguration() {
+        // Create Vertx instance for Consul client
+        Vertx vertx = Vertx.vertx();
+        
+        try {
+            // Create Consul client
+            ConsulClientOptions options = new ConsulClientOptions()
+                .setHost(sharedConsul.getHost())
+                .setPort(sharedConsul.getMappedPort(8500));
+            ConsulClient consulClient = ConsulClient.create(vertx, options);
+            
+            // Seed minimal configuration required for consul-config extension
+            String minimalConfig = """
+                smallrye:
+                  config:
+                    mapping:
+                      validate-unknown: false
+                
+                rokkon:
+                  engine:
+                    grpc-port: 49000
+                    rest-port: 8080
+                    debug: false
+                  
+                  consul:
+                    cleanup:
+                      enabled: true
+                      interval: 5m
+                      zombie-threshold: 2m
+                      cleanup-stale-whitelist: true
+                    health:
+                      check-interval: 10s
+                      deregister-after: 1m
+                      timeout: 5s
+                  
+                  modules:
+                    auto-discover: false
+                    service-prefix: "module-"
+                    require-whitelist: true
+                    connection-timeout: 30s
+                    max-instances-per-module: 10
+                  
+                  default-cluster:
+                    name: default
+                    auto-create: true
+                    description: "Default cluster for Rokkon pipelines"
+                """;
+            
+            // Put configuration in Consul
+            AtomicBoolean seeded = new AtomicBoolean(false);
+            AtomicBoolean failed = new AtomicBoolean(false);
+            
+            consulClient.putValue("config/application", minimalConfig, ar -> {
+                if (ar.succeeded()) {
+                    System.out.println("Successfully seeded Consul with initial configuration");
+                    seeded.set(true);
+                } else {
+                    System.err.println("Failed to seed Consul: " + ar.cause().getMessage());
+                    failed.set(true);
+                }
+            });
+            
+            // Wait for seeding to complete using Awaitility
+            Awaitility.await()
+                .atMost(10, TimeUnit.SECONDS)
+                .pollInterval(100, TimeUnit.MILLISECONDS)
+                .until(() -> seeded.get() || failed.get());
+            
+            if (failed.get()) {
+                throw new RuntimeException("Failed to seed Consul configuration");
+            }
+            
+        } catch (Exception e) {
+            System.err.println("Error seeding Consul: " + e.getMessage());
+            e.printStackTrace();
+        } finally {
+            vertx.close();
+        }
     }
 }
