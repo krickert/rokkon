@@ -44,3 +44,10 @@ test:
 # Disable Consul config for tests
   consul-config:
     enabled: false
+    
+# Test isolation settings
+  arc:
+    # Ensure proper bean discovery
+    remove-unused-beans: false
+    # Disable optimizations that might cause issues in tests
+    transform-unproxyable-classes: false
