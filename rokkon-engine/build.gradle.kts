@@ -66,12 +66,17 @@ dependencies {
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("org.assertj:assertj-core:3.26.3")
     testImplementation("org.awaitility:awaitility:4.3.0")
-    testImplementation("org.testcontainers:testcontainers:1.19.8")
-    testImplementation("org.testcontainers:junit-jupiter:1.19.8")
-    testImplementation("org.testcontainers:consul:1.19.8") {
+    testImplementation(project(":test-utilities"))
+
+    // --- Integration Testing ---
+    integrationTestImplementation(enforcedPlatform("${quarkusPlatformGroupId}:${quarkusPlatformArtifactId}:${quarkusPlatformVersion}"))
+    integrationTestImplementation("io.quarkus:quarkus-junit5-integration-test")
+    integrationTestImplementation("org.testcontainers:testcontainers:1.19.8")
+    integrationTestImplementation("org.testcontainers:junit-jupiter:1.19.8")
+    integrationTestImplementation("org.testcontainers:consul:1.19.8") {
         exclude(group = "org.apache.commons", module = "commons-compress")
     }
-    testImplementation(project(":test-utilities"))
+    integrationTestImplementation("com.orbitz.consul:consul-client:1.5.3")
 }
 
 group = "com.rokkon.pipeline"
@@ -104,9 +109,6 @@ quarkus {
     }
 }
 
-// Integration test source set is already configured by Quarkus
-// Just ensure the dependencies are available
-configurations {
-    getByName("integrationTestImplementation").extendsFrom(configurations.testImplementation.get())
-    getByName("integrationTestRuntimeOnly").extendsFrom(configurations.testRuntimeOnly.get())
-}
+// Integration test source set configuration
+
+
