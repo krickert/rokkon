@@ -9,7 +9,10 @@ import com.rokkon.pipeline.consul.test.TestSeedingService;
 import com.rokkon.pipeline.consul.test.TestSeedingServiceImpl;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
+import com.rokkon.pipeline.consul.test.NoSchedulerTestProfile;
 import jakarta.inject.Inject;
+import org.junit.jupiter.api.TestInstance;
 
 /**
  * Unit test for methodical build-up of the engine ecosystem.
@@ -18,6 +21,8 @@ import jakarta.inject.Inject;
 @QuarkusTest
 @QuarkusTestResource(ConsulTestResource.class)
 @QuarkusTestResource(MockTestModuleContainerResource.class)
+@TestProfile(NoSchedulerTestProfile.class)
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MethodicalBuildUpTest extends MethodicalBuildUpTestBase {
 
     @Inject

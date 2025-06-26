@@ -1,14 +1,16 @@
 package com.rokkon.pipeline.consul;
 
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
+import com.rokkon.pipeline.consul.test.NoSchedulerTestProfile;
+import com.rokkon.pipeline.consul.test.TestSeedingService;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
+import io.vertx.ext.consul.ConsulClientOptions;
 import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.ext.consul.ConsulClient;
-import io.vertx.ext.consul.ConsulClientOptions;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -18,61 +20,43 @@ import static org.assertj.core.api.Assertions.assertThat;
  */
 @QuarkusTest
 @QuarkusTestResource(ConsulTestResource.class)
+@TestProfile(NoSchedulerTestProfile.class)
 public class ConsulConfigLoadingTest {
     
     @Inject
+    TestSeedingService testSeedingService;
+
+    @Inject
     Vertx vertx;
-    
+
     @ConfigProperty(name = "consul.host")
     String consulHost;
-    
+
     @ConfigProperty(name = "consul.port")
     int consulPort;
-    
-    // This will be loaded from Consul if we put it there
-    @ConfigProperty(name = "test.loaded.from.consul", defaultValue = "not-loaded")
+
+    // This property name matches the key being set in TestSeedingService
+    @ConfigProperty(name = "rokkon.test-key", defaultValue = "not-loaded")
     String testValue;
-    
-    private ConsulClient consulClient;
-    
-    @BeforeEach
-    void setup() {
-        // Create Consul client to put test data
-        ConsulClientOptions options = new ConsulClientOptions()
-            .setHost(consulHost)
-            .setPort(consulPort);
-        consulClient = ConsulClient.create(vertx, options);
-    }
-    
+
     @Test
-    void testLoadingFromConsulKv() {
-        // Put some test configuration in Consul
-        String yamlConfig = """
-            test:
-              loaded:
-                from:
-                  consul: "value-from-consul"
-            """;
-        
-        // Put it in the config/test path that consul-config is watching
-        consulClient.putValue("config/test", yamlConfig)
-            .await().indefinitely();
-        
-        // Note: In a real test, consul-config would need to reload.
-        // Since we have watch disabled for tests, this value won't be picked up
-        // until the next application start.
-        
-        // For now, let's just verify we can write to and read from Consul
-        String readValue = consulClient.getValue("config/test")
-            .map(kv -> kv.getValue())
-            .await().indefinitely();
-        
-        assertThat(readValue).isEqualTo(yamlConfig);
-        System.out.println("✓ Successfully wrote and read configuration from Consul KV");
-        
-        // The testValue will still be "not-loaded" because consul-config
-        // loads at startup and we have watch disabled
-        System.out.println("Current test value: " + testValue);
+    void testSeedingAndConfigLoading() {
+        // 1. Assert that the config property has its default value at startup
         assertThat(testValue).isEqualTo("not-loaded");
+
+        // 2. Seed the configuration using the dedicated service
+        testSeedingService.seedConsulConfiguration();
+
+        // 3. Assert that the config property in the running application is NOT updated,
+        //    as consul-config loads at startup and watch is disabled for tests.
+        assertThat(testValue).isEqualTo("not-loaded");
+
+        // 4. Verify directly in Consul that the value was written successfully by the seeding service.
+        ConsulClient consulClient = ConsulClient.create(vertx, new ConsulClientOptions().setHost(consulHost).setPort(consulPort));
+        String valueFromConsul = consulClient.getValue("rokkon/test-key")
+                .map(kv -> kv.getValue())
+                .await().indefinitely();
+        assertThat(valueFromConsul).isEqualTo("test-value");
+        System.out.println("✓ Successfully verified that seeding service wrote to Consul and that running config was not affected.");
     }
 }

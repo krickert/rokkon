@@ -17,7 +17,7 @@ public class SharedNetworkManager {
      * 
      * @return the shared network
      */
-    public static Network getOrCreateNetwork() {
+    public static Network getNetwork() {
         if (sharedNetwork == null) {
             synchronized (lock) {
                 if (sharedNetwork == null) {

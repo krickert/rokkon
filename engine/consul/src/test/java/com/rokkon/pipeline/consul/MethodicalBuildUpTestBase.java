@@ -40,19 +40,19 @@ public abstract class MethodicalBuildUpTestBase {
     protected abstract TestSeedingService getTestSeedingService();
 
     @BeforeAll
-    static void setupClass() {
+    void setupClass() {
         LOG.info("=== Starting Methodical Build-Up Test Suite ===");
         LOG.info("This test suite validates the engine ecosystem layer by layer");
     }
 
     @AfterAll
-    static void teardownClass() {
+    void teardownClass() {
         LOG.info("=== Completed Methodical Build-Up Test Suite ===");
     }
 
-    @AfterEach
+    @AfterAll
     void cleanup() {
-        LOG.info("Cleaning up after test");
+        LOG.info("Cleaning up after test suite");
 
         // Use the TestSeedingService to tear down all test data
         try {
@@ -71,7 +71,6 @@ public abstract class MethodicalBuildUpTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     @Order(0)
     @DisplayName("0) Consul starts and is accessible")
     void testConsulStarts() {
@@ -97,7 +96,6 @@ public abstract class MethodicalBuildUpTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     @Order(1)
     @DisplayName("1) Create cluster - default vs non-default")
     void testCreateCluster() {
@@ -135,7 +133,6 @@ public abstract class MethodicalBuildUpTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to container connectivity issues")
     @Order(2)
     @DisplayName("2) Start container and access test-module")
     void testContainerAccess() throws Exception {
@@ -156,7 +153,6 @@ public abstract class MethodicalBuildUpTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul and container connectivity issues")
     @Order(3)
     @DisplayName("3) Register the container")
     void testRegisterContainer() {
@@ -195,7 +191,6 @@ public abstract class MethodicalBuildUpTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     @Order(4)
     @DisplayName("4) Create pipeline with no steps")
     void testCreateEmptyPipeline() {
@@ -228,7 +223,6 @@ public abstract class MethodicalBuildUpTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     @Order(5)
     @DisplayName("5) Add first test-module pipeline step")
     void testAddFirstPipelineStep() {
@@ -268,7 +262,6 @@ public abstract class MethodicalBuildUpTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul and container connectivity issues")
     @Order(6)
     @DisplayName("6) Run test-module 2x to ensure it runs twice")
     void testRunModuleTwice() {

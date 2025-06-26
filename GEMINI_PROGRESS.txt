@@ -1,0 +1,85 @@
+✦ Here's an update on the current state of the task:
+
+
+  Current Status:
+  The build is still failing, specifically the :engine:consul:test task. The primary issue is a NullPointerException occurring during test teardown, which points to a lifecycle mismatch between the ConsulTestResource (which manages the Consul container) and
+  the Quarkus application context. A secondary issue involved a scheduled task in ConfigurationExample attempting to run during teardown, causing injection errors.
+
+
+  What Has Been Done:
+   1. Identified Core Problem: The ConsulTestResource was attempting to manage Vertx and ConsulClient instances directly and perform Consul seeding within its own lifecycle methods (start() and stop()). This conflicts with Quarkus's dependency injection and
+      lifecycle management for application beans, leading to NullPointerException during teardown when the Quarkus context is no longer fully available.
+   2. Attempted Direct Fixes (and learned from them):
+       * Initial attempts focused on correctly managing Vertx and ConsulClient within ConsulTestResource, including trying to configure VertxOptions and adjusting finally blocks. These attempts highlighted the fundamental lifecycle mismatch.
+       * Realized that direct @Inject within QuarkusTestResourceLifecycleManager is not the correct pattern for integration tests.
+   3. Addressed Scheduled Task Issue:
+       * Located ConfigurationExample.java which contained a @Scheduled method causing errors during teardown.
+       * Created NoSchedulerTestProfile.java to disable the Quarkus scheduler during tests.
+       * Applied NoSchedulerTestProfile to ConsulConfigLoadingTest.java and MethodicalBuildUpTest.java.
+   4. Initiated `ConsulTestResource` Refactoring:
+       * Removed the jakarta.inject.Inject import from ConsulTestResource.java.
+       * Removed the Vertx vertx; and ConsulClient consulClient; fields from ConsulTestResource.java.
+       * Removed the seedConsulConfiguration() method and its call from the start() method in ConsulTestResource.java.
+
+
+  Next Steps in the Plan:
+  The revised strategy is to strictly separate the responsibilities: ConsulTestResource will only manage the ConsulContainer's lifecycle, and Consul data seeding will be handled by a regular Quarkus bean (TestSeedingService) that operates within the
+  application's CDI context.
+
+
+   1. Complete `ConsulTestResource` Cleanup:
+       * Remove any remaining unused imports (io.vertx.mutiny.core.Vertx, io.vertx.mutiny.ext.consul.ConsulClient, io.vertx.mutiny.ext.consul.ConsulClientOptions, org.awaitility.Awaitility, java.util.concurrent.TimeUnit,
+         java.util.concurrent.atomic.AtomicBoolean) from ConsulTestResource.java.
+       * Ensure the start() method only starts sharedConsul and returns the connection properties.
+       * Ensure the stop() method remains empty (relying on Testcontainers' Ryuk for container cleanup).
+   2. Move Consul Seeding Logic to `TestSeedingService`:
+       * Transfer the logic from the old seedConsulConfiguration() method (which interacts with Consul using Vertx and ConsulClient) into the TestSeedingService class.
+       * Ensure TestSeedingService correctly uses injected Vertx and ConsulClient instances (which will now be managed by Quarkus's CDI).
+   3. Call Seeding from Test Classes:
+       * Modify ConsulConfigLoadingTest and MethodicalBuildUpTest (and any other relevant integration tests) to call the appropriate seeding method from the TestSeedingService in their @BeforeAll or @BeforeEach methods. This ensures Consul is seeded after the
+         Quarkus application context is fully initialized and ready for bean injection.
+   4. Verify the Fix: Run a full Gradle build (./gradlew clean build) to confirm all tests pass and the NullPointerException is resolved.
+ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ✔  Edit Model did not provide valid parameters for edit tool                                                                                                                                                                                            │
+ │                                                                                                                                                                                                                                                         │
+ │    Error: Failed to edit, could not find the string to replace.                                                                                                                                                                                         │
+ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ╭──────────────────────────────────────────────────╮
+ │ ✔  ReadFile engine/test/ConsulTestResource.java  │
+ ╰──────────────────────────────────────────────────╯
+ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ✔  Edit Model did not provide valid parameters for edit tool                                                                                                                                                                                            │
+ │                                                                                                                                                                                                                                                         │
+ │    Error: Failed to edit, could not find the string to replace.                                                                                                                                                                                         │
+ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ✔  Edit Model did not provide valid parameters for edit tool                                                                                                                                                                                            │
+ │                                                                                                                                                                                                                                                         │
+ │    Error: Failed to edit, could not find the string to replace.                                                                                                                                                                                         │
+ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+ ╭──────────────────────────────────────────────────╮
+ │ ✔  ReadFile engine/test/ConsulTestResource.java  │
+ ╰──────────────────────────────────────────────────╯
+ ╭──────────────────────────────────────────────────╮
+ │ ✔  ReadFile engine/test/ConsulTestResource.java  │
+ ╰──────────────────────────────────────────────────╯
+ ╭─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╮
+ │ ✔  Edit engine/test/ConsulTestResource.java: import org.awaitility.Awaitili... => import java.util.Map;...                                                                                                                                              │
+ │                                                                                                                                                                                                                                                         │
+ │    8      import com.rokkon.test.containers.SharedNetworkManager;                                                                                                                                                                                       │
+ │    9                                                                                                                                                                                                                                                    │
+ │    10                                                                                                                                                                                                                                                   │
+ │    11   - import org.awaitility.Awaitility;                                                                                                                                                                                                             │
+ │    12   -                                                                                                                                                                                                                                               │
+ │    11     import java.util.Map;                                                                                                                                                                                                                         │
+ │    12     import java.util.Optional;                                                                                                                                                                                                                    │
+ │    15   - import java.util.concurrent.TimeUnit;                                                                                                                                                                                                         │
+ │    16   - import java.util.concurrent.atomic.AtomicBoolean;                                                                                                                                                                                             │
+ │    13                                                                                                                                                                                                                                                   │
+ │    14     /**                                                                                                                                                                                                                                           │
+ │    15      * Testcontainers resource that starts Consul for integration tests.                                                                                                                                                                          │
+ ╰─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────╯
+✦ Now that ConsulTestResource.java is cleaned up, I will move the Consul seeding logic from the old seedConsulConfiguration() method into TestSeedingServiceImpl.java.
+
+
+
