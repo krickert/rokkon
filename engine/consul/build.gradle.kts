@@ -23,6 +23,7 @@ dependencies {
     implementation("io.quarkus:quarkus-rest")
     implementation("io.quarkus:quarkus-scheduler")
     implementation("io.quarkus:quarkus-grpc") // For gRPC services
+    implementation("io.quarkus:quarkus-smallrye-context-propagation") // Required for Mutiny context propagation
 
     // Stork for Consul service discovery
     implementation("io.smallrye.stork:stork-service-discovery-consul:2.6.3")

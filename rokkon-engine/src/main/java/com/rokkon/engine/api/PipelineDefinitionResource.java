@@ -3,6 +3,7 @@ package com.rokkon.engine.api;
 import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.consul.service.PipelineDefinitionService;
 import com.rokkon.pipeline.consul.model.PipelineDefinitionSummary;
+import io.quarkus.runtime.LaunchMode;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -118,7 +119,22 @@ public class PipelineDefinitionResource {
             )
             .collect(Collectors.toList());
 
-        return Uni.combine().all().unis(stepConfigsUnis)
+        // Check if we're in production mode
+        boolean isProduction = LaunchMode.current() == LaunchMode.NORMAL;
+        
+        // Handle empty pipelines in non-production environments
+        Uni<PipelineConfig> pipelineConfigUni;
+        if (stepConfigsUnis.isEmpty()) {
+            if (isProduction) {
+                return Uni.createFrom().failure(new IllegalArgumentException(
+                    "Pipeline must have at least one step in production mode"));
+            }
+            // Allow empty pipelines in dev/test mode
+            LOG.warn("Creating pipeline '{}' with no steps (non-production mode)", pipelineRequest.name());
+            Map<String, PipelineStepConfig> emptyStepsMap = new HashMap<>();
+            pipelineConfigUni = Uni.createFrom().item(new PipelineConfig(pipelineRequest.name(), emptyStepsMap));
+        } else {
+            pipelineConfigUni = Uni.combine().all().unis(stepConfigsUnis)
             .with(listOfStepConfigs -> {
                 Map<String, PipelineStepConfig> pipelineStepsMap = new HashMap<>();
                 for (Object stepConfigObj : listOfStepConfigs) {
@@ -129,8 +145,10 @@ public class PipelineDefinitionResource {
                 // Description and metadata from DTO are not directly part of this specific PipelineConfig constructor.
                 // If description needs to be persisted, PipelineDefinitionService.createDefinition would need to handle it.
                 return new PipelineConfig(pipelineRequest.name(), pipelineStepsMap);
-            })
-            .onItem().transformToUni(pipelineConfig -> {
+            });
+        }
+        
+        return pipelineConfigUni.onItem().transformToUni(pipelineConfig -> {
                 LOG.info("Successfully transformed DTO to PipelineConfig for '{}'. Calling service.", pipelineConfig.name());
                 return pipelineDefinitionService.createDefinition(pipelineConfig.name(), pipelineConfig)
                     .map(result -> {
