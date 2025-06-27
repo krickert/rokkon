@@ -1,7 +1,7 @@
 package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.*;
-import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -22,7 +22,7 @@ public abstract class ProcessorInfoValidatorTestBase {
     
     @Test
     void testNullPipelineConfiguration() {
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(null);
+        ValidationResult result = getValidator().validate(null);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -35,7 +35,7 @@ public abstract class ProcessorInfoValidatorTestBase {
             Collections.emptyMap()
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -64,7 +64,7 @@ public abstract class ProcessorInfoValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -93,7 +93,7 @@ public abstract class ProcessorInfoValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -122,7 +122,7 @@ public abstract class ProcessorInfoValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0)).contains("gRPC service name 'ab' is too short");
@@ -152,7 +152,7 @@ public abstract class ProcessorInfoValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);
@@ -182,7 +182,7 @@ public abstract class ProcessorInfoValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0)).contains("should start with a letter");
@@ -211,7 +211,7 @@ public abstract class ProcessorInfoValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);
@@ -241,7 +241,7 @@ public abstract class ProcessorInfoValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0)).contains("must be a valid Java identifier");
@@ -270,7 +270,7 @@ public abstract class ProcessorInfoValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);
@@ -335,7 +335,7 @@ public abstract class ProcessorInfoValidatorTestBase {
             Map.of("step1", step1, "step2", step2, "step3", step3)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(2); // Two invalid names
         assertThat(result.warnings()).isEmpty();

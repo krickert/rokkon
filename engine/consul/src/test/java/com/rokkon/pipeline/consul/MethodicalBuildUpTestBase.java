@@ -6,6 +6,7 @@ import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.config.service.ModuleWhitelistService;
 import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.consul.test.TestSeedingService;
+import com.rokkon.pipeline.validation.ValidationResult;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import org.junit.jupiter.api.*;
 import org.jboss.logging.Logger;

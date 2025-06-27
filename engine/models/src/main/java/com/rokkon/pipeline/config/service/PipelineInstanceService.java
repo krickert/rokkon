@@ -1,7 +1,8 @@
 package com.rokkon.pipeline.config.service;
 
 import com.rokkon.pipeline.config.model.PipelineInstance;
-import com.rokkon.pipeline.consul.model.CreateInstanceRequest;
+import com.rokkon.pipeline.config.model.CreateInstanceRequest;
+import com.rokkon.pipeline.validation.ValidationResult;
 import io.smallrye.mutiny.Uni;
 
 import java.util.List;

@@ -3,6 +3,7 @@ package com.rokkon.pipeline.config.model;
 import com.fasterxml.jackson.annotation.JsonCreator;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
+import com.rokkon.pipeline.validation.PipelineClusterConfigValidatable;
 import io.swagger.v3.oas.annotations.media.Schema;
 
 import java.util.Collections;
@@ -17,7 +18,7 @@ public record PipelineClusterConfig(
         @JsonProperty("defaultPipelineName") String defaultPipelineName,
         @JsonProperty("allowedKafkaTopics") Set<String> allowedKafkaTopics,
         @JsonProperty("allowedGrpcServices") Set<String> allowedGrpcServices
-) {
+) implements PipelineClusterConfigValidatable {
     @JsonCreator
     public PipelineClusterConfig(
             @JsonProperty("clusterName") String clusterName,

@@ -1,7 +1,7 @@
 package com.rokkon.pipeline.consul.service;
 
 import com.rokkon.pipeline.config.service.ModuleWhitelistService;
-import com.rokkon.pipeline.consul.model.ModuleWhitelistRequest;
+import com.rokkon.pipeline.config.model.ModuleWhitelistRequest;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

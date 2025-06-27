@@ -6,11 +6,12 @@ import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.model.PipelineInstance;
 import com.rokkon.pipeline.config.service.PipelineDefinitionService;
 import com.rokkon.pipeline.config.service.PipelineInstanceService;
-import com.rokkon.pipeline.consul.model.PipelineDefinitionSummary;
+import com.rokkon.pipeline.config.model.PipelineDefinitionSummary;
 import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
 import com.rokkon.pipeline.validation.Composite;
 import com.rokkon.pipeline.validation.PipelineConfigValidator;
-import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.vertx.UniHelper;
 import io.vertx.ext.consul.ConsulClient;
@@ -159,7 +160,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
         return definitionExists(pipelineId)
             .flatMap(exists -> {
                 if (exists) {
-                    return Uni.createFrom().item(DefaultValidationResult.failure("Pipeline definition '" + pipelineId + "' already exists"));
+                    return Uni.createFrom().item(ValidationResultFactory.failure("Pipeline definition '" + pipelineId + "' already exists"));
                 }
                 
                 // Validate the pipeline configuration
@@ -176,7 +177,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                     return UniHelper.toUni(getConsulClient().putValue(key, json))
                         .flatMap(success -> {
                             if (!success) {
-                                return Uni.createFrom().item(DefaultValidationResult.failure("Failed to store pipeline definition in Consul"));
+                                return Uni.createFrom().item(ValidationResultFactory.failure("Failed to store pipeline definition in Consul"));
                             }
                             
                             // Store metadata
@@ -193,20 +194,20 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                                     .map(metaSuccess -> {
                                         if (metaSuccess) {
                                             LOG.info("Created pipeline definition '{}' in Consul", pipelineId);
-                                            return ValidationResult.success();
+                                            return ValidationResultFactory.success();
                                         } else {
-                                            return DefaultValidationResult.failure("Failed to store metadata");
+                                            return ValidationResultFactory.failure("Failed to store metadata");
                                         }
                                     });
                             } catch (JsonProcessingException e) {
                                 LOG.error("Failed to serialize metadata", e);
-                                return Uni.createFrom().item(DefaultValidationResult.failure("Failed to serialize metadata: " + e.getMessage()));
+                                return Uni.createFrom().item(ValidationResultFactory.failure("Failed to serialize metadata: " + e.getMessage()));
                             }
                         });
                     
                 } catch (JsonProcessingException e) {
                     LOG.error("Failed to serialize pipeline definition", e);
-                    return Uni.createFrom().item(DefaultValidationResult.failure("Failed to serialize pipeline definition: " + e.getMessage()));
+                    return Uni.createFrom().item(ValidationResultFactory.failure("Failed to serialize pipeline definition: " + e.getMessage()));
                 }
             });
     }
@@ -217,7 +218,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
         return definitionExists(pipelineId)
             .flatMap(exists -> {
                 if (!exists) {
-                    return Uni.createFrom().item(DefaultValidationResult.failure("Pipeline definition '" + pipelineId + "' not found"));
+                    return Uni.createFrom().item(ValidationResultFactory.failure("Pipeline definition '" + pipelineId + "' not found"));
                 }
                 
                 // Validate the pipeline configuration
@@ -234,7 +235,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                     return UniHelper.toUni(getConsulClient().putValue(key, json))
                         .flatMap(success -> {
                             if (!success) {
-                                return Uni.createFrom().item(DefaultValidationResult.failure("Failed to update pipeline definition in Consul"));
+                                return Uni.createFrom().item(ValidationResultFactory.failure("Failed to update pipeline definition in Consul"));
                             }
                             
                             // Update metadata
@@ -250,20 +251,20 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                                     .map(metaSuccess -> {
                                         if (metaSuccess) {
                                             LOG.info("Updated pipeline definition '{}' in Consul", pipelineId);
-                                            return ValidationResult.success();
+                                            return ValidationResultFactory.success();
                                         } else {
-                                            return DefaultValidationResult.failure("Failed to update metadata");
+                                            return ValidationResultFactory.failure("Failed to update metadata");
                                         }
                                     });
                             } catch (JsonProcessingException e) {
                                 LOG.error("Failed to serialize metadata", e);
-                                return Uni.createFrom().item(DefaultValidationResult.failure("Failed to serialize metadata: " + e.getMessage()));
+                                return Uni.createFrom().item(ValidationResultFactory.failure("Failed to serialize metadata: " + e.getMessage()));
                             }
                         });
                     
                 } catch (JsonProcessingException e) {
                     LOG.error("Failed to serialize pipeline definition", e);
-                    return Uni.createFrom().item(DefaultValidationResult.failure("Failed to serialize pipeline definition: " + e.getMessage()));
+                    return Uni.createFrom().item(ValidationResultFactory.failure("Failed to serialize pipeline definition: " + e.getMessage()));
                 }
             });
     }
@@ -274,14 +275,14 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
         return definitionExists(pipelineId)
             .flatMap(exists -> {
                 if (!exists) {
-                    return Uni.createFrom().item(DefaultValidationResult.failure("Pipeline definition '" + pipelineId + "' not found"));
+                    return Uni.createFrom().item(ValidationResultFactory.failure("Pipeline definition '" + pipelineId + "' not found"));
                 }
                 
                 // Check for active instances
                 return getActiveInstanceCount(pipelineId)
                     .flatMap(instanceCount -> {
                         if (instanceCount > 0) {
-                            return Uni.createFrom().item(DefaultValidationResult.failure("Cannot delete pipeline definition with " + instanceCount + " active instances"));
+                            return Uni.createFrom().item(ValidationResultFactory.failure("Cannot delete pipeline definition with " + instanceCount + " active instances"));
                         }
                         
                         // Delete from Consul
@@ -292,7 +293,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                             .flatMap(success -> UniHelper.toUni(getConsulClient().deleteValue(metadataKey)))
                             .map(metaSuccess -> {
                                 LOG.info("Deleted pipeline definition '{}' from Consul", pipelineId);
-                                return ValidationResult.success();
+                                return ValidationResultFactory.success();
                             });
                     });
             });

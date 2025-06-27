@@ -5,10 +5,11 @@ import com.rokkon.pipeline.config.model.*;
 import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.config.service.ModuleWhitelistService;
 import com.rokkon.pipeline.config.service.PipelineConfigService;
-import com.rokkon.pipeline.consul.model.ModuleWhitelistRequest;
-import com.rokkon.pipeline.consul.model.ModuleWhitelistResponse;
+import com.rokkon.pipeline.config.model.ModuleWhitelistRequest;
+import com.rokkon.pipeline.config.model.ModuleWhitelistResponse;
 import com.rokkon.pipeline.validation.CompositeValidator;
-import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -358,7 +359,7 @@ public class ModuleWhitelistServiceImpl implements ModuleWhitelistService {
 
         PipelineGraphConfig graphConfig = clusterConfig.pipelineGraphConfig();
         if (graphConfig == null || graphConfig.pipelines().isEmpty()) {
-            return Uni.createFrom().item(new DefaultValidationResult(true, List.of(), List.of()));
+            return Uni.createFrom().item(ValidationResultFactory.success());
         }
 
         List<String> allErrors = new ArrayList<>();
@@ -380,7 +381,7 @@ public class ModuleWhitelistServiceImpl implements ModuleWhitelistService {
         }
 
         return Uni.createFrom().item(
-            new DefaultValidationResult(allErrors.isEmpty(), allErrors, allWarnings)
+            allErrors.isEmpty() ? ValidationResultFactory.success() : ValidationResultFactory.failure(allErrors, allWarnings)
         );
     }
 

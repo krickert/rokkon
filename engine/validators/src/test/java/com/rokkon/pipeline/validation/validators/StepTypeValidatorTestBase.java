@@ -1,7 +1,7 @@
 package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.*;
-import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -23,7 +23,7 @@ public abstract class StepTypeValidatorTestBase {
     
     @Test
     void testNullPipelineConfiguration() {
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(null);
+        ValidationResult result = getValidator().validate(null);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -36,7 +36,7 @@ public abstract class StepTypeValidatorTestBase {
             Collections.emptyMap()
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -133,7 +133,7 @@ public abstract class StepTypeValidatorTestBase {
             )
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
     }
@@ -173,7 +173,7 @@ public abstract class StepTypeValidatorTestBase {
             Map.of("processor", pipelineStep, "writer", sinkStep)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();  // Now it's valid, just with warnings
         // We get warnings about missing INITIAL_PIPELINE step plus warnings about steps without proper inputs/outputs
         assertThat(result.warnings()).contains("Pipeline has no INITIAL_PIPELINE step - data must come from external sources");
@@ -215,7 +215,7 @@ public abstract class StepTypeValidatorTestBase {
             Map.of("reader", initialStep)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();  // Now it's valid, just with warnings
         // We get warnings about missing SINK step plus warnings about steps without proper inputs/outputs
         assertThat(result.warnings()).contains("Pipeline has no SINK step - ensure data has a destination");
@@ -282,7 +282,7 @@ public abstract class StepTypeValidatorTestBase {
             )
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();  // Now it's valid, just with warnings
         // We get warnings about multiple INITIAL_PIPELINE steps
         assertThat(result.warnings()).contains("Pipeline has multiple INITIAL_PIPELINE steps (2) - consider if this is intended");
@@ -340,7 +340,7 @@ public abstract class StepTypeValidatorTestBase {
             Map.of("reader", initialStep, "writer", sinkStep)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0)).contains("Step 'reader': INITIAL_PIPELINE steps should not have Kafka inputs");
@@ -380,7 +380,7 @@ public abstract class StepTypeValidatorTestBase {
             Map.of("reader", initialStep, "writer", sinkStep)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0)).contains("Step 'reader': INITIAL_PIPELINE steps must have at least one output");
@@ -438,7 +438,7 @@ public abstract class StepTypeValidatorTestBase {
             Map.of("reader", initialStep, "writer", sinkStep)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0)).contains("Step 'writer': SINK steps should not have outputs");
@@ -490,7 +490,7 @@ public abstract class StepTypeValidatorTestBase {
             Map.of("reader", initialStep, "writer", sinkStep)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);
@@ -578,7 +578,7 @@ public abstract class StepTypeValidatorTestBase {
             )
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(2);

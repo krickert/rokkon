@@ -1,7 +1,7 @@
 package com.rokkon.pipeline.consul.config;
 
-import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.validation.CompositeValidator;
+import com.rokkon.pipeline.validation.PipelineConfigValidatable;
 import com.rokkon.pipeline.validation.validators.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
@@ -14,8 +14,8 @@ public class ValidatorConfiguration {
     
     @Produces
     @ApplicationScoped
-    public CompositeValidator<PipelineConfig> pipelineConfigValidator() {
-        CompositeValidator<PipelineConfig> composite = new CompositeValidator<>("PipelineConfigValidator");
+    public CompositeValidator<PipelineConfigValidatable> pipelineConfigValidator() {
+        CompositeValidator<PipelineConfigValidatable> composite = new CompositeValidator<>("PipelineConfigValidator");
         
         // Add all the validators we need for pipeline configuration
         composite.addValidator(new RequiredFieldsValidator())

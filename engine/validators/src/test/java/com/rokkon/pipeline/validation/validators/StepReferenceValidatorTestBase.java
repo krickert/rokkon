@@ -1,7 +1,7 @@
 package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.*;
-import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -22,7 +22,7 @@ public abstract class StepReferenceValidatorTestBase {
     
     @Test
     void testNullPipelineConfiguration() {
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(null);
+        ValidationResult result = getValidator().validate(null);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -35,7 +35,7 @@ public abstract class StepReferenceValidatorTestBase {
             Collections.emptyMap()
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -88,7 +88,7 @@ public abstract class StepReferenceValidatorTestBase {
             Map.of("step1", step1, "step2", step2)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
     }
@@ -129,7 +129,7 @@ public abstract class StepReferenceValidatorTestBase {
             Map.of("step1", step1)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0)).contains("Step 'step1' output 'default' references non-existent target step 'nonexistent'");
@@ -171,7 +171,7 @@ public abstract class StepReferenceValidatorTestBase {
             Map.of("step1", step1)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
     }
@@ -211,7 +211,7 @@ public abstract class StepReferenceValidatorTestBase {
             Map.of("step1", step1, "step2", step2)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0)).contains("Duplicate step name found: duplicate-name");
@@ -253,7 +253,7 @@ public abstract class StepReferenceValidatorTestBase {
             Map.of("step1", step1)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
     }
@@ -304,7 +304,7 @@ public abstract class StepReferenceValidatorTestBase {
             Map.of("step1", step1, "target", targetStep)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0)).contains("Step 'step1' output 'invalid' references non-existent target step 'invalid'");

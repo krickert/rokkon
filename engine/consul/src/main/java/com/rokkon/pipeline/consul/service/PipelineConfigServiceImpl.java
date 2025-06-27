@@ -5,7 +5,8 @@ import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.validation.CompositeValidator;
-import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -68,9 +69,8 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
                 .flatMap(existing -> {
                     if (existing.isPresent()) {
                         return Uni.createFrom().item(
-                                new DefaultValidationResult(false,
-                                        List.of("Pipeline '" + pipelineId + "' already exists"), 
-                                        List.of()));
+                                ValidationResultFactory.failure(
+                                        "Pipeline '" + pipelineId + "' already exists"));
                     }
 
                     return storePipelineInConsul(clusterName, pipelineId, config);
@@ -95,9 +95,8 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
                 .flatMap(existing -> {
                     if (existing.isEmpty()) {
                         return Uni.createFrom().item(
-                                new DefaultValidationResult(false,
-                                        List.of("Pipeline '" + pipelineId + "' not found"), 
-                                        List.of()));
+                                ValidationResultFactory.failure(
+                                        "Pipeline '" + pipelineId + "' not found"));
                     }
 
                     return storePipelineInConsul(clusterName, pipelineId, config);
@@ -114,9 +113,8 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
                 .flatMap(existing -> {
                     if (existing.isEmpty()) {
                         return Uni.createFrom().item(
-                                new DefaultValidationResult(false,
-                                        List.of("Pipeline '" + pipelineId + "' not found"), 
-                                        List.of()));
+                                ValidationResultFactory.failure(
+                                        "Pipeline '" + pipelineId + "' not found"));
                     }
 
                     return deletePipelineFromConsul(clusterName, pipelineId);
@@ -233,18 +231,16 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
 
                 if (response.statusCode() == 200) {
                     LOG.info("Successfully stored pipeline '{}' in Consul", pipelineId);
-                    return new DefaultValidationResult(true, List.of(), List.of());
+                    return ValidationResultFactory.success();
                 } else {
                     LOG.error("Failed to store pipeline. Status: {}", response.statusCode());
-                    return new DefaultValidationResult(false,
-                            List.of("Failed to store pipeline in Consul"), 
-                            List.of());
+                    return ValidationResultFactory.failure(
+                            "Failed to store pipeline in Consul");
                 }
             } catch (Exception e) {
                 LOG.error("Error storing pipeline: {}", e.getMessage(), e);
-                return new DefaultValidationResult(false,
-                        List.of("Error storing pipeline: " + e.getMessage()), 
-                        List.of());
+                return ValidationResultFactory.failure(
+                        "Error storing pipeline: " + e.getMessage());
             }
         })
         .runSubscriptionOn(Infrastructure.getDefaultExecutor());
@@ -265,18 +261,16 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
 
                 if (response.statusCode() == 200) {
                     LOG.info("Successfully deleted pipeline '{}' from Consul", pipelineId);
-                    return new DefaultValidationResult(true, List.of(), List.of());
+                    return ValidationResultFactory.success();
                 } else {
                     LOG.error("Failed to delete pipeline. Status: {}", response.statusCode());
-                    return new DefaultValidationResult(false,
-                            List.of("Failed to delete pipeline from Consul"), 
-                            List.of());
+                    return ValidationResultFactory.failure(
+                            "Failed to delete pipeline from Consul");
                 }
             } catch (Exception e) {
                 LOG.error("Error deleting pipeline: {}", e.getMessage(), e);
-                return new DefaultValidationResult(false,
-                        List.of("Error deleting pipeline: " + e.getMessage()), 
-                        List.of());
+                return ValidationResultFactory.failure(
+                        "Error deleting pipeline: " + e.getMessage());
             }
         })
         .runSubscriptionOn(Infrastructure.getDefaultExecutor());

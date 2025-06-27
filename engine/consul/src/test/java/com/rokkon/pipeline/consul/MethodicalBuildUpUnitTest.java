@@ -2,6 +2,8 @@ package com.rokkon.pipeline.consul;
 
 import com.rokkon.pipeline.config.model.Cluster;
 import com.rokkon.pipeline.config.model.ClusterMetadata;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.config.service.ModuleWhitelistService;
 import com.rokkon.pipeline.config.service.PipelineConfigService;
@@ -74,7 +76,7 @@ class MethodicalBuildUpUnitTest extends MethodicalBuildUpTestBase {
 
         // Mock ClusterService
         when(clusterService.createCluster(anyString()))
-            .thenReturn(Uni.createFrom().item(ValidationResult.success()));
+            .thenReturn(Uni.createFrom().item(ValidationResultFactory.success()));
 
         when(clusterService.listClusters())
             .thenReturn(Uni.createFrom().item(List.of(

@@ -35,6 +35,7 @@ dependencies {
     implementation("org.yaml:snakeyaml:2.2")
 
     // Our modules - rokkon-commons and rokkon-protobuf come from BOM
+    implementation(project(":rokkon-commons"))
     implementation(project(":engine:models"))
     implementation(project(":engine:validators"))
     implementation("com.networknt:json-schema-validator:1.5.7")

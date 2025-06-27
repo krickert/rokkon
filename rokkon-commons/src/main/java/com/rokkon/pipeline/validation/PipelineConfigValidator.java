@@ -1,12 +1,10 @@
 package com.rokkon.pipeline.validation;
 
-import com.rokkon.pipeline.config.model.PipelineConfig;
-
 /**
  * Interface for validators that validate pipeline configurations.
- * This extends the base Validator interface with pipeline-specific functionality.
+ * This extends the base ConfigValidator interface with pipeline-specific functionality.
  */
-public interface PipelineConfigValidator extends Validator<PipelineConfig> {
+public interface PipelineConfigValidator extends ConfigValidator<PipelineConfigValidatable> {
     
     /**
      * Validates a pipeline configuration with its ID.
@@ -15,7 +13,7 @@ public interface PipelineConfigValidator extends Validator<PipelineConfig> {
      * @param config The pipeline configuration to validate
      * @return ValidationResult containing the validation outcome
      */
-    default ValidationResult validateWithId(String pipelineId, PipelineConfig config) {
+    default ValidationResult validateWithId(String pipelineId, PipelineConfigValidatable config) {
         // Default implementation just delegates to validate
         return validate(config);
     }

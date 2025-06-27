@@ -1,7 +1,7 @@
 package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.*;
-import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -44,7 +44,7 @@ public abstract class RequiredFieldsValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid());
         assertTrue(result.errors().isEmpty());
@@ -53,7 +53,7 @@ public abstract class RequiredFieldsValidatorTestBase {
     
     @Test
     void testNullPipelineConfiguration() {
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(null);
+        ValidationResult result = getValidator().validate(null);
         
         assertFalse(result.valid());
         assertEquals(1, result.errors().size());
@@ -64,7 +64,7 @@ public abstract class RequiredFieldsValidatorTestBase {
     void testEmptyPipelineSteps() {
         PipelineConfig config = new PipelineConfig("test-pipeline", Map.of());
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         // Empty pipelines are valid - steps will be added after services are whitelisted
         assertTrue(result.valid());
@@ -96,7 +96,7 @@ public abstract class RequiredFieldsValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid()); // Valid but has warnings
         assertTrue(result.errors().isEmpty());
@@ -129,7 +129,7 @@ public abstract class RequiredFieldsValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid()); // Valid but has warnings
         assertTrue(result.errors().isEmpty());
@@ -165,7 +165,7 @@ public abstract class RequiredFieldsValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid()); // Valid but has warnings
         assertTrue(result.errors().isEmpty());
@@ -199,7 +199,7 @@ public abstract class RequiredFieldsValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertFalse(result.valid());
         assertTrue(result.errors().stream().anyMatch(e -> 
@@ -230,7 +230,7 @@ public abstract class RequiredFieldsValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid());
         assertTrue(result.errors().isEmpty());
@@ -261,7 +261,7 @@ public abstract class RequiredFieldsValidatorTestBase {
             Map.of("step1", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid());
         assertTrue(result.errors().isEmpty());

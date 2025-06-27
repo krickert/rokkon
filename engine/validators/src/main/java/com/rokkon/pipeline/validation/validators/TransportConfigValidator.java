@@ -2,8 +2,9 @@ package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.*;
 import com.rokkon.pipeline.validation.PipelineConfigValidator;
-import com.rokkon.pipeline.validation.DefaultValidationResult;
-import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
+import com.rokkon.pipeline.validation.PipelineConfigValidatable;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.ArrayList;
@@ -17,9 +18,10 @@ import java.util.Map;
 public class TransportConfigValidator implements PipelineConfigValidator {
     
     @Override
-    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(PipelineConfig config) {
+    public ValidationResult validate(PipelineConfigValidatable validatable) {
+        PipelineConfig config = (PipelineConfig) validatable;
         if (config == null || config.pipelineSteps() == null || config.pipelineSteps().isEmpty()) {
-            return new DefaultValidationResult(true, List.of(), List.of());
+            return ValidationResultFactory.success();
         }
         
         List<String> errors = new ArrayList<>();
@@ -67,7 +69,9 @@ public class TransportConfigValidator implements PipelineConfigValidator {
             }
         }
         
-        return new DefaultValidationResult(errors.isEmpty(), errors, warnings);
+        return errors.isEmpty() ? 
+            (warnings.isEmpty() ? ValidationResultFactory.success() : ValidationResultFactory.successWithWarnings(warnings)) : 
+            ValidationResultFactory.failure(errors, warnings);
     }
     
     private void validateKafkaInput(String prefix, KafkaInputDefinition kafkaInput, 

@@ -1,10 +1,12 @@
 package com.rokkon.pipeline.consul.test;
 
 import com.rokkon.pipeline.config.model.*;
-import com.rokkon.pipeline.consul.model.ModuleWhitelistRequest;
+import com.rokkon.pipeline.config.model.ModuleWhitelistRequest;
 import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.config.service.ModuleWhitelistService;
 import com.rokkon.pipeline.config.service.PipelineConfigService;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 import io.smallrye.mutiny.Uni;
 import io.vertx.ext.consul.ConsulClientOptions;
 import io.vertx.ext.consul.ServiceOptions;
@@ -85,7 +87,7 @@ public class TestSeedingServiceImpl implements TestSeedingService {
                     // Check if it already exists
                     if (result.errors().stream().anyMatch(e -> e.contains("already exists"))) {
                         LOG.debug("Default cluster already exists");
-                        return Uni.createFrom().item(ValidationResult.success());
+                        return Uni.createFrom().item(ValidationResultFactory.success());
                     }
                     LOG.errorf("Failed to create default cluster: %s", result.errors());
                     return Uni.createFrom().item(result);

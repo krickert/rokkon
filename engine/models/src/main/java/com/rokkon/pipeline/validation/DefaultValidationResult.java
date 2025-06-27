@@ -11,7 +11,7 @@ public record DefaultValidationResult(
     boolean valid,
     List<String> errors,
     List<String> warnings
-) {
+) implements ValidationResult {
 
     /**
      * Creates a valid result with no errors or warnings.

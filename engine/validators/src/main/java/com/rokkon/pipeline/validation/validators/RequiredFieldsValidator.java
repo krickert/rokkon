@@ -3,8 +3,9 @@ package com.rokkon.pipeline.validation.validators;
 import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.model.PipelineStepConfig;
 import com.rokkon.pipeline.validation.PipelineConfigValidator;
-import com.rokkon.pipeline.validation.DefaultValidationResult;
-import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
+import com.rokkon.pipeline.validation.PipelineConfigValidatable;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.ArrayList;
@@ -32,12 +33,13 @@ import java.util.List;
 public class RequiredFieldsValidator implements PipelineConfigValidator {
     
     @Override
-    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(PipelineConfig config) {
+    public ValidationResult validate(PipelineConfigValidatable validatable) {
+        PipelineConfig config = (PipelineConfig) validatable;
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         
         if (config == null) {
-            return DefaultValidationResult.failure(List.of("Pipeline configuration cannot be null"));
+            return ValidationResultFactory.failure("Pipeline configuration cannot be null");
         }
         
         // Pipelines can start empty - no steps required initially
@@ -52,11 +54,11 @@ public class RequiredFieldsValidator implements PipelineConfigValidator {
         }
         
         if (!errors.isEmpty()) {
-            return DefaultValidationResult.failure(errors, warnings);
+            return ValidationResultFactory.failure(errors, warnings);
         } else if (!warnings.isEmpty()) {
-            return DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult.successWithWarnings(warnings);
+            return ValidationResultFactory.successWithWarnings(warnings);
         } else {
-            return DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult.success();
+            return ValidationResultFactory.success();
         }
     }
     

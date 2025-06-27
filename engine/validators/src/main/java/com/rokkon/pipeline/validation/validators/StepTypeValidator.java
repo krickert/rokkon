@@ -4,8 +4,9 @@ import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.model.PipelineStepConfig;
 import com.rokkon.pipeline.config.model.StepType;
 import com.rokkon.pipeline.validation.PipelineConfigValidator;
-import com.rokkon.pipeline.validation.DefaultValidationResult;
-import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
+import com.rokkon.pipeline.validation.PipelineConfigValidatable;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.ArrayList;
@@ -19,9 +20,11 @@ import java.util.List;
 public class StepTypeValidator implements PipelineConfigValidator {
     
     @Override
-    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(PipelineConfig config) {
-        if (config == null || config.pipelineSteps() == null || config.pipelineSteps().isEmpty()) {
-            return new DefaultValidationResult(true, List.of(), List.of());
+    public ValidationResult validate(PipelineConfigValidatable config) {
+        // Cast to PipelineConfig - safe because PipelineConfig implements PipelineConfigValidatable
+        PipelineConfig pipelineConfig = (PipelineConfig) config;
+        if (pipelineConfig == null || pipelineConfig.pipelineSteps() == null || pipelineConfig.pipelineSteps().isEmpty()) {
+            return ValidationResultFactory.success();
         }
         
         List<String> errors = new ArrayList<>();
@@ -30,7 +33,7 @@ public class StepTypeValidator implements PipelineConfigValidator {
         int initialPipelineCount = 0;
         int sinkCount = 0;
         
-        for (var entry : config.pipelineSteps().entrySet()) {
+        for (var entry : pipelineConfig.pipelineSteps().entrySet()) {
             String stepId = entry.getKey();
             PipelineStepConfig step = entry.getValue();
             
@@ -52,7 +55,7 @@ public class StepTypeValidator implements PipelineConfigValidator {
         }
         
         // Only warn about potentially incomplete pipelines
-        if (config.pipelineSteps() != null && !config.pipelineSteps().isEmpty()) {
+        if (pipelineConfig.pipelineSteps() != null && !pipelineConfig.pipelineSteps().isEmpty()) {
             if (initialPipelineCount == 0) {
                 warnings.add("Pipeline has no INITIAL_PIPELINE step - data must come from external sources");
             }
@@ -66,7 +69,13 @@ public class StepTypeValidator implements PipelineConfigValidator {
             }
         }
         
-        return new DefaultValidationResult(errors.isEmpty(), errors, warnings);
+        if (!errors.isEmpty()) {
+            return ValidationResultFactory.failure(errors, warnings);
+        } else if (!warnings.isEmpty()) {
+            return ValidationResultFactory.successWithWarnings(warnings);
+        } else {
+            return ValidationResultFactory.success();
+        }
     }
     
     private void validateStepTypeConstraints(String stepId, PipelineStepConfig step, 

@@ -1,13 +1,14 @@
 package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.KafkaInputDefinition;
-import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
 import jakarta.enterprise.context.ApplicationScoped;
 import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.model.PipelineStepConfig;
 import com.rokkon.pipeline.config.model.TransportType;
 import com.rokkon.pipeline.validation.PipelineConfigValidator;
-import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.PipelineConfigValidatable;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,12 +30,13 @@ public class KafkaTopicNamingValidator implements PipelineConfigValidator {
     private static final int MAX_TOPIC_LENGTH = 249;
     
     @Override
-    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(PipelineConfig config) {
+    public ValidationResult validate(PipelineConfigValidatable validatable) {
+        PipelineConfig config = (PipelineConfig) validatable;
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
         
         if (config.pipelineSteps() == null) {
-            return DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult.success();
+            return ValidationResultFactory.success();
         }
         
         for (var entry : config.pipelineSteps().entrySet()) {
@@ -81,11 +83,11 @@ public class KafkaTopicNamingValidator implements PipelineConfigValidator {
         }
         
         if (!errors.isEmpty()) {
-            return DefaultValidationResult.failure(errors, warnings);
+            return ValidationResultFactory.failure(errors, warnings);
         } else if (!warnings.isEmpty()) {
-            return DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult.successWithWarnings(warnings);
+            return ValidationResultFactory.successWithWarnings(warnings);
         } else {
-            return DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult.success();
+            return ValidationResultFactory.success();
         }
     }
     

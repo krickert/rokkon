@@ -1,6 +1,10 @@
 package com.rokkon.pipeline.validation;
 
 import com.rokkon.pipeline.config.model.PipelineConfig;
+import com.rokkon.pipeline.validation.PipelineConfigValidator;
+import com.rokkon.pipeline.validation.PipelineConfigValidatable;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ConfigValidator;
 
 import java.util.List;
 
@@ -10,19 +14,19 @@ import java.util.List;
  */
 public class CompositePipelineConfigValidator implements PipelineConfigValidator {
 
-    private final CompositeValidator<PipelineConfig> composite;
+    private final CompositeValidator<PipelineConfigValidatable> composite;
 
     public CompositePipelineConfigValidator() {
         // Default constructor for CDI
         this.composite = new CompositeValidator<>("Pipeline Configuration Validator", List.of());
     }
 
-    public CompositePipelineConfigValidator(List<Validator<PipelineConfig>> validators) {
+    public CompositePipelineConfigValidator(List<ConfigValidator<PipelineConfigValidatable>> validators) {
         this.composite = new CompositeValidator<>("Pipeline Configuration Validator", validators);
     }
 
     @Override
-    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(PipelineConfig config) {
+    public ValidationResult validate(PipelineConfigValidatable config) {
         return composite.validate(config);
     }
 
@@ -36,7 +40,7 @@ public class CompositePipelineConfigValidator implements PipelineConfigValidator
         return 0;
     }
 
-    public void setValidators(List<Validator<PipelineConfig>> validators) {
+    public void setValidators(List<ConfigValidator<PipelineConfigValidatable>> validators) {
         composite.getValidators().clear();
         composite.getValidators().addAll(validators);
     }

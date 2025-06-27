@@ -78,7 +78,7 @@ dependencies {
 
     // Rokkon dependencies
     implementation("com.rokkon.pipeline:rokkon-protobuf")
-    implementation("com.rokkon.pipeline:rokkon-commons")
+    implementation(project(":rokkon-commons"))
 
     // For file operations
     implementation("commons-io:commons-io:2.15.0")

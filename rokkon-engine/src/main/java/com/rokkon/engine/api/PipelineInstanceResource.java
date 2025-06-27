@@ -2,7 +2,7 @@ package com.rokkon.engine.api;
 
 import com.rokkon.pipeline.config.model.PipelineInstance;
 import com.rokkon.pipeline.config.service.PipelineInstanceService;
-import com.rokkon.pipeline.consul.model.CreateInstanceRequest;
+import com.rokkon.pipeline.config.model.CreateInstanceRequest;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;

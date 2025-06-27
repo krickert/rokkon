@@ -58,4 +58,14 @@ public interface ValidationResult {
      * @return true if there are any warnings
      */
     boolean hasWarnings();
+    
+    /**
+     * Factory method to create an empty validation result.
+     * Useful for testing and cases where validation is not needed.
+     * Always returns valid with no errors or warnings.
+     * @return an empty validation result that is always valid
+     */
+    static ValidationResult empty() {
+        return EmptyValidationResult.instance();
+    }
 }

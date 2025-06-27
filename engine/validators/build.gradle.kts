@@ -18,9 +18,9 @@ dependencies {
     implementation("io.quarkus:quarkus-hibernate-validator")
     
     // Depend on rokkon-commons which includes protobuf definitions
-    implementation("com.rokkon.pipeline:rokkon-commons")
+    implementation(project(":rokkon-commons"))
     // Depend on engine-models for the data structures
-    implementation("com.rokkon.pipeline:engine-models")
+    implementation(project(":engine:models"))
     
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("org.assertj:assertj-core") // Version managed by BOM

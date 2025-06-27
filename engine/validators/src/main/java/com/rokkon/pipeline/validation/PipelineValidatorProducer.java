@@ -32,7 +32,7 @@ public class PipelineValidatorProducer {
     @Default
     @ApplicationScoped
     public PipelineConfigValidator producePipelineConfigValidator() {
-        List<Validator<PipelineConfig>> validatorList = new ArrayList<>();
+        List<ConfigValidator<PipelineConfigValidatable>> validatorList = new ArrayList<>();
         
         // Add all validators explicitly to avoid circular dependency issues
         validatorList.add(requiredFieldsValidator);

@@ -3,7 +3,7 @@ package com.rokkon.pipeline.validation.validators;
 import com.rokkon.pipeline.config.model.PipelineClusterConfig;
 import com.rokkon.pipeline.config.model.PipelineGraphConfig;
 import com.rokkon.pipeline.config.model.PipelineConfig;
-import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -24,7 +24,7 @@ public abstract class InterPipelineLoopValidatorTestBase {
     
     @Test
     void testNullClusterConfiguration() {
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(null);
+        ValidationResult result = getValidator().validate(null);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -41,7 +41,7 @@ public abstract class InterPipelineLoopValidatorTestBase {
             Collections.emptySet()
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -62,7 +62,7 @@ public abstract class InterPipelineLoopValidatorTestBase {
             Collections.emptySet()
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);
@@ -89,7 +89,7 @@ public abstract class InterPipelineLoopValidatorTestBase {
             Collections.emptySet()
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);
@@ -130,7 +130,7 @@ public abstract class InterPipelineLoopValidatorTestBase {
             Collections.emptySet()
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);

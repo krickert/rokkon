@@ -1,8 +1,8 @@
 package com.rokkon.pipeline.config.service;
 
 import com.rokkon.pipeline.config.model.PipelineModuleConfiguration;
-import com.rokkon.pipeline.consul.model.ModuleWhitelistRequest;
-import com.rokkon.pipeline.consul.model.ModuleWhitelistResponse;
+import com.rokkon.pipeline.config.model.ModuleWhitelistRequest;
+import com.rokkon.pipeline.config.model.ModuleWhitelistResponse;
 import io.smallrye.mutiny.Uni;
 
 import java.util.List;

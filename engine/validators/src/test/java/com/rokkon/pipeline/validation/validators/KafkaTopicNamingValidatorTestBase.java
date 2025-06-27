@@ -1,7 +1,7 @@
 package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.*;
-import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -65,7 +65,7 @@ public abstract class KafkaTopicNamingValidatorTestBase {
             Map.of("parser", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid());
         assertTrue(result.errors().isEmpty());
@@ -97,7 +97,7 @@ public abstract class KafkaTopicNamingValidatorTestBase {
             Map.of("parser", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertFalse(result.valid());
         assertEquals(1, result.errors().size());
@@ -130,7 +130,7 @@ public abstract class KafkaTopicNamingValidatorTestBase {
             Map.of("parser", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertFalse(result.valid());
         assertEquals(1, result.errors().size());
@@ -172,7 +172,7 @@ public abstract class KafkaTopicNamingValidatorTestBase {
             Map.of("step1", step1, "step2", step2)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertFalse(result.valid());
         assertEquals(2, result.errors().size());
@@ -203,7 +203,7 @@ public abstract class KafkaTopicNamingValidatorTestBase {
             Map.of("parser", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertFalse(result.valid());
         assertEquals(1, result.errors().size());
@@ -235,7 +235,7 @@ public abstract class KafkaTopicNamingValidatorTestBase {
             Map.of("parser", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid());
         assertTrue(result.errors().isEmpty());
@@ -269,7 +269,7 @@ public abstract class KafkaTopicNamingValidatorTestBase {
             Map.of("parser", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid());
         assertTrue(result.errors().isEmpty());
@@ -303,7 +303,7 @@ public abstract class KafkaTopicNamingValidatorTestBase {
             Map.of("aggregator", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertFalse(result.valid());
         assertEquals(1, result.errors().size()); // Invalid chars only (removed empty test)
@@ -353,7 +353,7 @@ public abstract class KafkaTopicNamingValidatorTestBase {
             Map.of("router", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid());
         assertTrue(result.errors().isEmpty());
@@ -386,7 +386,7 @@ public abstract class KafkaTopicNamingValidatorTestBase {
             Map.of("grpc-step", step)
         );
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid());
         assertTrue(result.errors().isEmpty());
@@ -397,7 +397,7 @@ public abstract class KafkaTopicNamingValidatorTestBase {
     void testNullPipelineSteps() {
         PipelineConfig config = new PipelineConfig("test-pipeline", null);
         
-        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
+        ValidationResult result = getValidator().validate(config);
         
         assertTrue(result.valid());
         assertTrue(result.errors().isEmpty());

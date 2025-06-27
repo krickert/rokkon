@@ -21,8 +21,6 @@ public class ConfigurationExample {
     @Inject
     ConsulConfigSource config;
     
-    @Inject
-    DELETE_ME_GlobalModuleRegistryService registryService;
     
     @Inject
     PipelineConfigService pipelineService;
@@ -43,12 +41,15 @@ public class ConfigurationExample {
             config.consul().cleanup().zombieThreshold());
         
         // The actual cleanup still uses the registry service
+        // TODO: Re-implement when GlobalModuleRegistryService is available
+        /*
         registryService.cleanupZombieInstances()
             .subscribe().with(
                 result -> LOG.infof("Cleanup complete: %d zombies detected, %d cleaned", 
                     result.zombiesDetected(), result.zombiesCleaned()),
                 error -> LOG.error("Cleanup failed", error)
             );
+        */
     }
     
     /**
@@ -66,6 +67,8 @@ public class ConfigurationExample {
             moduleName, timeout, healthInterval);
         
         // Module registration still uses KV store for the actual data
+        // TODO: Re-implement when GlobalModuleRegistryService is available
+        /*
         registryService.registerModule(
             moduleName,
             "impl-" + moduleName,
@@ -78,6 +81,7 @@ public class ConfigurationExample {
             port,
             null
         ).await().indefinitely();
+        */
     }
     
     /**
@@ -94,8 +98,11 @@ public class ConfigurationExample {
             .await().indefinitely();
         LOG.infof("Found %d pipelines in KV store", pipelines.size());
         
+        // TODO: Re-implement when GlobalModuleRegistryService is available
+        /*
         var modules = registryService.listRegisteredModules()
             .await().indefinitely();
         LOG.infof("Found %d registered modules in KV store", modules.size());
+        */
     }
 }

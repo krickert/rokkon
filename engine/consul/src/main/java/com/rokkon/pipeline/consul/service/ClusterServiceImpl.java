@@ -4,7 +4,8 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rokkon.pipeline.config.model.*;
 import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
-import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.vertx.UniHelper;
 import io.vertx.ext.consul.ConsulClient;
@@ -44,7 +45,7 @@ public class ClusterServiceImpl implements ClusterService {
         // Validate cluster name
         if (clusterName == null || clusterName.trim().isEmpty()) {
             return Uni.createFrom().item(
-                DefaultValidationResult.failure("Cluster name cannot be empty")
+                ValidationResultFactory.failure("Cluster name cannot be empty")
             );
         }
 
@@ -53,7 +54,7 @@ public class ClusterServiceImpl implements ClusterService {
             .flatMap(exists -> {
                 if (exists) {
                     return Uni.createFrom().item(
-                        DefaultValidationResult.failure("Cluster '" + clusterName + "' already exists")
+                        ValidationResultFactory.failure("Cluster '" + clusterName + "' already exists")
                     );
                 }
 
@@ -112,11 +113,11 @@ public class ClusterServiceImpl implements ClusterService {
         return UniHelper.toUni(getConsulClient().deleteValues(key))
             .map(response -> {
                 LOG.infof("Deleted cluster: %s", clusterName);
-                return DefaultValidationResult.success();
+                return ValidationResultFactory.success();
             })
             .onFailure().recoverWithItem(error -> {
                 LOG.errorf(error, "Failed to delete cluster: %s", clusterName);
-                return DefaultValidationResult.failure("Failed to delete cluster: " + error.getMessage());
+                return ValidationResultFactory.failure("Failed to delete cluster: " + error.getMessage());
             });
     }
 
@@ -188,18 +189,18 @@ public class ClusterServiceImpl implements ClusterService {
                 .map(success -> {
                     if (Boolean.TRUE.equals(success)) {
                         LOG.infof("Created cluster: %s", clusterName);
-                        return DefaultValidationResult.success();
+                        return ValidationResultFactory.success();
                     } else {
-                        return DefaultValidationResult.failure("Failed to create cluster in Consul");
+                        return ValidationResultFactory.failure("Failed to create cluster in Consul");
                     }
                 })
                 .onFailure().recoverWithItem(error -> {
                     LOG.errorf(error, "Failed to store cluster metadata");
-                    return DefaultValidationResult.failure("Failed to store cluster metadata: " + error.getMessage());
+                    return ValidationResultFactory.failure("Failed to store cluster metadata: " + error.getMessage());
                 });
         } catch (Exception e) {
             LOG.error("Failed to serialize cluster metadata", e);
-            return Uni.createFrom().item(DefaultValidationResult.failure("Failed to serialize cluster metadata: " + e.getMessage()));
+            return Uni.createFrom().item(ValidationResultFactory.failure("Failed to serialize cluster metadata: " + e.getMessage()));
         }
     }
 
@@ -229,18 +230,18 @@ public class ClusterServiceImpl implements ClusterService {
                 .map(success -> {
                     if (Boolean.TRUE.equals(success)) {
                         LOG.infof("Created initial config for cluster: %s", clusterName);
-                        return DefaultValidationResult.success();
+                        return ValidationResultFactory.success();
                     } else {
-                        return DefaultValidationResult.failure("Failed to create cluster config in Consul");
+                        return ValidationResultFactory.failure("Failed to create cluster config in Consul");
                     }
                 })
                 .onFailure().recoverWithItem(error -> {
                     LOG.errorf(error, "Failed to create initial cluster config");
-                    return DefaultValidationResult.failure("Failed to create cluster config: " + error.getMessage());
+                    return ValidationResultFactory.failure("Failed to create cluster config: " + error.getMessage());
                 });
         } catch (Exception e) {
             LOG.error("Failed to serialize initial cluster config", e);
-            return Uni.createFrom().item(DefaultValidationResult.failure("Failed to create cluster config: " + e.getMessage()));
+            return Uni.createFrom().item(ValidationResultFactory.failure("Failed to create cluster config: " + e.getMessage()));
         }
     }
 }
