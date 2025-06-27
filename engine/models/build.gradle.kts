@@ -17,18 +17,19 @@ val swaggerUiVersion: String = project.findProperty("swagger.ui.version") as Str
 dependencies {
     // Import the rokkon BOM which includes Quarkus BOM
     implementation(platform(project(":rokkon-bom")))
-    
+
     // Don't need to declare Quarkus BOM again - it comes from rokkon-bom
-    
+
     // Core dependencies (arc, grpc, protobuf, commons) come from BOM automatically
-    
+    implementation(project(":rokkon-commons"))
+
     // Additional dependencies specific to this module
     implementation("io.quarkiverse.config:quarkus-config-consul")
     implementation("io.quarkus:quarkus-rest-jackson")
     implementation("io.quarkus:quarkus-smallrye-openapi")
     implementation("io.swagger.core.v3:swagger-annotations:${swaggerUiVersion}")
     implementation("io.quarkus:quarkus-hibernate-validator")
-    
+
     // Testing
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("org.assertj:assertj-core") // Version managed by BOM

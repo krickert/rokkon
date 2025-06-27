@@ -3,8 +3,7 @@ package com.rokkon.engine.grpc;
 import com.google.protobuf.Empty;
 import com.google.protobuf.Timestamp;
 import com.rokkon.search.grpc.*;
-import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService;
-import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ServiceHealthStatus;
+import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService;
 import io.vertx.ext.consul.CheckStatus;
 import io.quarkus.grpc.GrpcService;
 import io.smallrye.mutiny.Uni;
@@ -31,7 +30,7 @@ public class ModuleRegistrationServiceImpl extends MutinyModuleRegistrationGrpc.
     private static final Logger LOG = Logger.getLogger(ModuleRegistrationServiceImpl.class);
     
     @Inject
-    GlobalModuleRegistryService registryService;
+    DELETE_ME_GlobalModuleRegistryService registryService;
     
     @PostConstruct
     void init() {
@@ -183,7 +182,7 @@ public class ModuleRegistrationServiceImpl extends MutinyModuleRegistrationGrpc.
         // Use actual Consul health checks
         return registryService.getModuleHealthStatus(request.getServiceId())
             .map(healthStatus -> {
-                GlobalModuleRegistryService.ModuleRegistration module = healthStatus.module();
+                DELETE_ME_GlobalModuleRegistryService.ModuleRegistration module = healthStatus.module();
                 boolean isHealthy = healthStatus.exists() && healthStatus.healthStatus() == CheckStatus.PASSING;
                 
                 String healthDetails;
@@ -261,7 +260,7 @@ public class ModuleRegistrationServiceImpl extends MutinyModuleRegistrationGrpc.
             });
     }
     
-    private ModuleInfo toModuleInfo(GlobalModuleRegistryService.ModuleRegistration registration) {
+    private ModuleInfo toModuleInfo(DELETE_ME_GlobalModuleRegistryService.ModuleRegistration registration) {
         ModuleInfo.Builder builder = ModuleInfo.newBuilder()
             .setServiceName(registration.moduleName())
             .setServiceId(registration.moduleId())

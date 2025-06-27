@@ -1,10 +1,11 @@
 package com.rokkon.pipeline.consul.service;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rokkon.pipeline.config.model.PipelineConfig;
+import com.rokkon.pipeline.config.service.ClusterService;
+import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.validation.CompositeValidator;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.DefaultValidationResult;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -53,7 +54,7 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
      * Creates a new pipeline configuration in Consul.
      */
     public Uni<ValidationResult> createPipeline(String clusterName, String pipelineId,
-                                                          PipelineConfig config) {
+                                                PipelineConfig config) {
         LOG.info("Creating pipeline '{}' in cluster '{}'", pipelineId, clusterName);
 
         // Validate the configuration
@@ -67,7 +68,7 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
                 .flatMap(existing -> {
                     if (existing.isPresent()) {
                         return Uni.createFrom().item(
-                                new ValidationResult(false, 
+                                new DefaultValidationResult(false,
                                         List.of("Pipeline '" + pipelineId + "' already exists"), 
                                         List.of()));
                     }
@@ -80,7 +81,7 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
      * Updates an existing pipeline configuration.
      */
     public Uni<ValidationResult> updatePipeline(String clusterName, String pipelineId,
-                                                           PipelineConfig config) {
+                                                PipelineConfig config) {
         LOG.info("Updating pipeline '{}' in cluster '{}'", pipelineId, clusterName);
 
         // Validate the configuration
@@ -94,7 +95,7 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
                 .flatMap(existing -> {
                     if (existing.isEmpty()) {
                         return Uni.createFrom().item(
-                                new ValidationResult(false, 
+                                new DefaultValidationResult(false,
                                         List.of("Pipeline '" + pipelineId + "' not found"), 
                                         List.of()));
                     }
@@ -113,7 +114,7 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
                 .flatMap(existing -> {
                     if (existing.isEmpty()) {
                         return Uni.createFrom().item(
-                                new ValidationResult(false, 
+                                new DefaultValidationResult(false,
                                         List.of("Pipeline '" + pipelineId + "' not found"), 
                                         List.of()));
                     }
@@ -215,8 +216,8 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
         });
     }
 
-    private Uni<ValidationResult> storePipelineInConsul(String clusterName, String pipelineId, 
-                                                                    PipelineConfig config) {
+    private Uni<ValidationResult> storePipelineInConsul(String clusterName, String pipelineId,
+                                                        PipelineConfig config) {
         return Uni.createFrom().item(() -> {
             try {
                 String configJson = objectMapper.writeValueAsString(config);
@@ -232,16 +233,16 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
 
                 if (response.statusCode() == 200) {
                     LOG.info("Successfully stored pipeline '{}' in Consul", pipelineId);
-                    return new ValidationResult(true, List.of(), List.of());
+                    return new DefaultValidationResult(true, List.of(), List.of());
                 } else {
                     LOG.error("Failed to store pipeline. Status: {}", response.statusCode());
-                    return new ValidationResult(false, 
+                    return new DefaultValidationResult(false,
                             List.of("Failed to store pipeline in Consul"), 
                             List.of());
                 }
             } catch (Exception e) {
                 LOG.error("Error storing pipeline: {}", e.getMessage(), e);
-                return new ValidationResult(false, 
+                return new DefaultValidationResult(false,
                         List.of("Error storing pipeline: " + e.getMessage()), 
                         List.of());
             }
@@ -264,16 +265,16 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
 
                 if (response.statusCode() == 200) {
                     LOG.info("Successfully deleted pipeline '{}' from Consul", pipelineId);
-                    return new ValidationResult(true, List.of(), List.of());
+                    return new DefaultValidationResult(true, List.of(), List.of());
                 } else {
                     LOG.error("Failed to delete pipeline. Status: {}", response.statusCode());
-                    return new ValidationResult(false, 
+                    return new DefaultValidationResult(false,
                             List.of("Failed to delete pipeline from Consul"), 
                             List.of());
                 }
             } catch (Exception e) {
                 LOG.error("Error deleting pipeline: {}", e.getMessage(), e);
-                return new ValidationResult(false, 
+                return new DefaultValidationResult(false,
                         List.of("Error deleting pipeline: " + e.getMessage()), 
                         List.of());
             }

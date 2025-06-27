@@ -2,6 +2,7 @@ package com.rokkon.pipeline.consul.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rokkon.pipeline.config.model.PipelineConfig;
+import com.rokkon.pipeline.config.service.ModuleWhitelistService;
 import com.rokkon.pipeline.validation.CompositeValidator;
 import com.rokkon.test.containers.ModuleContainerResource;
 import com.rokkon.test.containers.SharedNetworkManager;

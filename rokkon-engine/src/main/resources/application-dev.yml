@@ -1,4 +1,14 @@
 # Development profile overrides for local Consul
+# This file is used to configure the application for local development with Consul.
+
+# General application properties
+application:
+  name: stork-engine
+  version: 1.0.0
+  description: Stork Engine for local development
+
+# Quarkus configuration for HTTP and gRPC servers
+# Use
 quarkus:
   http:
     port: 8080

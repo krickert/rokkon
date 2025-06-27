@@ -1,7 +1,7 @@
-package com.rokkon.pipeline.consul.service;
+package com.rokkon.pipeline.config.service;
 
-import com.rokkon.pipeline.consul.model.Cluster;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.config.model.Cluster;
+import com.rokkon.pipeline.config.model.ClusterMetadata;
 import io.smallrye.mutiny.Uni;
 
 import java.util.List;

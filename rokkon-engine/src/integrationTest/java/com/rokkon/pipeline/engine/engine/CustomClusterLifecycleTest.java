@@ -1,6 +1,6 @@
 package com.rokkon.pipeline.engine;
 
-import com.rokkon.pipeline.consul.service.ClusterService;
+import com.rokkon.pipeline.config.service.ClusterService;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;

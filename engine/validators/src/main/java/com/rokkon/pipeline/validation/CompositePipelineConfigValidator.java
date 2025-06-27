@@ -22,7 +22,7 @@ public class CompositePipelineConfigValidator implements PipelineConfigValidator
     }
 
     @Override
-    public ValidationResult validate(PipelineConfig config) {
+    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(PipelineConfig config) {
         return composite.validate(config);
     }
 

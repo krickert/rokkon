@@ -2,7 +2,8 @@ package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.*;
 import com.rokkon.pipeline.validation.PipelineConfigValidator;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.ArrayList;
@@ -25,13 +26,13 @@ public class RetryConfigValidator implements PipelineConfigValidator {
     private static final long WARN_TIMEOUT_MS = 600000; // 10 minutes
 
     @Override
-    public ValidationResult validate(PipelineConfig config) {
+    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(PipelineConfig config) {
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
 
         if (config == null || config.pipelineSteps() == null) {
             errors.add("Pipeline configuration or steps cannot be null");
-            return new ValidationResult(false, errors, warnings);
+            return new DefaultValidationResult(false, errors, warnings);
         }
 
         for (var entry : config.pipelineSteps().entrySet()) {
@@ -40,7 +41,7 @@ public class RetryConfigValidator implements PipelineConfigValidator {
             validateStepRetryConfig(stepId, step, errors, warnings);
         }
 
-        return new ValidationResult(errors.isEmpty(), errors, warnings);
+        return new DefaultValidationResult(errors.isEmpty(), errors, warnings);
     }
 
     private void validateStepRetryConfig(String stepId, PipelineStepConfig step, List<String> errors, List<String> warnings) {

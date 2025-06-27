@@ -1,8 +1,8 @@
 package com.rokkon.engine.api;
 
-import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService;
-import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ModuleRegistration;
-import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ZombieCleanupResult;
+import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService;
+import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService.ModuleRegistration;
+import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService.ZombieCleanupResult;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
@@ -16,13 +16,12 @@ import java.util.Set;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
-import static org.hamcrest.Matchers.greaterThan;
 
 @QuarkusTest
 class GlobalModuleResourceTest {
     
     @InjectMock
-    GlobalModuleRegistryService moduleRegistry;
+    DELETE_ME_GlobalModuleRegistryService moduleRegistry;
 
     @BeforeEach
     void setup() {

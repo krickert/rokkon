@@ -2,7 +2,8 @@ package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.PipelineClusterConfig;
 import com.rokkon.pipeline.validation.PipelineClusterConfigValidator;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.ArrayList;
@@ -16,11 +17,11 @@ import java.util.List;
 public class InterPipelineLoopValidator implements PipelineClusterConfigValidator {
     
     @Override
-    public ValidationResult validate(PipelineClusterConfig clusterConfig) {
+    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(PipelineClusterConfig clusterConfig) {
         if (clusterConfig == null || 
             clusterConfig.pipelineGraphConfig() == null || 
             clusterConfig.pipelineGraphConfig().pipelines() == null) {
-            return new ValidationResult(true, List.of(), List.of());
+            return new DefaultValidationResult(true, List.of(), List.of());
         }
         
         List<String> errors = new ArrayList<>();
@@ -32,7 +33,7 @@ public class InterPipelineLoopValidator implements PipelineClusterConfigValidato
         // For now, just add a warning that this validation is not yet implemented
         warnings.add("Inter-pipeline loop detection is not yet implemented");
         
-        return new ValidationResult(errors.isEmpty(), errors, warnings);
+        return new DefaultValidationResult(errors.isEmpty(), errors, warnings);
     }
     
     @Override

@@ -1,5 +1,6 @@
 package com.rokkon.pipeline.consul.service;
 
+import com.rokkon.pipeline.config.service.ModuleWhitelistService;
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;

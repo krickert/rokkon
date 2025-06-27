@@ -1,26 +1,16 @@
 package com.rokkon.pipeline.engine;
 
-import com.rokkon.pipeline.consul.service.ClusterService;
-import com.rokkon.pipeline.consul.service.ClusterMetadata;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.config.service.ClusterService;
 import io.quarkus.runtime.StartupEvent;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
-import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
-import org.mockito.ArgumentCaptor;
-
-import java.time.Instant;
-import java.util.Map;
-import java.util.Optional;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.ArgumentMatchers.any;
-import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.*;
 
 @QuarkusTest

@@ -8,7 +8,6 @@ import io.grpc.health.v1.HealthGrpc;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.RestAssured;
 import io.restassured.response.Response;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -23,7 +22,7 @@ import java.net.http.HttpResponse;
 import java.net.URI;
 import org.jboss.logging.Logger;
 import jakarta.inject.Inject;
-import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService;
+import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.hamcrest.CoreMatchers.*;
@@ -43,7 +42,7 @@ class ContainerAwareRegistrationIT extends ModuleRegistrationTestBase {
     private static final Logger LOG = Logger.getLogger(ContainerAwareRegistrationIT.class);
     
     @Inject
-    GlobalModuleRegistryService moduleRegistry;
+    DELETE_ME_GlobalModuleRegistryService moduleRegistry;
     
     @ConfigProperty(name = "test.module.container.grpc.port")
     int externalGrpcPort;

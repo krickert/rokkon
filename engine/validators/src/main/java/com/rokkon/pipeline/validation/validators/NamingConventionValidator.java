@@ -5,7 +5,8 @@ import com.rokkon.pipeline.config.model.PipelineStepConfig;
 import com.rokkon.pipeline.config.model.TransportType;
 import com.rokkon.pipeline.config.model.KafkaTransportConfig;
 import com.rokkon.pipeline.validation.PipelineConfigValidator;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.ArrayList;
@@ -26,9 +27,9 @@ public class NamingConventionValidator implements PipelineConfigValidator {
     private static final int MAX_TOPIC_LENGTH = 249;
     
     @Override
-    public ValidationResult validate(PipelineConfig config) {
+    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(PipelineConfig config) {
         if (config == null) {
-            return ValidationResult.success();
+            return DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult.success();
         }
         
         List<String> errors = new ArrayList<>();
@@ -47,11 +48,11 @@ public class NamingConventionValidator implements PipelineConfigValidator {
         }
         
         if (!errors.isEmpty()) {
-            return ValidationResult.failure(errors, warnings);
+            return DefaultValidationResult.failure(errors, warnings);
         } else if (!warnings.isEmpty()) {
-            return ValidationResult.successWithWarnings(warnings);
+            return DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult.successWithWarnings(warnings);
         } else {
-            return ValidationResult.success();
+            return DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult.success();
         }
     }
     

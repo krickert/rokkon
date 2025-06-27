@@ -4,7 +4,8 @@ import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.model.PipelineStepConfig;
 import com.rokkon.pipeline.config.model.StepType;
 import com.rokkon.pipeline.validation.PipelineConfigValidator;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.ArrayList;
@@ -18,9 +19,9 @@ import java.util.List;
 public class StepTypeValidator implements PipelineConfigValidator {
     
     @Override
-    public ValidationResult validate(PipelineConfig config) {
+    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(PipelineConfig config) {
         if (config == null || config.pipelineSteps() == null || config.pipelineSteps().isEmpty()) {
-            return new ValidationResult(true, List.of(), List.of());
+            return new DefaultValidationResult(true, List.of(), List.of());
         }
         
         List<String> errors = new ArrayList<>();
@@ -65,7 +66,7 @@ public class StepTypeValidator implements PipelineConfigValidator {
             }
         }
         
-        return new ValidationResult(errors.isEmpty(), errors, warnings);
+        return new DefaultValidationResult(errors.isEmpty(), errors, warnings);
     }
     
     private void validateStepTypeConstraints(String stepId, PipelineStepConfig step, 

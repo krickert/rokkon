@@ -24,7 +24,7 @@ import static org.junit.jupiter.api.Assertions.*;
 class GlobalModuleRegistryServiceIT extends ConsulIntegrationTestBase {
     
     @Inject
-    GlobalModuleRegistryService registryService;
+    DELETE_ME_GlobalModuleRegistryService registryService;
     
     // Test-specific JSON schema
     private final String validJsonSchema = """

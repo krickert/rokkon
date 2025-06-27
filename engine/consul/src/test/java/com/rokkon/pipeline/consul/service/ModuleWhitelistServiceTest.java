@@ -1,11 +1,13 @@
 package com.rokkon.pipeline.consul.service;
 
 import com.rokkon.pipeline.config.model.*;
+import com.rokkon.pipeline.config.service.ClusterService;
+import com.rokkon.pipeline.config.service.ModuleWhitelistService;
+import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.consul.model.ModuleWhitelistRequest;
 import com.rokkon.pipeline.consul.model.ModuleWhitelistResponse;
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
 import com.rokkon.pipeline.consul.test.MockTestModuleContainerResource;
-import com.rokkon.pipeline.validation.ValidationResult;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusTest;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
@@ -16,10 +18,8 @@ import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.jboss.logging.Logger;
 
-import java.time.Instant;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import static org.assertj.core.api.Assertions.assertThat;
 

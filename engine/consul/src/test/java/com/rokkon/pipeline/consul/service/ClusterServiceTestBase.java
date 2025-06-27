@@ -1,6 +1,6 @@
 package com.rokkon.pipeline.consul.service;
 
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.config.service.ClusterService;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;

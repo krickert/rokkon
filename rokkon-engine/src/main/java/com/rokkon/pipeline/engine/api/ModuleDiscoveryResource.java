@@ -13,6 +13,7 @@ import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -21,59 +22,59 @@ import java.util.stream.Collectors;
 @Produces(MediaType.APPLICATION_JSON)
 @Tag(name = "Module Discovery", description = "Module discovery operations")
 public class ModuleDiscoveryResource {
-    
+
     private static final Logger LOG = Logger.getLogger(ModuleDiscoveryResource.class);
-    
+
     @Inject
     Vertx vertx;
-    
+
     @Inject
     com.rokkon.pipeline.consul.connection.ConsulConnectionManager connectionManager;
-    
+
     @Inject
-    com.rokkon.pipeline.consul.service.GlobalModuleRegistryService globalRegistry;
-    
+    GlobalModuleRegistryService globalRegistry;
+
     private ConsulClient getConsulClient() {
         return connectionManager.getClient().orElseThrow(() -> 
             new WebApplicationException("Consul not connected", Response.Status.SERVICE_UNAVAILABLE)
         );
     }
-    
+
     @GET
     @Path("/by-cluster")
     @Operation(summary = "Get all registered modules grouped by cluster")
     public Uni<Response> getModulesByCluster() {
         LOG.info("Fetching all modules grouped by cluster");
-        
+
         // Get all services first, then filter by tag
         return UniHelper.toUni(getConsulClient().catalogServices())
             .onItem().transform(services -> {
                 Map<String, List<ModuleInfo>> modulesByCluster = new HashMap<>();
-                
+
                 // Filter services that have the rokkon-module tag
                 services.getList().stream()
                     .filter(service -> service.getTags().contains("rokkon-module"))
                     .forEach(service -> {
                         String serviceName = service.getName();
                         List<String> tags = service.getTags();
-                        
+
                         // Extract cluster from tags
                         String cluster = tags.stream()
                             .filter(tag -> tag.startsWith("cluster:"))
                             .map(tag -> tag.substring("cluster:".length()))
                             .findFirst()
                             .orElse("unknown");
-                        
+
                         ModuleInfo module = new ModuleInfo(
                             serviceName,
                             extractModuleType(tags),
                             tags
                         );
-                        
+
                         modulesByCluster.computeIfAbsent(cluster, k -> new ArrayList<>())
                             .add(module);
                     });
-                
+
                 return Response.ok(modulesByCluster).build();
             })
             .onFailure().recoverWithItem(throwable -> {
@@ -83,13 +84,13 @@ public class ModuleDiscoveryResource {
                     .build();
             });
     }
-    
+
     @GET
     @Path("/{moduleName}/details")
     @Operation(summary = "Get detailed information about a specific module")
     public Uni<Response> getModuleDetails(@PathParam("moduleName") String moduleName) {
         LOG.infof("Fetching details for module: %s", moduleName);
-        
+
         return UniHelper.toUni(getConsulClient().healthServiceNodes(moduleName, true))
             .map(serviceEntries -> {
                 if (serviceEntries.getList().isEmpty()) {
@@ -97,7 +98,7 @@ public class ModuleDiscoveryResource {
                         .entity(Map.of("error", "Module not found"))
                         .build();
                 }
-                
+
                 // Transform Vert.x ServiceEntry to our format
                 List<ServiceInstance> instances = serviceEntries.getList().stream()
                     .map(entry -> {
@@ -112,7 +113,7 @@ public class ModuleDiscoveryResource {
                         );
                     })
                     .toList();
-                
+
                 return Response.ok(instances).build();
             })
             .onFailure().recoverWithItem(throwable -> {
@@ -122,13 +123,13 @@ public class ModuleDiscoveryResource {
                     .build();
             });
     }
-    
+
     @GET
     @Path("/all-services")
     @Operation(summary = "Get all services registered in Consul")
     public Uni<Response> getAllServices() {
         LOG.info("Fetching all services from Consul");
-        
+
         return UniHelper.toUni(getConsulClient().catalogServices())
             .onItem().transformToUni(serviceList -> {
                 // Get details for each service including ALL instances
@@ -136,7 +137,7 @@ public class ModuleDiscoveryResource {
                     .map(service -> {
                         String serviceName = service.getName();
                         List<String> tags = service.getTags();
-                        
+
                         // Get all instances (healthy and unhealthy) for each service
                         return UniHelper.toUni(getConsulClient().healthServiceNodes(serviceName, false))
                             .map(healthEntries -> {
@@ -147,7 +148,7 @@ public class ModuleDiscoveryResource {
                                         // Check if this specific instance is healthy
                                         // Look at ALL checks (both node and service health)
                                         boolean healthy = false; // Default to unhealthy/unknown
-                                        
+
                                         if (entry.getChecks() != null && !entry.getChecks().isEmpty()) {
                                             // All checks must pass for the instance to be healthy
                                             healthy = entry.getChecks().stream()
@@ -162,7 +163,7 @@ public class ModuleDiscoveryResource {
                                                         passing);
                                                     return passing;
                                                 });
-                                            
+
                                             LOG.infof("Service %s at %s:%d - Total checks: %d, All passing: %s", 
                                                 serviceName, svc.getAddress(), svc.getPort(), 
                                                 entry.getChecks().size(), healthy);
@@ -170,7 +171,7 @@ public class ModuleDiscoveryResource {
                                             LOG.warnf("Service %s at %s:%d - No checks found, defaulting to unhealthy", 
                                                 serviceName, svc.getAddress(), svc.getPort());
                                         }
-                                        
+
                                         return new ServiceInfo(
                                             serviceName, 
                                             healthy, 
@@ -184,7 +185,7 @@ public class ModuleDiscoveryResource {
                             .onFailure().recoverWithItem(List.of(new ServiceInfo(serviceName, false, "", 0, tags)));
                     })
                     .toList();
-                
+
                 return Uni.combine().all().unis(serviceUnis)
                     .with(list -> {
                         // Flatten the list of lists into a single list
@@ -203,14 +204,14 @@ public class ModuleDiscoveryResource {
                     .build();
             });
     }
-    
+
     private String extractModuleType(List<String> tags) {
         // For now, all are PipeStepProcessor, but could be extended
         return "PipeStepProcessor";
     }
-    
+
     public record ModuleInfo(String name, String type, List<String> tags) {}
-    
+
     public record ServiceInfo(
         String name,
         boolean healthy,
@@ -218,7 +219,7 @@ public class ModuleDiscoveryResource {
         int port,
         List<String> tags
     ) {}
-    
+
     public record ServiceInstance(
         String ID,
         String Node,
@@ -227,47 +228,47 @@ public class ModuleDiscoveryResource {
         Map<String, String> ServiceMeta,
         List<String> ServiceTags
     ) {}
-    
+
     @GET
     @Path("/dashboard")
     @Operation(summary = "Get comprehensive service data for dashboard")
     public Uni<Response> getDashboardData() {
         LOG.info("Fetching dashboard data");
-        
+
         // Get all services and registered modules in parallel
         Uni<List<ServiceInfo>> allServicesUni = getAllServicesData();
-        Uni<Set<com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ModuleRegistration>> registeredModulesUni = getRegisteredModules();
-        
+        Uni<Set<GlobalModuleRegistryService.ModuleRegistration>> registeredModulesUni = getRegisteredModules();
+
         return Uni.combine().all().unis(allServicesUni, registeredModulesUni)
             .with((allServices, registeredModules) -> {
                 // Create a map of registered modules by name for quick lookup
-                Map<String, List<com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ModuleRegistration>> registeredByName = 
+                Map<String, List<GlobalModuleRegistryService.ModuleRegistration>> registeredByName = 
                     registeredModules.stream()
                         .collect(Collectors.groupingBy(m -> m.moduleName()));
-                
+
                 // Separate base services from module services
                 List<BaseServiceInfo> baseServices = new ArrayList<>();
                 List<ModuleServiceInfo> moduleServices = new ArrayList<>();
-                
+
                 // Group services by name
                 Map<String, List<ServiceInfo>> servicesByName = allServices.stream()
                     .collect(Collectors.groupingBy(ServiceInfo::name));
-                
+
                 servicesByName.forEach((serviceName, instances) -> {
                     if (serviceName.startsWith("module-")) {
                         // This is a module service
                         String moduleName = serviceName.substring(7);
-                        List<com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ModuleRegistration> registered = 
+                        List<GlobalModuleRegistryService.ModuleRegistration> registered = 
                             registeredByName.getOrDefault(moduleName, List.of());
-                        
+
                         List<ModuleInstanceInfo> moduleInstances = instances.stream()
                             .map(instance -> {
                                 // Find matching registration
-                                com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ModuleRegistration reg = registered.stream()
+                                GlobalModuleRegistryService.ModuleRegistration reg = registered.stream()
                                     .filter(r -> r.host().equals(instance.address()) && r.port() == instance.port())
                                     .findFirst()
                                     .orElse(null);
-                                
+
                                 return new ModuleInstanceInfo(
                                     reg != null ? reg.moduleId() : null,
                                     instance.address(),
@@ -281,7 +282,7 @@ public class ModuleDiscoveryResource {
                                 );
                             })
                             .toList();
-                        
+
                         moduleServices.add(new ModuleServiceInfo(
                             moduleName,
                             serviceName,
@@ -291,7 +292,7 @@ public class ModuleDiscoveryResource {
                     } else {
                         // This is a base service
                         List<String> grpcServices = extractGrpcServices(serviceName, instances);
-                        
+
                         List<BaseServiceInstanceInfo> baseInstances = instances.stream()
                             .map(instance -> new BaseServiceInstanceInfo(
                                 instance.address(),
@@ -301,7 +302,7 @@ public class ModuleDiscoveryResource {
                                 grpcServices
                             ))
                             .toList();
-                        
+
                         baseServices.add(new BaseServiceInfo(
                             serviceName,
                             determineServiceType(serviceName),
@@ -309,11 +310,11 @@ public class ModuleDiscoveryResource {
                         ));
                     }
                 });
-                
+
                 // Sort services: base services first, then modules
                 baseServices.sort(Comparator.comparing(BaseServiceInfo::name));
                 moduleServices.sort(Comparator.comparing(ModuleServiceInfo::moduleName));
-                
+
                 // Calculate statistics
                 int totalModules = moduleServices.size();
                 int healthyModules = (int) moduleServices.stream()
@@ -323,7 +324,7 @@ public class ModuleDiscoveryResource {
                     .flatMap(m -> m.instances().stream())
                     .filter(i -> !i.registered())
                     .count();
-                
+
                 DashboardData dashboard = new DashboardData(
                     baseServices,
                     moduleServices,
@@ -334,7 +335,7 @@ public class ModuleDiscoveryResource {
                         zombieCount
                     )
                 );
-                
+
                 return Response.ok(dashboard).build();
             })
             .onFailure().recoverWithItem(throwable -> {
@@ -344,7 +345,7 @@ public class ModuleDiscoveryResource {
                     .build();
             });
     }
-    
+
     private Uni<List<ServiceInfo>> getAllServicesData() {
         return UniHelper.toUni(getConsulClient().catalogServices())
             .onItem().transformToUni(serviceList -> {
@@ -352,7 +353,7 @@ public class ModuleDiscoveryResource {
                     .map(service -> {
                         String serviceName = service.getName();
                         List<String> tags = service.getTags();
-                        
+
                         return UniHelper.toUni(getConsulClient().healthServiceNodes(serviceName, false))
                             .map(healthEntries -> healthEntries.getList().stream()
                                 .map(entry -> {
@@ -360,7 +361,7 @@ public class ModuleDiscoveryResource {
                                     boolean healthy = entry.getChecks() != null && !entry.getChecks().isEmpty() &&
                                         entry.getChecks().stream().allMatch(check -> 
                                             check.getStatus() == io.vertx.ext.consul.CheckStatus.PASSING);
-                                    
+
                                     return new ServiceInfo(serviceName, healthy, svc.getAddress(), 
                                         svc.getPort(), svc.getTags());
                                 })
@@ -369,7 +370,7 @@ public class ModuleDiscoveryResource {
                             .onFailure().recoverWithItem(List.of());
                     })
                     .toList();
-                
+
                 return Uni.combine().all().unis(serviceUnis)
                     .with(list -> {
                         @SuppressWarnings("unchecked")
@@ -380,18 +381,18 @@ public class ModuleDiscoveryResource {
                     });
             });
     }
-    
-    private Uni<Set<com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ModuleRegistration>> getRegisteredModules() {
+
+    private Uni<Set<GlobalModuleRegistryService.ModuleRegistration>> getRegisteredModules() {
         // Get registered modules from the injected service
         return globalRegistry.listRegisteredModules();
     }
-    
+
     private List<String> extractGrpcServices(String serviceName, List<ServiceInfo> instances) {
         // For rokkon-engine, return the known gRPC services
         if ("rokkon-engine".equals(serviceName)) {
             return List.of("ConnectorEngine", "PipeStreamEngine", "ModuleRegistrationService");
         }
-        
+
         // For other services, check tags for gRPC service info
         return instances.stream()
             .flatMap(i -> i.tags().stream())
@@ -400,7 +401,7 @@ public class ModuleDiscoveryResource {
             .distinct()
             .toList();
     }
-    
+
     private String extractVersion(List<String> tags) {
         return tags.stream()
             .filter(tag -> tag.startsWith("version:"))
@@ -408,7 +409,7 @@ public class ModuleDiscoveryResource {
             .findFirst()
             .orElse("unknown");
     }
-    
+
     private String determineServiceType(String serviceName) {
         return switch (serviceName) {
             case "consul" -> "infrastructure";
@@ -416,20 +417,20 @@ public class ModuleDiscoveryResource {
             default -> "service";
         };
     }
-    
+
     // New record types for dashboard data
     public record DashboardData(
         List<BaseServiceInfo> baseServices,
         List<ModuleServiceInfo> moduleServices,
         ServiceStatistics statistics
     ) {}
-    
+
     public record BaseServiceInfo(
         String name,
         String type,
         List<BaseServiceInstanceInfo> instances
     ) {}
-    
+
     public record BaseServiceInstanceInfo(
         String address,
         int port,
@@ -437,14 +438,14 @@ public class ModuleDiscoveryResource {
         String version,
         List<String> grpcServices
     ) {}
-    
+
     public record ModuleServiceInfo(
         String moduleName,
         String serviceName,
         List<ModuleInstanceInfo> instances,
         List<String> tags
     ) {}
-    
+
     public record ModuleInstanceInfo(
         String moduleId,
         String address,
@@ -456,7 +457,7 @@ public class ModuleDiscoveryResource {
         String containerName,
         Map<String, String> metadata
     ) {}
-    
+
     public record ServiceStatistics(
         int totalBaseServices,
         int totalModules,

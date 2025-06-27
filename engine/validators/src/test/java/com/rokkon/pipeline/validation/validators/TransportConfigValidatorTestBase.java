@@ -1,7 +1,7 @@
 package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.*;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -23,7 +23,7 @@ public abstract class TransportConfigValidatorTestBase {
     
     @Test
     void testNullPipelineConfiguration() {
-        ValidationResult result = getValidator().validate(null);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(null);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -57,7 +57,7 @@ public abstract class TransportConfigValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -91,7 +91,7 @@ public abstract class TransportConfigValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);
@@ -131,7 +131,7 @@ public abstract class TransportConfigValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);
@@ -176,7 +176,7 @@ public abstract class TransportConfigValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -220,7 +220,7 @@ public abstract class TransportConfigValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);
@@ -265,7 +265,7 @@ public abstract class TransportConfigValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);
@@ -306,7 +306,7 @@ public abstract class TransportConfigValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -346,7 +346,7 @@ public abstract class TransportConfigValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(1);
@@ -389,7 +389,7 @@ public abstract class TransportConfigValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).hasSize(2);

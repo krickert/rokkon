@@ -2,10 +2,9 @@ package com.rokkon.pipeline.consul.test;
 
 import com.rokkon.pipeline.config.model.*;
 import com.rokkon.pipeline.consul.model.ModuleWhitelistRequest;
-import com.rokkon.pipeline.consul.service.ClusterService;
-import com.rokkon.pipeline.consul.service.ModuleWhitelistService;
-import com.rokkon.pipeline.consul.service.PipelineConfigService;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.config.service.ClusterService;
+import com.rokkon.pipeline.config.service.ModuleWhitelistService;
+import com.rokkon.pipeline.config.service.PipelineConfigService;
 import io.smallrye.mutiny.Uni;
 import io.vertx.ext.consul.ConsulClientOptions;
 import io.vertx.ext.consul.ServiceOptions;
@@ -15,14 +14,11 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
-import org.awaitility.Awaitility;
 
 import java.time.Duration;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicBoolean;
 
 /**
  * Implementation of TestSeedingService for unit tests.
@@ -55,40 +51,7 @@ public class TestSeedingServiceImpl implements TestSeedingService {
     @ConfigProperty(name = "consul.port", defaultValue = "8500")
     int consulPort;
     
-    private ConsulClient consulClient;
-    private final AtomicBoolean consulSeeded = new AtomicBoolean(false);
-
     private int currentStep = -1;
-
-    @Override
-    public Map<String, String> seedConsulConfiguration() {
-        if (consulSeeded.get()) {
-            return Map.of();
-        }
-
-        consulClient = ConsulClient.create(vertx, new ConsulClientOptions().setHost(consulHost).setPort(consulPort));
-
-        // Put a key/value pair
-        consulClient.putValue("rokkon/test-key", "test-value")
-                .onItem().invoke(() -> System.out.println("Successfully put the key 'rokkon/test-key' into Consul."))
-                .onFailure().invoke(throwable -> System.err.println("Failed to put key into Consul: " + throwable.getMessage()))
-                .await().indefinitely();
-
-        // Verify the key is present
-        Awaitility.await().atMost(5, TimeUnit.SECONDS).until(() -> {
-            try {
-                return consulClient.getValue("rokkon/test-key")
-                        .onItem().transform(kv -> kv != null && "test-value".equals(kv.getValue()))
-                        .onFailure().transform(err -> false)
-                        .await().indefinitely();
-            } catch (Exception e) {
-                return false;
-            }
-        });
-
-        consulSeeded.set(true);
-        return Map.of();
-    }
 
     @Override
     public Uni<Boolean> seedStep0_ConsulStarted() {

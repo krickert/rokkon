@@ -1,14 +1,11 @@
 package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.*;
-import com.rokkon.pipeline.validation.ValidationResult;
-import io.quarkus.test.junit.QuarkusTest;
+import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
 import java.util.HashMap;
-import java.util.List;
-import java.util.Collections;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
@@ -19,7 +16,7 @@ public abstract class OutputRoutingValidatorTestBase {
 
     @Test
     void testNullPipelineConfiguration() {
-        ValidationResult result = getValidator().validate(null);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(null);
         
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).containsExactly("Pipeline configuration or steps cannot be null");
@@ -69,7 +66,7 @@ public abstract class OutputRoutingValidatorTestBase {
             Map.of("step1", step1, "step2", step2)
         );
 
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
@@ -105,7 +102,7 @@ public abstract class OutputRoutingValidatorTestBase {
             Map.of("test-step", step)
         );
 
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).containsExactly(
@@ -143,7 +140,7 @@ public abstract class OutputRoutingValidatorTestBase {
             Map.of("sink-step", step)
         );
 
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).containsExactlyInAnyOrder(
@@ -174,7 +171,7 @@ public abstract class OutputRoutingValidatorTestBase {
             Map.of("test-step", step)
         );
 
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
@@ -274,7 +271,7 @@ public abstract class OutputRoutingValidatorTestBase {
             Map.of("test-step", step, "target-step", targetStep)
         );
 
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
@@ -331,7 +328,7 @@ public abstract class OutputRoutingValidatorTestBase {
             Map.of("test-step", step, "target-step", targetStep)
         );
 
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);

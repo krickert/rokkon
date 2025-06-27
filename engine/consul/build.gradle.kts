@@ -12,7 +12,7 @@ repositories {
 
 dependencies {
     implementation(platform(project(":rokkon-bom")))
-    
+
     // Quarkus extensions for Consul functionality
     implementation("io.quarkiverse.config:quarkus-config-consul") // For configuration properties
     implementation("io.quarkus:quarkus-hibernate-validator")
@@ -30,7 +30,7 @@ dependencies {
 
     // Vertx Consul client for service registration
     implementation("io.smallrye.reactive:smallrye-mutiny-vertx-consul-client")
-    
+
     // YAML processing for config persistence
     implementation("org.yaml:snakeyaml:2.2")
 
@@ -49,11 +49,9 @@ dependencies {
     testImplementation("org.testcontainers:junit-jupiter")
     testImplementation("org.awaitility:awaitility:4.2.0")
     testImplementation(project(":test-utilities")) // Provides quarkus-docker-client and other test utilities
-    
-    // Integration test dependencies
-    integrationTestImplementation("io.quarkus:quarkus-junit5")
-    integrationTestImplementation("org.assertj:assertj-core")
-    integrationTestImplementation(project(":test-utilities"))
+
+    // Integration tests are handled by Quarkus automatically
+    // It automatically gets testImplementation dependencies, so no need to add them twice
 }
 
 group = "com.rokkon.pipeline"

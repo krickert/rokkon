@@ -5,9 +5,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.model.PipelineInstance;
 import com.rokkon.pipeline.config.model.PipelineInstance.PipelineInstanceStatus;
+import com.rokkon.pipeline.config.service.PipelineDefinitionService;
+import com.rokkon.pipeline.config.service.PipelineInstanceService;
 import com.rokkon.pipeline.consul.model.CreateInstanceRequest;
 import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.DefaultValidationResult;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.vertx.UniHelper;
 import io.vertx.ext.consul.ConsulClient;
@@ -104,7 +106,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
         return pipelineDefinitionService.getDefinition(request.pipelineDefinitionId())
             .flatMap(definition -> {
                 if (definition == null) {
-                    return Uni.createFrom().item(ValidationResult.failure(
+                    return Uni.createFrom().item(DefaultValidationResult.failure(
                         "Pipeline definition '" + request.pipelineDefinitionId() + "' not found"));
                 }
                 
@@ -117,7 +119,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
         return instanceExists(clusterName, request.instanceId())
             .flatMap(exists -> {
                 if (exists) {
-                    return Uni.createFrom().item(ValidationResult.failure("Pipeline instance '" + request.instanceId() + "' already exists in cluster '" + clusterName + "'"));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Pipeline instance '" + request.instanceId() + "' already exists in cluster '" + clusterName + "'"));
                 }
                 
                 // Create the instance
@@ -151,13 +153,13 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
                                     request.instanceId(), clusterName, request.pipelineDefinitionId());
                                 return ValidationResult.success();
                             } else {
-                                return ValidationResult.failure("Failed to store pipeline instance in Consul");
+                                return DefaultValidationResult.failure("Failed to store pipeline instance in Consul");
                             }
                         });
                     
                 } catch (JsonProcessingException e) {
                     LOG.error("Failed to serialize pipeline instance", e);
-                    return Uni.createFrom().item(ValidationResult.failure("Failed to serialize pipeline instance: " + e.getMessage()));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Failed to serialize pipeline instance: " + e.getMessage()));
                 }
             });
     }
@@ -168,7 +170,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
         return getInstance(clusterName, instanceId)
             .flatMap(existing -> {
                 if (existing == null) {
-                    return Uni.createFrom().item(ValidationResult.failure("Pipeline instance '" + instanceId + "' not found in cluster '" + clusterName + "'"));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Pipeline instance '" + instanceId + "' not found in cluster '" + clusterName + "'"));
                 }
                 
                 // Create updated instance with preserved immutable fields
@@ -201,13 +203,13 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
                                 LOG.info("Updated pipeline instance '{}' in cluster '{}'", instanceId, clusterName);
                                 return ValidationResult.success();
                             } else {
-                                return ValidationResult.failure("Failed to update pipeline instance in Consul");
+                                return DefaultValidationResult.failure("Failed to update pipeline instance in Consul");
                             }
                         });
                     
                 } catch (JsonProcessingException e) {
                     LOG.error("Failed to serialize pipeline instance", e);
-                    return Uni.createFrom().item(ValidationResult.failure("Failed to serialize pipeline instance: " + e.getMessage()));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Failed to serialize pipeline instance: " + e.getMessage()));
                 }
             });
     }
@@ -218,13 +220,13 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
         return getInstance(clusterName, instanceId)
             .flatMap(instance -> {
                 if (instance == null) {
-                    return Uni.createFrom().item(ValidationResult.failure("Pipeline instance '" + instanceId + "' not found in cluster '" + clusterName + "'"));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Pipeline instance '" + instanceId + "' not found in cluster '" + clusterName + "'"));
                 }
                 
                 // Check if running
                 if (instance.status() == PipelineInstanceStatus.RUNNING || 
                     instance.status() == PipelineInstanceStatus.STARTING) {
-                    return Uni.createFrom().item(ValidationResult.failure("Cannot delete running instance. Stop it first."));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Cannot delete running instance. Stop it first."));
                 }
                 
                 // Delete from Consul
@@ -237,7 +239,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
                     })
                     .onFailure().recoverWithItem(error -> {
                         LOG.error("Failed to delete pipeline instance from Consul", error);
-                        return ValidationResult.failure("Failed to delete pipeline instance: " + error.getMessage());
+                        return DefaultValidationResult.failure("Failed to delete pipeline instance: " + error.getMessage());
                     });
             });
     }
@@ -247,11 +249,11 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
         return getInstance(clusterName, instanceId)
             .flatMap(instance -> {
                 if (instance == null) {
-                    return Uni.createFrom().item(ValidationResult.failure("Pipeline instance '" + instanceId + "' not found in cluster '" + clusterName + "'"));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Pipeline instance '" + instanceId + "' not found in cluster '" + clusterName + "'"));
                 }
                 
                 if (instance.status() == PipelineInstanceStatus.RUNNING) {
-                    return Uni.createFrom().item(ValidationResult.failure("Pipeline instance is already running"));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Pipeline instance is already running"));
                 }
                 
                 // Update status to STARTING then RUNNING
@@ -285,18 +287,18 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
                                 // TODO: Actually start the pipeline processing
                                 return ValidationResult.success();
                             } else {
-                                return ValidationResult.failure("Failed to update pipeline instance status");
+                                return DefaultValidationResult.failure("Failed to update pipeline instance status");
                             }
                         });
                     
                 } catch (JsonProcessingException e) {
                     LOG.error("Failed to serialize pipeline instance", e);
-                    return Uni.createFrom().item(ValidationResult.failure("Failed to serialize pipeline instance: " + e.getMessage()));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Failed to serialize pipeline instance: " + e.getMessage()));
                 }
             })
             .onFailure().recoverWithItem(error -> {
                 LOG.error("Failed to start pipeline instance", error);
-                return ValidationResult.failure("Failed to start pipeline instance: " + error.getMessage());
+                return DefaultValidationResult.failure("Failed to start pipeline instance: " + error.getMessage());
             });
     }
     
@@ -305,11 +307,11 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
         return getInstance(clusterName, instanceId)
             .flatMap(instance -> {
                 if (instance == null) {
-                    return Uni.createFrom().item(ValidationResult.failure("Pipeline instance '" + instanceId + "' not found in cluster '" + clusterName + "'"));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Pipeline instance '" + instanceId + "' not found in cluster '" + clusterName + "'"));
                 }
                 
                 if (instance.status() != PipelineInstanceStatus.RUNNING) {
-                    return Uni.createFrom().item(ValidationResult.failure("Pipeline instance is not running"));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Pipeline instance is not running"));
                 }
                 
                 // Update status to STOPPING then STOPPED
@@ -343,18 +345,18 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
                                 // TODO: Actually stop the pipeline processing
                                 return ValidationResult.success();
                             } else {
-                                return ValidationResult.failure("Failed to update pipeline instance status");
+                                return DefaultValidationResult.failure("Failed to update pipeline instance status");
                             }
                         });
                     
                 } catch (JsonProcessingException e) {
                     LOG.error("Failed to serialize pipeline instance", e);
-                    return Uni.createFrom().item(ValidationResult.failure("Failed to serialize pipeline instance: " + e.getMessage()));
+                    return Uni.createFrom().item(DefaultValidationResult.failure("Failed to serialize pipeline instance: " + e.getMessage()));
                 }
             })
             .onFailure().recoverWithItem(error -> {
                 LOG.error("Failed to stop pipeline instance", error);
-                return ValidationResult.failure("Failed to stop pipeline instance: " + error.getMessage());
+                return DefaultValidationResult.failure("Failed to stop pipeline instance: " + error.getMessage());
             });
     }
     

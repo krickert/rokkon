@@ -42,7 +42,7 @@ public class EngineContainerResource implements QuarkusTestResourceLifecycleMana
     @Override
     public Map<String, String> start() {
         // Get or create the shared network
-        sharedNetwork = SharedNetworkManager.getOrCreateNetwork();
+        sharedNetwork = SharedNetworkManager.getNetwork();
         System.out.println("Engine using shared network: " + sharedNetwork.getId());
         
         // Check if Consul is available in the network

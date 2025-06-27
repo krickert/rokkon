@@ -60,7 +60,7 @@ public class ModuleContainerResource implements QuarkusTestResourceLifecycleMana
                 sharedNetwork = SharedNetworkManager.getSharedNetwork();
                 if (sharedNetwork == null) {
                     System.out.println("Module creating new network (SharedNetworkManager had none)");
-                    sharedNetwork = SharedNetworkManager.getOrCreateNetwork();
+                    sharedNetwork = SharedNetworkManager.getNetwork();
                 } else {
                     System.out.println("Module using existing shared network: " + sharedNetwork.getId());
                 }
@@ -70,7 +70,7 @@ public class ModuleContainerResource implements QuarkusTestResourceLifecycleMana
             }
         } else {
             // No shared network exists yet, create one
-            sharedNetwork = SharedNetworkManager.getOrCreateNetwork();
+            sharedNetwork = SharedNetworkManager.getNetwork();
             System.out.println("Module created shared network: " + sharedNetwork.getId());
         }
         

@@ -1,5 +1,6 @@
 package com.rokkon.pipeline.consul.service;
 
+import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.consul.config.ConsulConfigSource;
 import io.quarkus.scheduler.Scheduled;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -21,7 +22,7 @@ public class ConfigurationExample {
     ConsulConfigSource config;
     
     @Inject
-    GlobalModuleRegistryService registryService;
+    DELETE_ME_GlobalModuleRegistryService registryService;
     
     @Inject
     PipelineConfigService pipelineService;

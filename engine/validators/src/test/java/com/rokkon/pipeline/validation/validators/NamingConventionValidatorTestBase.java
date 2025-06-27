@@ -6,7 +6,7 @@ import com.rokkon.pipeline.config.model.KafkaTransportConfig;
 import com.rokkon.pipeline.config.model.TransportType;
 import com.rokkon.pipeline.config.model.StepType;
 import com.rokkon.pipeline.config.model.KafkaInputDefinition;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
 import org.junit.jupiter.api.Test;
 
 import java.util.List;
@@ -28,7 +28,7 @@ public abstract class NamingConventionValidatorTestBase {
     
     @Test
     void testNullPipelineConfiguration() {
-        ValidationResult result = getValidator().validate(null);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(null);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -41,7 +41,7 @@ public abstract class NamingConventionValidatorTestBase {
             Collections.emptyMap()
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
     }
@@ -53,7 +53,7 @@ public abstract class NamingConventionValidatorTestBase {
             Collections.emptyMap()
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(2);
         assertThat(result.errors().get(0)).contains("cannot contain dots - dots are reserved as delimiters");
@@ -67,7 +67,7 @@ public abstract class NamingConventionValidatorTestBase {
             Collections.emptyMap()
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0)).contains("must contain only alphanumeric characters and hyphens");
@@ -81,7 +81,7 @@ public abstract class NamingConventionValidatorTestBase {
             Collections.emptyMap()
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.warnings()).hasSize(1);
         assertThat(result.warnings().get(0)).contains("longer than 50 characters");
@@ -116,7 +116,7 @@ public abstract class NamingConventionValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
     }
@@ -149,7 +149,7 @@ public abstract class NamingConventionValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(2);
         assertThat(result.errors().get(0)).contains("cannot contain dots - dots are reserved as delimiters");
@@ -200,7 +200,7 @@ public abstract class NamingConventionValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -250,7 +250,7 @@ public abstract class NamingConventionValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(2);
         assertThat(result.errors().get(0)).contains("doesn't follow the required naming pattern");
@@ -291,7 +291,7 @@ public abstract class NamingConventionValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isTrue();
         assertThat(result.errors()).isEmpty();
         assertThat(result.warnings()).isEmpty();
@@ -331,7 +331,7 @@ public abstract class NamingConventionValidatorTestBase {
             Map.of("step1", step)
         );
         
-        ValidationResult result = getValidator().validate(config);
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = getValidator().validate(config);
         assertThat(result.valid()).isFalse();
         assertThat(result.errors()).hasSize(1);
         assertThat(result.errors().get(0)).contains("doesn't follow the required naming pattern");

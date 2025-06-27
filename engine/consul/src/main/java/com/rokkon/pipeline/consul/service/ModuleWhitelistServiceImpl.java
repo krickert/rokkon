@@ -2,10 +2,13 @@ package com.rokkon.pipeline.consul.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rokkon.pipeline.config.model.*;
+import com.rokkon.pipeline.config.service.ClusterService;
+import com.rokkon.pipeline.config.service.ModuleWhitelistService;
+import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.consul.model.ModuleWhitelistRequest;
 import com.rokkon.pipeline.consul.model.ModuleWhitelistResponse;
 import com.rokkon.pipeline.validation.CompositeValidator;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.DefaultValidationResult;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -20,7 +23,6 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
-import java.util.stream.Collectors;
 
 /**
  * Service implementation for managing module whitelisting in clusters.
@@ -356,7 +358,7 @@ public class ModuleWhitelistServiceImpl implements ModuleWhitelistService {
 
         PipelineGraphConfig graphConfig = clusterConfig.pipelineGraphConfig();
         if (graphConfig == null || graphConfig.pipelines().isEmpty()) {
-            return Uni.createFrom().item(new ValidationResult(true, List.of(), List.of()));
+            return Uni.createFrom().item(new DefaultValidationResult(true, List.of(), List.of()));
         }
 
         List<String> allErrors = new ArrayList<>();
@@ -378,7 +380,7 @@ public class ModuleWhitelistServiceImpl implements ModuleWhitelistService {
         }
 
         return Uni.createFrom().item(
-            new ValidationResult(allErrors.isEmpty(), allErrors, allWarnings)
+            new DefaultValidationResult(allErrors.isEmpty(), allErrors, allWarnings)
         );
     }
 

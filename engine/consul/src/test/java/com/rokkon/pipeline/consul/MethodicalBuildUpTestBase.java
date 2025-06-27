@@ -1,12 +1,11 @@
 package com.rokkon.pipeline.consul;
 
 import com.rokkon.pipeline.config.model.StepType;
-import com.rokkon.pipeline.consul.model.Cluster;
-import com.rokkon.pipeline.consul.service.ClusterService;
-import com.rokkon.pipeline.consul.service.ModuleWhitelistService;
-import com.rokkon.pipeline.consul.service.PipelineConfigService;
+import com.rokkon.pipeline.config.model.Cluster;
+import com.rokkon.pipeline.config.service.ClusterService;
+import com.rokkon.pipeline.config.service.ModuleWhitelistService;
+import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.consul.test.TestSeedingService;
-import com.rokkon.pipeline.validation.ValidationResult;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import org.junit.jupiter.api.*;
 import org.jboss.logging.Logger;
@@ -38,6 +37,7 @@ public abstract class MethodicalBuildUpTestBase {
     protected abstract ModuleWhitelistService getModuleWhitelistService();
     protected abstract PipelineConfigService getPipelineConfigService();
     protected abstract TestSeedingService getTestSeedingService();
+
 
     @BeforeAll
     void setupClass() {

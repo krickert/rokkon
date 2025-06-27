@@ -1,7 +1,7 @@
 package com.rokkon.engine.api;
 
-import com.rokkon.pipeline.consul.service.ClusterService;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.config.service.ClusterService;
+import com.rokkon.pipeline.validation.DefaultValidationResult;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;
@@ -36,7 +36,7 @@ public class ClusterResource {
             .map(clusters -> Response.ok(clusters).build())
             .onFailure().recoverWithItem(throwable -> {
                 LOG.errorf(throwable, "Failed to list clusters");
-                ValidationResult error = ValidationResult.failure(
+                ValidationResult error = DefaultValidationResult.failure(
                     "Failed to retrieve clusters: " + throwable.getMessage()
                 );
                 return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
@@ -85,7 +85,7 @@ public class ClusterResource {
                     return Response.ok(cluster.get()).build();
                 } else {
                     return Response.status(Response.Status.NOT_FOUND)
-                        .entity(ValidationResult.failure("Cluster '" + clusterName + "' not found"))
+                        .entity(DefaultValidationResult.failure("Cluster '" + clusterName + "' not found"))
                         .build();
                 }
             });

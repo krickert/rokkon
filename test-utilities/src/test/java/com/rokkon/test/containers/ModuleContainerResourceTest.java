@@ -47,7 +47,7 @@ class ModuleContainerResourceTest {
     @Test
     void testSharedNetworkManager() {
         // Test that SharedNetworkManager can create networks
-        Network network = SharedNetworkManager.getOrCreateNetwork();
+        Network network = SharedNetworkManager.getNetwork();
         assertThat(network).isNotNull();
         assertThat(network.getId()).isNotBlank();
         

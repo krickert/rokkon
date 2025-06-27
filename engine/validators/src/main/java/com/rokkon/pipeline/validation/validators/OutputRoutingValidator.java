@@ -2,7 +2,8 @@ package com.rokkon.pipeline.validation.validators;
 
 import com.rokkon.pipeline.config.model.*;
 import com.rokkon.pipeline.validation.PipelineConfigValidator;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.ArrayList;
@@ -18,13 +19,13 @@ import java.util.Set;
 public class OutputRoutingValidator implements PipelineConfigValidator {
 
     @Override
-    public ValidationResult validate(PipelineConfig config) {
+    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(PipelineConfig config) {
         List<String> errors = new ArrayList<>();
         List<String> warnings = new ArrayList<>();
 
         if (config == null || config.pipelineSteps() == null) {
             errors.add("Pipeline configuration or steps cannot be null");
-            return new ValidationResult(false, errors, warnings);
+            return new DefaultValidationResult(false, errors, warnings);
         }
 
         Set<String> stepIds = config.pipelineSteps().keySet();
@@ -35,7 +36,7 @@ public class OutputRoutingValidator implements PipelineConfigValidator {
             validateStepOutputs(stepId, step, stepIds, errors, warnings);
         }
 
-        return new ValidationResult(errors.isEmpty(), errors, warnings);
+        return new DefaultValidationResult(errors.isEmpty(), errors, warnings);
     }
 
     private void validateStepOutputs(String stepId, PipelineStepConfig step, 

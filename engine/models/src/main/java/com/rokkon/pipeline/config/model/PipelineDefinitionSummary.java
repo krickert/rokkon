@@ -1,4 +1,4 @@
-package com.rokkon.pipeline.consul.model;
+package com.rokkon.pipeline.config.model;
 
 /**
  * Summary information about a pipeline definition

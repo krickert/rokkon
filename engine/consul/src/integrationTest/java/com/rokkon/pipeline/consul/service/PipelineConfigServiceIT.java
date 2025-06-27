@@ -2,6 +2,8 @@ package com.rokkon.pipeline.consul.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rokkon.pipeline.config.model.PipelineConfig;
+import com.rokkon.pipeline.config.service.ClusterService;
+import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
 import com.rokkon.pipeline.validation.CompositeValidator;
 import com.rokkon.pipeline.validation.Validator;
@@ -9,7 +11,6 @@ import com.rokkon.pipeline.validation.validators.RequiredFieldsValidator;
 import com.rokkon.pipeline.validation.validators.StepTypeValidator;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusIntegrationTest;
-import io.restassured.RestAssured;
 import org.junit.jupiter.api.BeforeEach;
 
 import java.lang.reflect.Field;

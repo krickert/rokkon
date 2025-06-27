@@ -1,6 +1,6 @@
 package com.rokkon.engine.api;
 
-import com.rokkon.pipeline.consul.service.PipelineDefinitionService;
+import com.rokkon.pipeline.config.service.PipelineDefinitionService;
 import io.smallrye.mutiny.Uni;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;

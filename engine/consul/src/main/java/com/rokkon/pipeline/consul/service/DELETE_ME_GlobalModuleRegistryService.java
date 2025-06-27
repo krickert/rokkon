@@ -1,70 +1,49 @@
 package com.rokkon.pipeline.consul.service;
 
-import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
-import com.rokkon.pipeline.consul.config.ConsulConfigSource;
-import com.rokkon.pipeline.events.ModuleRegistrationRequestEvent; // @deprecated - for event-based registration
-import com.rokkon.pipeline.events.ModuleRegistrationResponseEvent; // @deprecated - for event-based registration
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.networknt.schema.JsonSchema;
-import com.networknt.schema.JsonSchemaFactory;
-import com.networknt.schema.SpecVersion;
+import com.rokkon.pipeline.events.ModuleRegistrationRequestEvent;
 import io.smallrye.mutiny.Uni;
-import io.vertx.ext.consul.ConsulClient;
-import io.vertx.ext.consul.Service;
-import io.vertx.ext.consul.ServiceOptions;
-import io.vertx.ext.consul.CheckOptions;
 import jakarta.enterprise.context.ApplicationScoped;
-import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.WebApplicationException;
-import jakarta.ws.rs.core.Response;
 import org.jboss.logging.Logger;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Objects;
-import java.util.Optional;
 import java.util.Set;
-import java.util.LinkedHashSet;
-import java.util.UUID;
-import java.util.ArrayList;
-import java.net.Socket;
-import java.net.InetSocketAddress;
-
-import io.quarkus.scheduler.Scheduled;
-import io.vertx.ext.consul.CheckStatus;
 
 /**
- * Service for managing global module registrations in Consul.
- * Modules are registered globally and can be referenced by clusters.
+ * Delegating implementation of GlobalModuleRegistryService.
+ * This class delegates all calls to the actual implementation (GlobalModuleRegistryServiceImpl).
+ * It exists for backward compatibility.
+ * 
+ * @deprecated Use GlobalModuleRegistryServiceImpl directly
  */
 @ApplicationScoped
-public class GlobalModuleRegistryService {
-    
-    private static final Logger LOG = Logger.getLogger(GlobalModuleRegistryService.class);
+@Deprecated(forRemoval = true, since = "2024-01")
+public class DELETE_ME_GlobalModuleRegistryService implements com.rokkon.pipeline.commons.model.GlobalModuleRegistryService {
+
+    private static final Logger LOG = Logger.getLogger(DELETE_ME_GlobalModuleRegistryService.class);
     private static final String MODULE_KV_PREFIX = "rokkon/modules/registered/";
     private static final String ARCHIVE_PREFIX = "rokkon/archive";
-    
+
     @Inject
     ConsulConnectionManager connectionManager;
-    
+
     @Inject
     ObjectMapper objectMapper;
-    
+
     /**
      * @deprecated Part of the event-based registration approach. Use direct calls instead.
      */
     @Deprecated(forRemoval = true, since = "2024-01")
     @Inject
     Event<ModuleRegistrationResponseEvent> moduleRegistrationResponseEvent;
-    
+
     @Inject
     ConsulConfigSource config;
-    
+
     private final JsonSchemaFactory schemaFactory = JsonSchemaFactory.getInstance(SpecVersion.VersionFlag.V7);
-    
+
     /**
      * Module registration data stored globally
      */
@@ -86,7 +65,7 @@ public class GlobalModuleRegistryService {
         String containerName, // Docker container name (if available)
         String hostname     // Container hostname (if available)
     ) implements Comparable<ModuleRegistration> {
-        
+
         @Override
         public boolean equals(Object o) {
             if (this == o) return true;
@@ -95,12 +74,12 @@ public class GlobalModuleRegistryService {
             // This allows multiple instances with the same module name
             return Objects.equals(moduleId, other.moduleId);
         }
-        
+
         @Override
         public int hashCode() {
             return Objects.hash(moduleId);
         }
-        
+
         @Override
         public int compareTo(ModuleRegistration other) {
             // Sort by module name first, then by registration time
@@ -109,7 +88,7 @@ public class GlobalModuleRegistryService {
             return Long.compare(this.registeredAt, other.registeredAt);
         }
     }
-    
+
     /**
      * Register a module globally in Consul.
      * This creates both a service entry and stores metadata in KV.
@@ -125,18 +104,18 @@ public class GlobalModuleRegistryService {
             String engineHost,
             int enginePort,
             String jsonSchema) {
-        
+
         ConsulClient client = getConsulClient();
         String moduleId = generateModuleId(moduleName);
-        
+
         LOG.infof("Registering module globally: %s (%s) at %s:%d (engine connection: %s:%d)", 
                   moduleName, implementationId, host, port, engineHost, enginePort);
-        
+
         // Extract container metadata if provided
         final String containerId = metadata != null ? metadata.get("containerId") : null;
         final String containerName = metadata != null ? metadata.get("containerName") : null;
         final String hostname = metadata != null ? metadata.get("hostname") : null;
-        
+
         // Validate JSON Schema v7 if provided
         if (jsonSchema != null && !jsonSchema.trim().isEmpty()) {
             if (!isValidJsonSchemaV7(jsonSchema)) {
@@ -145,7 +124,7 @@ public class GlobalModuleRegistryService {
                 );
             }
         }
-        
+
         // Allow multiple instances of the same module type to register
         // Each instance gets a unique moduleId but shares the same moduleName
         return listRegisteredModules()
@@ -155,7 +134,7 @@ public class GlobalModuleRegistryService {
                     Optional<ModuleRegistration> duplicateContainer = existingModules.stream()
                         .filter(m -> containerId.equals(m.containerId()))
                         .findFirst();
-                    
+
                     if (duplicateContainer.isPresent()) {
                         ModuleRegistration dup = duplicateContainer.get();
                         LOG.errorf("Container %s is already registered as module '%s'", containerId, dup.moduleName());
@@ -166,16 +145,16 @@ public class GlobalModuleRegistryService {
                         ));
                     }
                 }
-                
+
                 // Check if there are existing modules with the same name
                 List<ModuleRegistration> sameNameModules = existingModules.stream()
                     .filter(m -> m.moduleName().equals(moduleName))
                     .toList();
-                
+
                 if (!sameNameModules.isEmpty()) {
                     LOG.infof("Module type '%s' already has %d instance(s) registered. Adding new instance.", 
                              moduleName, sameNameModules.size());
-                    
+
                     // Validate schema consistency across instances
                     for (ModuleRegistration existing : sameNameModules) {
                         if (existing.jsonSchema() != null && jsonSchema != null) {
@@ -189,7 +168,7 @@ public class GlobalModuleRegistryService {
                         }
                     }
                 }
-                
+
                 // Validate the module is accessible using engine connection
                 return validateModuleConnection(engineHost, enginePort, moduleName);
             })
@@ -200,7 +179,7 @@ public class GlobalModuleRegistryService {
                         Response.Status.BAD_REQUEST
                     ));
                 }
-                
+
                 // Create the module registration record
                 ModuleRegistration registration = new ModuleRegistration(
                     moduleId,
@@ -220,7 +199,7 @@ public class GlobalModuleRegistryService {
                     containerName,
                     hostname
                 );
-                
+
                 // Create service options for Consul
                 Map<String, String> serviceMeta = new java.util.HashMap<>();
                 serviceMeta.put("moduleName", moduleName);
@@ -228,23 +207,23 @@ public class GlobalModuleRegistryService {
                 serviceMeta.put("serviceType", serviceType);
                 serviceMeta.put("version", version);
                 serviceMeta.put("registeredAt", String.valueOf(registration.registeredAt()));
-                
+
                 // Add container metadata if available
                 if (containerId != null) serviceMeta.put("containerId", containerId);
                 if (containerName != null) serviceMeta.put("containerName", containerName);
                 if (hostname != null) serviceMeta.put("hostname", hostname);
-                
+
                 // Store JSON schema if provided
                 if (jsonSchema != null && !jsonSchema.trim().isEmpty()) {
                     serviceMeta.put("jsonSchema", jsonSchema);
                 }
-                
+
                 // Store engine connection info if different from Consul registration
                 if (!engineHost.equals(host) || enginePort != port) {
                     serviceMeta.put("engineHost", engineHost);
                     serviceMeta.put("enginePort", String.valueOf(enginePort));
                 }
-                
+
                 ServiceOptions serviceOptions = new ServiceOptions()
                     .setId(moduleId)
                     .setName(moduleName)
@@ -252,7 +231,7 @@ public class GlobalModuleRegistryService {
                     .setAddress(host)
                     .setPort(port)
                     .setMeta(serviceMeta);
-                
+
                 // Add gRPC health check with configurable intervals
                 CheckOptions checkOptions = new CheckOptions()
                     .setName("Module gRPC Health Check")
@@ -260,9 +239,9 @@ public class GlobalModuleRegistryService {
                     .setGrpcTls(false)
                     .setInterval(config.consul().health().checkInterval().getSeconds() + "s")
                     .setDeregisterAfter(config.consul().health().deregisterAfter().getSeconds() + "s");
-                
+
                 serviceOptions.setCheckOptions(checkOptions);
-                
+
                 // Register the service
                 return Uni.createFrom().completionStage(
                     client.registerService(serviceOptions).toCompletionStage()
@@ -281,14 +260,14 @@ public class GlobalModuleRegistryService {
                 );
             });
     }
-    
+
     /**
      * List all globally registered modules as an ordered set (no duplicates)
      * This includes both enabled and disabled modules
      */
     public Uni<Set<ModuleRegistration>> listRegisteredModules() {
         ConsulClient client = getConsulClient();
-        
+
         return Uni.createFrom().completionStage(
             client.localServices().toCompletionStage()
         )
@@ -297,16 +276,16 @@ public class GlobalModuleRegistryService {
             List<Service> moduleServices = services.stream()
                 .filter(service -> service.getTags() != null && service.getTags().contains("module"))
                 .toList();
-            
+
             // Convert to ModuleRegistration objects
             List<Uni<ModuleRegistration>> registrationUnis = moduleServices.stream()
                 .map(this::serviceToModuleRegistration)
                 .toList();
-            
+
             if (registrationUnis.isEmpty()) {
                 return Uni.createFrom().item(new LinkedHashSet<>());
             }
-            
+
             return Uni.combine().all().unis(registrationUnis)
                 .with(list -> {
                     // Use LinkedHashSet to maintain order and prevent duplicates
@@ -316,7 +295,7 @@ public class GlobalModuleRegistryService {
                 });
         });
     }
-    
+
     /**
      * List only enabled modules
      */
@@ -332,13 +311,13 @@ public class GlobalModuleRegistryService {
                 return enabledModules;
             });
     }
-    
+
     /**
      * Get a specific module by ID
      */
     public Uni<ModuleRegistration> getModule(String moduleId) {
         ConsulClient client = getConsulClient();
-        
+
         return Uni.createFrom().completionStage(
             client.localServices().toCompletionStage()
         )
@@ -355,13 +334,13 @@ public class GlobalModuleRegistryService {
             return serviceToModuleRegistration(service);
         });
     }
-    
+
     /**
      * Disable a module (sets enabled=false)
      */
     public Uni<Boolean> disableModule(String moduleId) {
         LOG.infof("Disabling module: %s", moduleId);
-        
+
         // First get the current module registration
         return getModule(moduleId)
             .onItem().transformToUni(module -> {
@@ -369,7 +348,7 @@ public class GlobalModuleRegistryService {
                     LOG.warnf("Module %s not found for disabling", moduleId);
                     return Uni.createFrom().item(false);
                 }
-                
+
                 // Create a new registration with enabled=false
                 ModuleRegistration disabledModule = new ModuleRegistration(
                     module.moduleId(),
@@ -389,7 +368,7 @@ public class GlobalModuleRegistryService {
                     module.containerName(),
                     module.hostname()
                 );
-                
+
                 // Update the KV store with the disabled state
                 return storeModuleMetadata(disabledModule)
                     .onItem().transform(v -> {
@@ -402,13 +381,13 @@ public class GlobalModuleRegistryService {
                 return false;
             });
     }
-    
+
     /**
      * Enable a module (sets enabled=true)
      */
     public Uni<Boolean> enableModule(String moduleId) {
         LOG.infof("Enabling module: %s", moduleId);
-        
+
         // First get the current module registration
         return getModule(moduleId)
             .onItem().transformToUni(module -> {
@@ -416,7 +395,7 @@ public class GlobalModuleRegistryService {
                     LOG.warnf("Module %s not found for enabling", moduleId);
                     return Uni.createFrom().item(false);
                 }
-                
+
                 // Create a new registration with enabled=true
                 ModuleRegistration enabledModule = new ModuleRegistration(
                     module.moduleId(),
@@ -436,7 +415,7 @@ public class GlobalModuleRegistryService {
                     module.containerName(),
                     module.hostname()
                 );
-                
+
                 // Update the KV store with the enabled state
                 return storeModuleMetadata(enabledModule)
                     .onItem().transform(v -> {
@@ -449,15 +428,15 @@ public class GlobalModuleRegistryService {
                 return false;
             });
     }
-    
+
     /**
      * Deregister a module (hard delete - removes from registry completely)
      */
     public Uni<Boolean> deregisterModule(String moduleId) {
         ConsulClient client = getConsulClient();
-        
+
         LOG.infof("Deregistering module (hard delete): %s", moduleId);
-        
+
         // First deregister from Consul service registry
         return Uni.createFrom().completionStage(
             client.deregisterService(moduleId).toCompletionStage()
@@ -478,7 +457,7 @@ public class GlobalModuleRegistryService {
             return false;
         });
     }
-    
+
     /**
      * Enable a module for a specific cluster
      */
@@ -486,7 +465,7 @@ public class GlobalModuleRegistryService {
         ConsulClient client = getConsulClient();
         String kvKey = String.format("rokkon/clusters/%s/enabled-modules/%s", 
                                     clusterName, moduleId);
-        
+
         return Uni.createFrom().completionStage(
             client.putValue(kvKey, "true").toCompletionStage()
         )
@@ -502,7 +481,7 @@ public class GlobalModuleRegistryService {
             }
         });
     }
-    
+
     /**
      * Disable a module for a specific cluster
      */
@@ -510,7 +489,7 @@ public class GlobalModuleRegistryService {
         ConsulClient client = getConsulClient();
         String kvKey = String.format("rokkon/clusters/%s/enabled-modules/%s", 
                                     clusterName, moduleId);
-        
+
         return Uni.createFrom().completionStage(
             client.deleteValue(kvKey).toCompletionStage()
         )
@@ -519,14 +498,14 @@ public class GlobalModuleRegistryService {
             return null;
         });
     }
-    
+
     /**
      * List modules enabled for a specific cluster as an ordered set
      */
     public Uni<Set<String>> listEnabledModulesForCluster(String clusterName) {
         ConsulClient client = getConsulClient();
         String prefix = String.format("rokkon/clusters/%s/enabled-modules/", clusterName);
-        
+
         return Uni.createFrom().completionStage(
             client.getKeys(prefix).toCompletionStage()
         )
@@ -534,7 +513,7 @@ public class GlobalModuleRegistryService {
             if (keyList == null || keyList.isEmpty()) {
                 return new LinkedHashSet<>();
             }
-            
+
             // Extract module IDs from keys into ordered set
             Set<String> enabledModules = new LinkedHashSet<>();
             keyList.stream()
@@ -543,21 +522,21 @@ public class GlobalModuleRegistryService {
             return enabledModules;
         });
     }
-    
+
     private Uni<ModuleRegistration> serviceToModuleRegistration(Service service) {
         Map<String, String> meta = service.getMeta();
         ConsulClient client = getConsulClient();
         String moduleId = service.getId();
-        
+
         // First, try to get the enabled state from KV store
         String kvKey = MODULE_KV_PREFIX + moduleId;
-        
+
         return Uni.createFrom().completionStage(
             client.getValue(kvKey).toCompletionStage()
         )
         .onItem().transform(kvValue -> {
             boolean enabled = true; // Default to enabled if not found
-            
+
             if (kvValue != null && kvValue.getValue() != null) {
                 try {
                     // Parse the JSON to get the enabled field
@@ -569,19 +548,19 @@ public class GlobalModuleRegistryService {
                     LOG.warnf("Failed to parse enabled state for module %s, defaulting to true", moduleId);
                 }
             }
-            
+
             // Extract engine connection info if present, otherwise default to service host/port
             String engineHost = meta.getOrDefault("engineHost", service.getAddress());
             int enginePort = Integer.parseInt(meta.getOrDefault("enginePort", String.valueOf(service.getPort())));
-            
+
             // Get schema if stored in metadata
             String jsonSchema = meta.get("jsonSchema");
-            
+
             // Get container metadata if available
             String containerId = meta.get("containerId");
             String containerName = meta.get("containerName");
             String hostname = meta.get("hostname");
-            
+
             return new ModuleRegistration(
                 service.getId(),
                 meta.getOrDefault("moduleName", service.getName()),
@@ -602,11 +581,11 @@ public class GlobalModuleRegistryService {
             );
         });
     }
-    
+
     private Uni<Void> storeModuleMetadata(ModuleRegistration registration) {
         ConsulClient client = getConsulClient();
         String kvKey = MODULE_KV_PREFIX + registration.moduleId();
-        
+
         // Convert registration to JSON (simplified for now)
         String jsonValue = String.format("""
             {
@@ -639,7 +618,7 @@ public class GlobalModuleRegistryService {
             registration.containerName() != null ? "\"" + registration.containerName() + "\"" : "null",
             registration.hostname() != null ? "\"" + registration.hostname() + "\"" : "null"
         );
-        
+
         return Uni.createFrom().completionStage(
             client.putValue(kvKey, jsonValue).toCompletionStage()
         )
@@ -654,25 +633,25 @@ public class GlobalModuleRegistryService {
             }
         });
     }
-    
+
     private String generateModuleId(String moduleName) {
         return moduleName + "-" + UUID.randomUUID().toString().substring(0, 8);
     }
-    
+
     private ConsulClient getConsulClient() {
         return connectionManager.getClient().orElseThrow(() -> 
             new WebApplicationException("Consul not connected", 
                                       Response.Status.SERVICE_UNAVAILABLE)
         );
     }
-    
+
     /**
      * Validate that we can connect to the module before registering it
      */
     private Uni<Boolean> validateModuleConnection(String host, int port, String moduleName) {
         return Uni.createFrom().item(() -> {
             LOG.infof("Validating connection to module %s at %s:%d", moduleName, host, port);
-            
+
             // Simple TCP connection test - Consul will handle the actual gRPC health checks
             try (Socket socket = new Socket()) {
                 // Use configured timeout for module connections
@@ -687,14 +666,14 @@ public class GlobalModuleRegistryService {
             }
         });
     }
-    
+
     /**
      * Archive a service by moving it from active to archive namespace in Consul
      */
     public Uni<Boolean> archiveService(String serviceName, String reason) {
         ConsulClient client = getConsulClient();
         String timestamp = java.time.Instant.now().toString();
-        
+
         // First, try to get the service from Consul's service registry
         return Uni.createFrom().completionStage(
             client.catalogServiceNodes(serviceName).toCompletionStage()
@@ -704,10 +683,10 @@ public class GlobalModuleRegistryService {
                 LOG.warnf("Service %s not found in Consul registry", serviceName);
                 return Uni.createFrom().item(false);
             }
-            
+
             // Get the first service node
             var serviceNode = serviceNodes.getList().get(0);
-            
+
             // Create archive metadata
             String archiveJson;
             try {
@@ -733,11 +712,11 @@ public class GlobalModuleRegistryService {
                 LOG.warnf("Failed to create archive JSON: %s", e.getMessage());
                 return archiveServiceSimple(serviceName, reason, timestamp);
             }
-            
+
             // Store in archive namespace
             String archiveKey = String.format("%s/services/%s-%s", 
                 ARCHIVE_PREFIX, serviceName, timestamp.replace(":", "-").replace(".", "-"));
-            
+
             return Uni.createFrom().completionStage(
                 client.putValue(archiveKey, archiveJson).toCompletionStage()
             )
@@ -747,11 +726,11 @@ public class GlobalModuleRegistryService {
                         new RuntimeException("Failed to archive service metadata")
                     );
                 }
-                
+
                 // Now deregister the service using the service ID
                 String serviceId = serviceNode.getId() != null ? 
                     serviceNode.getId() : serviceName;
-                    
+
                 return Uni.createFrom().completionStage(
                     client.deregisterService(serviceId).toCompletionStage()
                 )
@@ -771,10 +750,10 @@ public class GlobalModuleRegistryService {
             return Uni.createFrom().item(false);
         });
     }
-    
+
     private Uni<Boolean> archiveServiceSimple(String serviceName, String reason, String timestamp) {
         ConsulClient client = getConsulClient();
-        
+
         // Simple archive format without complex JSON serialization
         String archiveJson = String.format("""
             {
@@ -787,10 +766,10 @@ public class GlobalModuleRegistryService {
             timestamp,
             reason
         );
-        
+
         String archiveKey = String.format("%s/services/%s-%s", 
             ARCHIVE_PREFIX, serviceName, timestamp.replace(":", "-").replace(".", "-"));
-        
+
         return Uni.createFrom().completionStage(
             client.putValue(archiveKey, archiveJson).toCompletionStage()
         )
@@ -801,7 +780,7 @@ public class GlobalModuleRegistryService {
             return success;
         });
     }
-    
+
     /**
      * Compare two JSON schemas for semantic equivalence.
      * This handles differences in formatting, property ordering, etc.
@@ -811,7 +790,7 @@ public class GlobalModuleRegistryService {
             // Parse both schemas as JSON
             JsonNode schemaNode1 = objectMapper.readTree(schema1);
             JsonNode schemaNode2 = objectMapper.readTree(schema2);
-            
+
             // Use Jackson's equals which does deep comparison ignoring order
             return schemaNode1.equals(schemaNode2);
         } catch (Exception e) {
@@ -819,7 +798,7 @@ public class GlobalModuleRegistryService {
             return false;
         }
     }
-    
+
     /**
      * Validate that a schema is a valid JSON Schema v7
      */
@@ -827,7 +806,7 @@ public class GlobalModuleRegistryService {
         if (schemaContent == null || schemaContent.trim().isEmpty()) {
             return false;
         }
-        
+
         try {
             JsonNode schemaNode = objectMapper.readTree(schemaContent);
             // Attempt to create a JsonSchema - this validates it's proper JSON Schema v7
@@ -838,7 +817,7 @@ public class GlobalModuleRegistryService {
             return false;
         }
     }
-    
+
     /**
      * Result of zombie cleanup operation
      */
@@ -847,7 +826,7 @@ public class GlobalModuleRegistryService {
         int zombiesCleaned,
         List<String> errors
     ) {}
-    
+
     /**
      * Clean up zombie instances - modules that are failing health checks or no longer exist
      * This method uses Consul health information instead of Docker
@@ -855,39 +834,39 @@ public class GlobalModuleRegistryService {
     public Uni<ZombieCleanupResult> cleanupZombieInstances() {
         LOG.info("Starting zombie instance cleanup using Consul health checks");
         ConsulClient client = getConsulClient();
-        
+
         return listRegisteredModules()
             .onItem().transformToUni(modules -> {
                 if (modules.isEmpty()) {
                     LOG.info("No modules to check for zombies");
                     return Uni.createFrom().item(new ZombieCleanupResult(0, 0, List.of()));
                 }
-                
+
                 // Get health check status for all module services
                 List<Uni<ServiceHealthStatus>> healthCheckUnis = modules.stream()
                     .map(module -> checkModuleHealth(client, module))
                     .toList();
-                
+
                 return Uni.combine().all().unis(healthCheckUnis)
                     .with(results -> {
                         @SuppressWarnings("unchecked")
                         List<ServiceHealthStatus> healthStatuses = (List<ServiceHealthStatus>) results;
-                        
+
                         // Identify zombies (critical health or missing)
                         List<ServiceHealthStatus> zombies = healthStatuses.stream()
                             .filter(status -> status.isZombie())
                             .toList();
-                        
+
                         return zombies;
                     })
                     .onItem().transformToUni(zombies -> {
                         int zombiesDetected = zombies.size();
                         LOG.infof("Detected %d zombie instances", zombiesDetected);
-                        
+
                         if (zombiesDetected == 0) {
                             return Uni.createFrom().item(new ZombieCleanupResult(0, 0, List.of()));
                         }
-                        
+
                         // Clean up zombies
                         List<Uni<Boolean>> cleanupUnis = zombies.stream()
                             .map(zombie -> {
@@ -900,16 +879,16 @@ public class GlobalModuleRegistryService {
                                     });
                             })
                             .toList();
-                        
+
                         return Uni.combine().all().unis(cleanupUnis)
                             .with(cleanupResults -> {
                                 @SuppressWarnings("unchecked")
                                 List<Boolean> cleanResults = (List<Boolean>) cleanupResults;
-                                
+
                                 int zombiesCleaned = (int) cleanResults.stream()
                                     .filter(success -> success)
                                     .count();
-                                
+
                                 List<String> errors = new ArrayList<>();
                                 for (int i = 0; i < cleanResults.size(); i++) {
                                     if (!cleanResults.get(i)) {
@@ -918,10 +897,10 @@ public class GlobalModuleRegistryService {
                                                                 zombie.moduleId(), zombie.moduleName()));
                                     }
                                 }
-                                
+
                                 LOG.infof("Zombie cleanup completed: %d detected, %d cleaned, %d errors", 
                                          zombiesDetected, zombiesCleaned, errors.size());
-                                
+
                                 return new ZombieCleanupResult(zombiesDetected, zombiesCleaned, errors);
                             });
                     });
@@ -931,7 +910,7 @@ public class GlobalModuleRegistryService {
                 return new ZombieCleanupResult(0, 0, List.of("Cleanup failed: " + t.getMessage()));
             });
     }
-    
+
     public record ServiceHealthStatus(
         ModuleRegistration module,
         CheckStatus healthStatus,
@@ -944,7 +923,7 @@ public class GlobalModuleRegistryService {
             return !exists || healthStatus == CheckStatus.CRITICAL;
         }
     }
-    
+
     /**
      * Public method to check module health using Consul health checks
      * @param moduleId The module ID to check
@@ -960,13 +939,13 @@ public class GlobalModuleRegistryService {
                 return checkModuleHealth(client, module);
             });
     }
-    
+
     /**
      * Check module health using Consul health checks
      */
     private Uni<ServiceHealthStatus> checkModuleHealth(ConsulClient client, ModuleRegistration module) {
         String serviceName = module.moduleName();
-        
+
         return Uni.createFrom().completionStage(
             client.healthServiceNodes(serviceName, false).toCompletionStage()
         )
@@ -976,18 +955,18 @@ public class GlobalModuleRegistryService {
                 LOG.debugf("Module %s not found in Consul health checks", module.moduleId());
                 return new ServiceHealthStatus(module, CheckStatus.CRITICAL, false);
             }
-            
+
             // Find the specific instance by ID
             var instanceHealth = serviceEntryList.getList().stream()
                 .filter(entry -> module.moduleId().equals(entry.getService().getId()))
                 .findFirst();
-            
+
             if (instanceHealth.isEmpty()) {
                 // Specific instance not found
                 LOG.debugf("Module instance %s not found in health checks", module.moduleId());
                 return new ServiceHealthStatus(module, CheckStatus.CRITICAL, false);
             }
-            
+
             // Get the worst health check status for this instance
             CheckStatus worstStatus = CheckStatus.PASSING;
             var checks = instanceHealth.get().getChecks();
@@ -1002,11 +981,11 @@ public class GlobalModuleRegistryService {
                     }
                 }
             }
-            
+
             if (worstStatus == CheckStatus.CRITICAL) {
                 LOG.debugf("Module %s has critical health status", module.moduleId());
             }
-            
+
             return new ServiceHealthStatus(module, worstStatus, true);
         })
         .onFailure().recoverWithItem(t -> {
@@ -1015,21 +994,21 @@ public class GlobalModuleRegistryService {
             return new ServiceHealthStatus(module, CheckStatus.WARNING, true);
         });
     }
-    
+
     /**
      * Clean up stale entries in the whitelist (modules registered but not in Consul)
      */
     public Uni<Integer> cleanupStaleWhitelistedModules() {
         LOG.info("Starting stale whitelist cleanup");
         ConsulClient client = getConsulClient();
-        
+
         return listRegisteredModules()
             .onItem().transformToUni(registeredModules -> {
                 if (registeredModules.isEmpty()) {
                     LOG.info("No registered modules to check for staleness");
                     return Uni.createFrom().item(0);
                 }
-                
+
                 // Get all services from Consul
                 return Uni.createFrom().completionStage(
                     client.localServices().toCompletionStage()
@@ -1039,19 +1018,19 @@ public class GlobalModuleRegistryService {
                     Set<String> consulServiceIds = consulServices.stream()
                         .map(Service::getId)
                         .collect(java.util.stream.Collectors.toSet());
-                    
+
                     // Find registered modules that don't exist in Consul
                     List<ModuleRegistration> staleModules = registeredModules.stream()
                         .filter(module -> !consulServiceIds.contains(module.moduleId()))
                         .toList();
-                    
+
                     if (staleModules.isEmpty()) {
                         LOG.info("No stale whitelist entries found");
                         return Uni.createFrom().item(0);
                     }
-                    
+
                     LOG.infof("Found %d stale whitelist entries", staleModules.size());
-                    
+
                     // Clean up stale entries from KV store
                     List<Uni<Boolean>> cleanupUnis = staleModules.stream()
                         .map(module -> {
@@ -1071,7 +1050,7 @@ public class GlobalModuleRegistryService {
                             });
                         })
                         .toList();
-                    
+
                     return Uni.combine().all().unis(cleanupUnis)
                         .with(results -> {
                             @SuppressWarnings("unchecked")
@@ -1079,7 +1058,7 @@ public class GlobalModuleRegistryService {
                             int cleaned = (int) cleanResults.stream()
                                 .filter(success -> success)
                                 .count();
-                            
+
                             LOG.infof("Stale whitelist cleanup completed: %d entries cleaned", cleaned);
                             return cleaned;
                         });
@@ -1090,7 +1069,7 @@ public class GlobalModuleRegistryService {
                 return 0;
             });
     }
-    
+
     /**
      * Scheduled cleanup task that runs periodically.
      * Timing is controlled by configuration properties that can be updated at runtime.
@@ -1103,14 +1082,14 @@ public class GlobalModuleRegistryService {
             LOG.debug("Scheduled cleanup is disabled via configuration");
             return;
         }
-        
+
         if (connectionManager.getClient().isEmpty()) {
             LOG.debug("Skipping scheduled cleanup - Consul not connected");
             return;
         }
-        
+
         LOG.debug("Running scheduled cleanup tasks");
-        
+
         // Run zombie cleanup
         cleanupZombieInstances()
             .subscribe().with(
@@ -1122,7 +1101,7 @@ public class GlobalModuleRegistryService {
                 },
                 failure -> LOG.errorf(failure, "Scheduled zombie cleanup failed")
             );
-        
+
         // Run stale whitelist cleanup
         cleanupStaleWhitelistedModules()
             .subscribe().with(
@@ -1134,7 +1113,7 @@ public class GlobalModuleRegistryService {
                 failure -> LOG.errorf(failure, "Scheduled whitelist cleanup failed")
             );
     }
-    
+
     /**
      * Observe module registration request events from gRPC service and process them
      * @deprecated Use direct calls to registerModule() instead of events. 
@@ -1144,7 +1123,7 @@ public class GlobalModuleRegistryService {
     @Deprecated(forRemoval = true, since = "2024-01")
     public void onModuleRegistrationRequest(@Observes ModuleRegistrationRequestEvent event) {
         LOG.warnf("DEPRECATED: Received module registration request via event: %s. Please use direct calls to GlobalModuleRegistryService instead.", event.moduleName());
-        
+
         // Process the registration request
         registerModule(
             event.moduleName(),

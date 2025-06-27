@@ -231,3 +231,221 @@ public class ModuleRegistrationIntegrationTest {
     * E2E tests are the most valuable for ensuring all parts of the system work together correctly.
     * They are the slowest and most complex to maintain. They should be run as part of a CI/CD pipeline before a release to production.
     * This layer is where you can later add performance, load, and stress testing.
+
+-----
+
+## Updated Testing Patterns and Lessons Learned
+
+### Test Organization Pattern: Base/Unit/Integration
+
+Based on our refactoring experience, we've established a pattern for organizing tests that promotes code reuse while maintaining clear separation between test types:
+
+#### 1. Base Test Classes
+- **Location**: `src/test/java` (main test directory for sharing)
+- **Purpose**: Define common test logic that can be reused by both unit and integration tests
+- **Pattern**: Abstract class with abstract methods for dependency injection
+
+```java
+// MethodicalBuildUpTestBase.java
+public abstract class MethodicalBuildUpTestBase {
+    private static final Logger LOG = Logger.getLogger(MethodicalBuildUpTestBase.class);
+    
+    // Abstract methods for dependency injection
+    protected abstract ClusterService getClusterService();
+    protected abstract ModuleWhitelistService getModuleWhitelistService();
+    
+    // Common test logic
+    @Test
+    void testCreateCluster() {
+        ValidationResult result = getClusterService().createCluster("test")
+            .await().indefinitely();
+        assertThat(result.valid()).isTrue();
+    }
+}
+```
+
+#### 2. Unit Test Implementation
+- **Location**: `src/test/java`
+- **Framework**: `@QuarkusTest` with `@InjectMock`
+- **Purpose**: Test service interactions with mocked dependencies
+
+```java
+@QuarkusTest
+class MethodicalBuildUpUnitTest extends MethodicalBuildUpTestBase {
+    @InjectMock
+    ClusterService clusterService;
+    
+    @BeforeEach
+    void setupMocks() {
+        when(clusterService.createCluster(anyString()))
+            .thenReturn(Uni.createFrom().item(ValidationResult.success()));
+    }
+    
+    @Override
+    protected ClusterService getClusterService() {
+        return clusterService;
+    }
+}
+```
+
+#### 3. Integration Test Implementation
+- **Location**: `src/integrationTest/java`
+- **Framework**: `@QuarkusIntegrationTest` (or `@QuarkusTest` with real resources)
+- **Purpose**: Test with real infrastructure (Consul, containers)
+
+```java
+@QuarkusIntegrationTest
+@QuarkusTestResource(ConsulTestResource.class)
+class MethodicalBuildUpIntegrationTest extends MethodicalBuildUpTestBase {
+    @Inject
+    ClusterService clusterService;
+    
+    @Override
+    protected ClusterService getClusterService() {
+        return clusterService;
+    }
+}
+```
+
+### Key Learnings from Test Refactoring
+
+#### 1. Context Propagation Issues
+
+**Problem**: Tests failing with `SmallRyeContextManager` errors:
+```
+Cannot invoke "io.smallrye.context.SmallRyeContextManager.defaultThreadContext()" 
+because the return value of "io.smallrye.context.SmallRyeContextManagerProvider.getManager()" is null
+```
+
+**Root Cause**: These errors typically indicate that a test requires full Quarkus context but is trying to run in a limited test environment.
+
+**Solutions**:
+- Move tests requiring full context to integration tests
+- Ensure `quarkus-smallrye-context-propagation` dependency is present
+- For unit tests, mock the services that require context propagation
+- Create wrapper interfaces for hard-to-mock components
+
+#### 2. Logging Best Practices
+
+**Always use Logger instead of System.out**:
+```java
+// Bad
+System.out.println("Test passed");
+
+// Good
+private static final Logger LOG = Logger.getLogger(MyTest.class);
+LOG.info("Test passed");
+```
+
+**Benefits**:
+- Consistent with production code
+- Configurable log levels
+- Better IDE and CI/CD integration
+- Structured logging support
+
+#### 3. Mocking Strategies
+
+**Create Mock Implementations for Complex Dependencies**:
+
+When Mockito becomes cumbersome (e.g., for Vertx, ConsulClient), create mock implementations:
+
+```java
+// Interface
+public interface ConsulService {
+    Uni<Boolean> registerService(String name, String id);
+    Uni<List<Service>> getServices();
+}
+
+// Real implementation
+@ApplicationScoped
+public class ConsulServiceImpl implements ConsulService {
+    @Inject Vertx vertx;
+    private ConsulClient client;
+    // Real Consul operations
+}
+
+// Mock implementation for tests
+public class MockConsulService implements ConsulService {
+    private Map<String, Service> services = new HashMap<>();
+    
+    @Override
+    public Uni<Boolean> registerService(String name, String id) {
+        services.put(id, new Service(name, id));
+        return Uni.createFrom().item(true);
+    }
+}
+```
+
+#### 4. Test Resource Management
+
+**Keep Test Resources Simple**:
+- Test resources should only manage lifecycle (start/stop)
+- Don't put data seeding logic in test resources
+- Use separate seeding services that can be injected and controlled by tests
+
+```java
+// Good: Simple lifecycle management
+public class ConsulTestResource implements QuarkusTestResourceLifecycleManager {
+    private ConsulContainer consul;
+    
+    @Override
+    public Map<String, String> start() {
+        consul = new ConsulContainer();
+        consul.start();
+        return Map.of(
+            "consul.host", consul.getHost(),
+            "consul.port", String.valueOf(consul.getMappedPort(8500))
+        );
+    }
+    
+    @Override
+    public void stop() {
+        if (consul != null) {
+            consul.stop();
+        }
+    }
+}
+```
+
+#### 5. Test Profiles
+
+Use test profiles to customize behavior:
+
+```java
+public class NoSchedulerTestProfile implements QuarkusTestProfile {
+    @Override
+    public Map<String, String> getConfigOverrides() {
+        return Map.of(
+            "quarkus.scheduler.enabled", "false",
+            "quarkus.consul-config.enabled", "false"
+        );
+    }
+}
+```
+
+### Migration Checklist
+
+When refactoring tests:
+
+1. **Identify Test Type**:
+   - [ ] Is it testing a single class? → Unit test with mocks
+   - [ ] Is it testing service interactions? → Component test with selective mocks
+   - [ ] Does it need real infrastructure? → Integration test
+
+2. **Check for Context Issues**:
+   - [ ] SmallRyeContextManager errors? → Move to integration test
+   - [ ] Complex async operations? → Consider integration test
+   - [ ] Can be simplified with mocks? → Keep as unit test
+
+3. **Apply Patterns**:
+   - [ ] Extract common logic to base class
+   - [ ] Create unit test with mocks
+   - [ ] Create integration test with real services
+   - [ ] Use Logger instead of System.out
+   - [ ] Create interfaces for hard-to-mock components
+
+4. **Organize Code**:
+   - [ ] Base classes in `src/test/java`
+   - [ ] Unit tests in `src/test/java`
+   - [ ] Integration tests in `src/integrationTest/java`
+   - [ ] Keep `@Disabled` annotation with explanation for WIP tests

@@ -1,4 +1,4 @@
-package com.rokkon.pipeline.consul.service;
+package com.rokkon.pipeline.config.service;
 
 import com.rokkon.pipeline.config.model.PipelineModuleConfiguration;
 import com.rokkon.pipeline.consul.model.ModuleWhitelistRequest;

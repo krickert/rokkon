@@ -7,16 +7,15 @@ import com.rokkon.search.grpc.UnregistrationStatus;
 import com.rokkon.search.grpc.ModuleHealthStatus;
 import com.rokkon.search.grpc.ModuleList;
 import com.rokkon.search.grpc.MutinyModuleRegistrationGrpc;
-import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService;
-import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ModuleRegistration;
-import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ServiceHealthStatus;
+import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService;
+import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService.ModuleRegistration;
+import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService.ServiceHealthStatus;
 import com.google.protobuf.Empty;
 import io.quarkus.grpc.GrpcClient;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.InjectMock;
 import io.smallrye.mutiny.Uni;
 import io.vertx.ext.consul.CheckStatus;
-import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -36,7 +35,7 @@ class ModuleRegistrationServiceImplTest {
     MutinyModuleRegistrationGrpc.MutinyModuleRegistrationStub registrationClient;
 
     @InjectMock
-    GlobalModuleRegistryService mockRegistryService;
+    DELETE_ME_GlobalModuleRegistryService mockRegistryService;
     
     @BeforeEach
     void setup() {

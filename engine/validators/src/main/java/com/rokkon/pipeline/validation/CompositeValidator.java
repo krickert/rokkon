@@ -40,11 +40,11 @@ public class CompositeValidator<T> implements Validator<T> {
     }
     
     @Override
-    public ValidationResult validate(T object) {
-        ValidationResult result = ValidationResult.success();
+    public DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult validate(T object) {
+        DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult result = DELET_ME_I_SHOULD_USE_INTERFACE_OR_MOCK_OR_DEFAULT_ValidationResult.success();
         
         for (Validator<T> validator : validators) {
-            ValidationResult validatorResult = validator.validate(object);
+            DefaultValidationResult validatorResult = validator.validate(object);
             result = result.combine(validatorResult);
             
             // Option to stop on first error (could be configurable)

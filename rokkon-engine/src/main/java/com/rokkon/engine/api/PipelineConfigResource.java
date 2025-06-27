@@ -1,8 +1,7 @@
 package com.rokkon.engine.api;
 
 import com.rokkon.pipeline.config.model.PipelineConfig;
-import com.rokkon.pipeline.consul.service.PipelineConfigService;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.config.service.PipelineConfigService;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.*;

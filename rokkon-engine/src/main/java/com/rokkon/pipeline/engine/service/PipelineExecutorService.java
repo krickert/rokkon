@@ -1,7 +1,7 @@
 package com.rokkon.pipeline.engine.service;
 
 import com.rokkon.pipeline.config.model.*;
-import com.rokkon.pipeline.consul.service.PipelineConfigService;
+import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.engine.util.JsonProtoConverter;
 import com.rokkon.search.engine.ProcessResponse;
 import com.rokkon.search.engine.ProcessStatus;
@@ -10,7 +10,6 @@ import com.rokkon.search.sdk.ProcessConfiguration;
 import com.rokkon.search.sdk.ProcessRequest;
 import com.rokkon.search.sdk.ServiceMetadata;
 import io.smallrye.mutiny.Uni;
-import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;

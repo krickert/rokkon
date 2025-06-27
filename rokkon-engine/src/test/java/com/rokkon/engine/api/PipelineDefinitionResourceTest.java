@@ -2,10 +2,10 @@ package com.rokkon.engine.api;
 
 import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.consul.model.PipelineDefinitionSummary;
-import com.rokkon.pipeline.consul.service.PipelineDefinitionService;
-import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService;
-import com.rokkon.pipeline.consul.service.GlobalModuleRegistryService.ModuleRegistration;
-import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.config.service.PipelineDefinitionService;
+import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService;
+import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService.ModuleRegistration;
+import com.rokkon.pipeline.validation.DefaultValidationResult;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
@@ -37,7 +37,7 @@ class PipelineDefinitionResourceTest extends PipelineDefinitionResourceTestBase 
     PipelineDefinitionService pipelineDefinitionService;
 
     @InjectMock
-    GlobalModuleRegistryService moduleRegistryService;
+    DELETE_ME_GlobalModuleRegistryService moduleRegistryService;
 
     @BeforeEach
     void setup() {
@@ -121,7 +121,7 @@ class PipelineDefinitionResourceTest extends PipelineDefinitionResourceTestBase 
             "steps", List.of()
         );
 
-        ValidationResult successResult = new ValidationResult(true, List.of(), List.of());
+        ValidationResult successResult = new DefaultValidationResult(true, List.of(), List.of());
 
         when(pipelineDefinitionService.createDefinition(
             eq(pipelineId),
@@ -149,7 +149,7 @@ class PipelineDefinitionResourceTest extends PipelineDefinitionResourceTestBase 
             "version", "1.0.0"
         );
 
-        ValidationResult failureResult = new ValidationResult(
+        ValidationResult failureResult = new DefaultValidationResult(
             false, 
             List.of("Pipeline definition already exists"), 
             List.of()
@@ -182,7 +182,7 @@ class PipelineDefinitionResourceTest extends PipelineDefinitionResourceTestBase 
             "version", "2.0.0"
         );
 
-        ValidationResult successResult = new ValidationResult(true, List.of(), List.of());
+        ValidationResult successResult = new DefaultValidationResult(true, List.of(), List.of());
 
         when(pipelineDefinitionService.updateDefinition(
             eq(pipelineId),
@@ -209,7 +209,7 @@ class PipelineDefinitionResourceTest extends PipelineDefinitionResourceTestBase 
             "version", "2.0.0"
         );
 
-        ValidationResult failureResult = new ValidationResult(
+        ValidationResult failureResult = new DefaultValidationResult(
             false, 
             List.of("Pipeline definition not found"), 
             List.of()
@@ -236,7 +236,7 @@ class PipelineDefinitionResourceTest extends PipelineDefinitionResourceTestBase 
     void testDeleteDefinition() {
         String pipelineId = "delete-pipeline";
 
-        ValidationResult successResult = new ValidationResult(true, List.of(), List.of());
+        ValidationResult successResult = new DefaultValidationResult(true, List.of(), List.of());
 
         when(pipelineDefinitionService.deleteDefinition(pipelineId))
             .thenReturn(Uni.createFrom().item(successResult));
@@ -252,7 +252,7 @@ class PipelineDefinitionResourceTest extends PipelineDefinitionResourceTestBase 
     void testDeleteNonExistentDefinition() {
         String pipelineId = "non-existent-pipeline";
 
-        ValidationResult failureResult = new ValidationResult(
+        ValidationResult failureResult = new DefaultValidationResult(
             false, 
             List.of("Pipeline definition not found"), 
             List.of()
@@ -275,7 +275,7 @@ class PipelineDefinitionResourceTest extends PipelineDefinitionResourceTestBase 
     void testDeleteDefinitionWithActiveInstances() {
         String pipelineId = "active-pipeline";
 
-        ValidationResult failureResult = new ValidationResult(
+        ValidationResult failureResult = new DefaultValidationResult(
             false, 
             List.of("Cannot delete: pipeline has active instances"), 
             List.of()
@@ -320,7 +320,7 @@ class PipelineDefinitionResourceTest extends PipelineDefinitionResourceTestBase 
                 .thenReturn(Uni.createFrom().item(mockModule));
 
         // And: Pipeline creation will succeed
-        ValidationResult successResult = new ValidationResult(true, List.of(), List.of());
+        ValidationResult successResult = new DefaultValidationResult(true, List.of(), List.of());
         when(pipelineDefinitionService.createDefinition(
                 anyString(), 
                 any(PipelineConfig.class)))
@@ -437,7 +437,7 @@ class PipelineDefinitionResourceTest extends PipelineDefinitionResourceTestBase 
                 .thenReturn(Uni.createFrom().item(mockModule));
 
         // And: Pipeline already exists
-        ValidationResult conflictResult = new ValidationResult(
+        ValidationResult conflictResult = new DefaultValidationResult(
                 false, 
                 List.of("Pipeline 'test-pipeline' already exists"),
                 List.of()
