@@ -1284,3 +1284,217 @@ test-utilities (test helpers)
 5. **Faster Builds**: Clear dependencies improve build performance
 
 This structure enforces clean architecture principles and makes the codebase more maintainable and testable.
+
+---
+
+## Phase 2: End-to-End Implementation Roadmap
+
+### 🎉 Milestone Achieved: Working Dev Environment with Consul
+
+We've successfully established a working development environment where:
+- ✅ Consul runs in Docker with proper networking
+- ✅ Engine runs locally with Quarkus Dev Mode
+- ✅ Bidirectional communication works (Engine → Consul and Consul → Engine)
+- ✅ Health checks are passing using `host.docker.internal`
+- ✅ Created diagnostic endpoints (`/api/consul/registration`) for debugging
+
+This gives us a solid foundation to build upon, as we now understand:
+- How services register and discover each other through Consul
+- How to handle Docker-to-host networking challenges
+- How to diagnose and fix health check issues
+
+### Implementation Strategy: Build Working Examples First
+
+Before diving deep into unit and integration tests, we're taking a strategic approach to build working examples that will inform our testing strategy. This "implementation-first" approach ensures we understand the real-world patterns before codifying them in tests.
+
+#### Phase 2.1: Get Test Module Running (Week 1)
+
+**Goal**: Create a simple test module that registers with Consul and can be discovered by the engine.
+
+**Tasks**:
+1. Create a minimal `test-module` with gRPC service
+   - Implement basic gRPC health check
+   - Register with Consul on startup
+   - Provide simple echo/transform capability
+2. Test module discovery from engine
+   - Engine should discover test module via Consul
+   - Verify gRPC communication works
+3. Document the module startup sequence
+   - How modules find Consul
+   - How they register themselves
+   - How they maintain health checks
+
+**Success Criteria**:
+- Test module appears in Consul UI as healthy
+- Engine can list test module in available modules
+- Basic gRPC call from engine to module succeeds
+
+#### Phase 2.2: Implement Pipeline Creation (Week 1-2)
+
+**Goal**: Create pipelines that can be deployed and configured through the engine.
+
+**Tasks**:
+1. Implement pipeline CRUD operations
+   - Create pipeline via REST API
+   - Store pipeline config in Consul
+   - Retrieve and update pipelines
+2. Add pipeline validation
+   - Ensure pipeline has required fields
+   - Validate step configurations
+   - Check module availability
+3. Implement pipeline deployment
+   - Mark pipeline as "deployed" in Consul
+   - Notify relevant modules
+   - Track deployment status
+
+**Success Criteria**:
+- Can create pipeline via REST API
+- Pipeline configuration persists in Consul
+- Pipeline validation prevents invalid configurations
+- Deployment status is trackable
+
+#### Phase 2.3: Implement Data Flow Between Steps (Week 2)
+
+**Goal**: Get two pipeline steps passing data to each other via the engine.
+
+**Tasks**:
+1. Create two simple processor modules
+   - `uppercase-module`: Converts text to uppercase
+   - `reverse-module`: Reverses text
+2. Implement data flow orchestration in engine
+   - Receive data from step 1
+   - Route data to step 2
+   - Return final result
+3. Add error handling and retries
+   - Handle module unavailability
+   - Implement retry logic
+   - Provide meaningful error messages
+
+**Success Criteria**:
+- Data flows from module A → engine → module B
+- Can chain transformations (e.g., "hello" → "HELLO" → "OLLEH")
+- Errors are properly propagated and logged
+- System remains stable under failure conditions
+
+#### Phase 2.4: Testing Strategy Refinement (Week 2-3)
+
+**Goal**: Use learnings from implementation to refine testing approach.
+
+**Tasks**:
+1. Document discovered patterns
+   - Service registration patterns
+   - Health check requirements
+   - Data flow patterns
+   - Error handling patterns
+2. Create test fixtures based on real examples
+   - Working module test containers
+   - Pipeline configuration fixtures
+   - Data flow test scenarios
+3. Update test profiles and resources
+   - Consul test resource improvements
+   - Module test containers
+   - Pipeline test utilities
+
+**Success Criteria**:
+- Clear documentation of discovered patterns
+- Reusable test fixtures and utilities
+- Updated test profiles that match reality
+
+#### Phase 2.5: Complete Unit Test Migration (Week 3)
+
+**Goal**: Fix all remaining unit tests using patterns discovered during implementation.
+
+**Current Status** (from test inventory):
+- ✅ 50 tests passing in consul module
+- ❌ 8 tests failing in rokkon-engine
+- ❌ 13 tests failing in engine/validators
+- ❌ 13 tests failing in engine/models
+- ❌ 31 tests failing in modules/*
+- ❌ 12 tests failing in rokkon-commons
+- ❌ 4 tests failing in test-utilities
+- ❌ 2 tests failing in engine/cli-register
+- ❌ 3 tests failing in engine/seed-config
+
+**Approach**:
+1. Apply NoConsulTestProfile pattern to all unit tests
+2. Mock external dependencies consistently
+3. Use discovered patterns for test data creation
+4. Ensure all tests run in < 1 second
+
+#### Phase 2.6: Implement Integration Tests (Week 3-4)
+
+**Goal**: Create comprehensive integration tests based on working examples.
+
+**Test Scenarios**:
+1. **Module Registration IT**
+   - Start Consul container
+   - Start test module container
+   - Verify registration and health checks
+   
+2. **Pipeline Deployment IT**
+   - Create pipeline via API
+   - Deploy pipeline
+   - Verify modules are notified
+   
+3. **Data Flow IT**
+   - Deploy multi-step pipeline
+   - Send data through pipeline
+   - Verify transformations
+   
+4. **Failure Recovery IT**
+   - Kill module mid-processing
+   - Verify error handling
+   - Test circuit breakers
+
+**Success Criteria**:
+- All integration tests use real containers
+- Tests are repeatable and isolated
+- Failure scenarios are properly tested
+- Tests provide confidence in production behavior
+
+### Why This Approach?
+
+1. **Real Understanding First**: By building working examples, we understand the actual patterns and challenges before encoding them in tests.
+
+2. **Informed Testing**: Our tests will be based on real, working code rather than assumptions about how things should work.
+
+3. **Documentation by Example**: The working examples serve as living documentation for how the system actually works.
+
+4. **Confidence in Patterns**: When we implement the tests, we'll be confident we're testing the right things in the right way.
+
+5. **Faster Iteration**: We can quickly experiment and adjust without being constrained by extensive test suites.
+
+### Tracking Progress
+
+We'll track progress in several ways:
+
+1. **Working Examples Checklist**:
+   - [ ] Test module registering with Consul
+   - [ ] Engine discovering test module
+   - [ ] Pipeline CRUD operations working
+   - [ ] Two modules passing data
+   - [ ] Error handling demonstrated
+
+2. **Test Migration Status**:
+   - [ ] All unit tests passing without Consul
+   - [ ] Integration test suite created
+   - [ ] E2E test scenarios implemented
+   - [ ] CI/CD pipeline updated
+
+3. **Documentation Updates**:
+   - [ ] Module development guide
+   - [ ] Pipeline configuration guide
+   - [ ] Testing best practices
+   - [ ] Troubleshooting guide
+
+### Expected Outcomes
+
+By the end of this phase, we will have:
+
+1. **Working System**: A minimal but functional pipeline system with real modules
+2. **Proven Patterns**: Documented patterns that we know work in practice
+3. **Comprehensive Tests**: Unit and integration tests based on real implementations
+4. **Developer Confidence**: Clear understanding of how to build and test Rokkon components
+5. **Solid Foundation**: Ready to scale up with more modules and complex pipelines
+
+This pragmatic approach ensures we build the right thing and test it properly, rather than building elaborate tests for code that might not work as expected.
