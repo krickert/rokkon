@@ -1,0 +1,57 @@
+# Config test specific configuration
+quarkus:
+  application:
+    name: engine-consul-config-test
+  
+  # Test profile configurations
+  test:
+    profile: test-config
+  
+  # Enable Consul config for config tests
+  consul-config:
+    enabled: true
+    agent:
+      host: ${consul.host:localhost}
+      port: ${consul.port:8500}
+    properties-value-keys:
+      - config/config-test  # Config test specific namespace
+    format: yaml
+    watch: false
+    fail-on-missing-key: false
+
+# Test consul connection with config-test namespace
+consul:
+  host: localhost
+  port: 8500
+
+# Config test specific configuration  
+rokkon:
+  engine:
+    grpc-port: 49200
+    rest-port: 8280
+    debug: false
+  
+  consul:
+    # Use config-test prefix to isolate from other tests
+    kv-prefix: "config-test"
+    cleanup:
+      enabled: true
+      interval: 5m
+      zombie-threshold: 2m
+      cleanup-stale-whitelist: true
+    health:
+      check-interval: 10s
+      deregister-after: 1m
+      timeout: 5s
+  
+  modules:
+    auto-discover: false
+    service-prefix: "config-test-module-"
+    require-whitelist: true
+    connection-timeout: 30s
+    max-instances-per-module: 10
+  
+  default-cluster:
+    name: config-test-default
+    auto-create: true
+    description: "Default cluster for config tests"

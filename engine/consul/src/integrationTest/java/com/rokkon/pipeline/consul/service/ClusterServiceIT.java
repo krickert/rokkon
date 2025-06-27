@@ -3,14 +3,14 @@ package com.rokkon.pipeline.consul.service;
 import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
 import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusIntegrationTest;
 import jakarta.inject.Inject;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-@QuarkusTest
+@QuarkusIntegrationTest
 @QuarkusTestResource(ConsulTestResource.class)
-class ClusterServiceTest extends ClusterServiceTestBase {
+class ClusterServiceIT extends ClusterServiceTestBase {
     
     @Inject
     ClusterService clusterService;

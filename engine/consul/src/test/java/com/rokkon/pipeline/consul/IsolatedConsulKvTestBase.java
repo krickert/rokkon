@@ -1,74 +1,53 @@
 package com.rokkon.pipeline.consul;
 
-import com.rokkon.pipeline.consul.test.ConsulTestResource;
-import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
-import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.ext.consul.ConsulClient;
-import io.vertx.ext.consul.ConsulClientOptions;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.jboss.logging.Logger;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration test demonstrating isolated Consul KV writes for parallel test execution.
+ * Base class for testing isolated Consul KV writes for parallel test execution.
  * Each test gets its own unique namespace in Consul KV to avoid conflicts.
  */
-@QuarkusTest
-@QuarkusTestResource(ConsulTestResource.class)
-@io.quarkus.test.junit.TestProfile(IsolatedConsulKvTest.IsolatedKvProfile.class)
-public class IsolatedConsulKvTest {
+public abstract class IsolatedConsulKvTestBase {
+    private static final Logger LOG = Logger.getLogger(IsolatedConsulKvTestBase.class);
     
-    @Inject
-    Vertx vertx;
+    protected String testNamespace;
+    protected final ConcurrentHashMap<String, Boolean> writtenKeys = new ConcurrentHashMap<>();
     
-    @ConfigProperty(name = "consul.host")
-    String consulHost;
-    
-    @ConfigProperty(name = "consul.port")
-    int consulPort;
-    
-    private ConsulClient consulClient;
-    private String testNamespace;
-    
-    // Track all keys written by this test for cleanup
-    private final ConcurrentHashMap<String, Boolean> writtenKeys = new ConcurrentHashMap<>();
+    protected abstract ConsulClient getConsulClient();
+    protected abstract boolean isRealConsul();
     
     @BeforeEach
     void setup() {
         // Create unique namespace for this test
         testNamespace = "test/" + getClass().getSimpleName() + "/" + UUID.randomUUID().toString();
-        
-        ConsulClientOptions options = new ConsulClientOptions()
-            .setHost(consulHost)
-            .setPort(consulPort);
-        consulClient = ConsulClient.create(vertx, options);
-        
-        System.out.println("Test namespace: " + testNamespace);
+        LOG.infof("Test namespace: %s", testNamespace);
     }
     
     @AfterEach
     void cleanup() {
-        // Clean up all keys written by this test
-        writtenKeys.keySet().forEach(key -> {
-            consulClient.deleteValue(key)
-                .onFailure().recoverWithNull()
-                .await().indefinitely();
-        });
+        if (isRealConsul()) {
+            // Clean up all keys written by this test
+            ConsulClient consulClient = getConsulClient();
+            writtenKeys.keySet().forEach(key -> {
+                consulClient.deleteValue(key)
+                    .onFailure().recoverWithNull()
+                    .await().indefinitely();
+            });
+        }
         writtenKeys.clear();
     }
     
     @Test
     void testIsolatedWrites() {
+        ConsulClient consulClient = getConsulClient();
         String key = testNamespace + "/config/app";
         String value = """
             application:
@@ -85,11 +64,13 @@ public class IsolatedConsulKvTest {
             .await().indefinitely();
         
         assertThat(readValue).isEqualTo(value);
-        System.out.println("✓ Isolated write/read successful in namespace: " + testNamespace);
+        LOG.infof("✓ Isolated write/read successful in namespace: %s", testNamespace);
     }
     
     @Test
     void testParallelSafeWrites() {
+        ConsulClient consulClient = getConsulClient();
+        
         // Write multiple values in our isolated namespace
         for (int i = 0; i < 5; i++) {
             String key = testNamespace + "/config/service-" + i;
@@ -107,11 +88,13 @@ public class IsolatedConsulKvTest {
             assertThat(readValue).isEqualTo("service-" + i + "-config");
         }
         
-        System.out.println("✓ Multiple isolated writes successful");
+        LOG.info("✓ Multiple isolated writes successful");
     }
     
     @Test
     void testNoInterferenceWithOtherNamespaces() {
+        ConsulClient consulClient = getConsulClient();
+        
         // Write to our namespace
         String ourKey = testNamespace + "/config/test";
         writeValue(ourKey, "our-value");
@@ -123,11 +106,13 @@ public class IsolatedConsulKvTest {
             .await().indefinitely();
         
         assertThat(otherValue).isNull();
-        System.out.println("✓ No interference with other test namespaces");
+        LOG.info("✓ No interference with other test namespaces");
     }
     
     @Test
     void testCleanupVerification() {
+        ConsulClient consulClient = getConsulClient();
+        
         // Write some test data
         String key1 = testNamespace + "/cleanup-test/key1";
         String key2 = testNamespace + "/cleanup-test/key2";
@@ -150,32 +135,13 @@ public class IsolatedConsulKvTest {
             .await().indefinitely();
         assertThat(deletedValue).isNull();
         
-        System.out.println("✓ Cleanup mechanism verified");
+        LOG.info("✓ Cleanup mechanism verified");
     }
     
-    private void writeValue(String key, String value) {
+    protected void writeValue(String key, String value) {
+        ConsulClient consulClient = getConsulClient();
         consulClient.putValue(key, value)
             .await().indefinitely();
         writtenKeys.put(key, true);
-    }
-    
-    /**
-     * Profile for isolated consul-config testing.
-     * Each test could have its own config namespace.
-     */
-    public static class IsolatedKvProfile implements QuarkusTestProfile {
-        @Override
-        public Map<String, String> getConfigOverrides() {
-            // Generate unique namespace for this test run
-            String testId = UUID.randomUUID().toString().substring(0, 8);
-            return Map.of(
-                // Each test run gets unique config paths
-                "quarkus.consul-config.properties-value-keys[0]", "config/test-" + testId + "/application",
-                "quarkus.consul-config.properties-value-keys[1]", "config/test-" + testId + "/test",
-                "quarkus.consul-config.fail-on-missing-key", "false",
-                // Disable watch for tests to avoid resource leaks
-                "quarkus.consul-config.watch", "false"
-            );
-        }
     }
 }

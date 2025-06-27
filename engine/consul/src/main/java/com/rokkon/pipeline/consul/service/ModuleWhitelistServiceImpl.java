@@ -10,18 +10,20 @@ import com.rokkon.pipeline.config.model.ModuleWhitelistResponse;
 import com.rokkon.pipeline.validation.CompositeValidator;
 import com.rokkon.pipeline.validation.ValidationResult;
 import com.rokkon.pipeline.validation.ValidationResultFactory;
+import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
+import io.smallrye.mutiny.vertx.UniHelper;
+import io.vertx.ext.consul.ConsulClient;
+import io.vertx.ext.consul.ServiceQueryOptions;
 import jakarta.enterprise.context.ApplicationScoped;
+import jakarta.ws.rs.WebApplicationException;
+import jakarta.ws.rs.core.Response;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.net.URI;
-import java.net.http.HttpClient;
-import java.net.http.HttpRequest;
-import java.net.http.HttpResponse;
 import java.time.Duration;
 import java.util.*;
 
@@ -33,7 +35,9 @@ import java.util.*;
 public class ModuleWhitelistServiceImpl implements ModuleWhitelistService {
 
     private static final Logger LOG = LoggerFactory.getLogger(ModuleWhitelistServiceImpl.class);
-    private static final String KV_PREFIX = "rokkon-clusters";
+    
+    @ConfigProperty(name = "rokkon.consul.kv-prefix", defaultValue = "rokkon")
+    String kvPrefix;
 
     @Inject
     ObjectMapper objectMapper;
@@ -47,15 +51,14 @@ public class ModuleWhitelistServiceImpl implements ModuleWhitelistService {
     @Inject
     PipelineConfigService pipelineConfigService;
 
-    @ConfigProperty(name = "consul.host", defaultValue = "localhost")
-    String consulHost;
+    @Inject
+    ConsulConnectionManager connectionManager;
 
-    @ConfigProperty(name = "consul.port", defaultValue = "8500")
-    String consulPort;
-
-    private final HttpClient httpClient = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(10))
-            .build();
+    private ConsulClient getConsulClient() {
+        return connectionManager.getClient().orElseThrow(() -> 
+            new WebApplicationException("Consul not connected", Response.Status.SERVICE_UNAVAILABLE)
+        );
+    }
 
     /**
      * Adds a module to the cluster's whitelist (PipelineModuleMap).
@@ -305,35 +308,15 @@ public class ModuleWhitelistServiceImpl implements ModuleWhitelistService {
      * Helper method that implements the retry logic for verifyModuleExistsInConsul.
      */
     private Uni<Boolean> checkModuleExistsInConsul(String grpcServiceName, int currentRetry, int maxRetries, long retryDelayMs) {
-        return Uni.createFrom().item(() -> {
-            try {
-                String url = String.format("http://%s:%s/v1/catalog/service/%s", 
-                                          consulHost, consulPort, grpcServiceName);
-
-                HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .GET()
-                    .build();
-
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-                // If we get a 200, check if the array has any services
-                if (response.statusCode() == 200) {
-                    String body = response.body();
-                    // Check if the response is an empty array "[]" or null
-                    if (body == null || body.equals("null") || body.equals("[]")) {
-                        return false;
-                    }
-                    // Parse the JSON to check if there are any services
-                    return body.trim().length() > 2; // More than just "[]"
-                }
+        return UniHelper.toUni(getConsulClient().healthServiceNodes(grpcServiceName, true))
+            .map(serviceList -> {
+                // Check if any healthy service instances exist
+                return serviceList != null && !serviceList.getList().isEmpty();
+            })
+            .onFailure().recoverWithItem(error -> {
+                LOG.warn("Failed to verify module in Consul: {}", grpcServiceName, error);
                 return false;
-            } catch (Exception e) {
-                LOG.warn("Failed to verify module in Consul: {}", grpcServiceName, e);
-                return false;
-            }
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultExecutor())
+            })
         .onItem().transformToUni(exists -> {
             if (exists || currentRetry >= maxRetries) {
                 return Uni.createFrom().item(exists);
@@ -494,54 +477,44 @@ public class ModuleWhitelistServiceImpl implements ModuleWhitelistService {
      * Loads cluster configuration from Consul.
      */
     private Uni<PipelineClusterConfig> loadClusterConfig(String clusterName) {
-        return Uni.createFrom().item(() -> {
-            try {
-                String key = String.format("%s/%s/config", KV_PREFIX, clusterName);
-                String url = String.format("http://%s:%s/v1/kv/%s?raw", consulHost, consulPort, key);
-
-                HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .GET()
-                    .build();
-
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-                if (response.statusCode() == 200) {
-                    return objectMapper.readValue(response.body(), PipelineClusterConfig.class);
+        String key = String.format("%s/clusters/%s/config", kvPrefix, clusterName);
+        
+        return UniHelper.toUni(getConsulClient().getValue(key))
+            .map(keyValue -> {
+                if (keyValue == null || keyValue.getValue() == null) {
+                    return null;
                 }
+                
+                try {
+                    return objectMapper.readValue(keyValue.getValue(), PipelineClusterConfig.class);
+                } catch (Exception e) {
+                    LOG.error("Failed to parse cluster config for {}", clusterName, e);
+                    return null;
+                }
+            })
+            .onFailure().recoverWithItem(error -> {
+                LOG.error("Failed to load cluster config from Consul", error);
                 return null;
-            } catch (Exception e) {
-                LOG.error("Failed to load cluster config", e);
-                return null;
-            }
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultExecutor());
+            });
     }
 
     /**
      * Saves cluster configuration to Consul.
      */
     private Uni<Boolean> saveClusterConfig(String clusterName, PipelineClusterConfig config) {
-        return Uni.createFrom().item(() -> {
-            try {
-                String key = String.format("%s/%s/config", KV_PREFIX, clusterName);
-                String url = String.format("http://%s:%s/v1/kv/%s", consulHost, consulPort, key);
-
-                String json = objectMapper.writeValueAsString(config);
-                HttpRequest request = HttpRequest.newBuilder()
-                    .uri(URI.create(url))
-                    .header("Content-Type", "application/json")
-                    .PUT(HttpRequest.BodyPublishers.ofString(json))
-                    .build();
-
-                HttpResponse<String> response = httpClient.send(request, HttpResponse.BodyHandlers.ofString());
-
-                return response.statusCode() == 200;
-            } catch (Exception e) {
-                LOG.error("Failed to save cluster config", e);
-                return false;
-            }
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultExecutor());
+        String key = String.format("%s/clusters/%s/config", kvPrefix, clusterName);
+        
+        try {
+            String json = objectMapper.writeValueAsString(config);
+            
+            return UniHelper.toUni(getConsulClient().putValue(key, json))
+                .onFailure().recoverWithItem(error -> {
+                    LOG.error("Failed to save cluster config to Consul", error);
+                    return false;
+                });
+        } catch (Exception e) {
+            LOG.error("Failed to serialize cluster config", e);
+            return Uni.createFrom().item(false);
+        }
     }
 }

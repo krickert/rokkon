@@ -3,7 +3,7 @@ package com.rokkon.pipeline.consul;
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
 import com.rokkon.pipeline.consul.test.NoSchedulerTestProfile;
 import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusIntegrationTest;
 import io.quarkus.test.junit.TestProfile;
 import io.vertx.ext.consul.ConsulClientOptions;
 import io.vertx.mutiny.core.Vertx;
@@ -18,11 +18,11 @@ import static org.assertj.core.api.Assertions.assertThat;
 /**
  * Test that consul-config actually loads configuration from Consul KV.
  */
-@QuarkusTest
+@QuarkusIntegrationTest
 @QuarkusTestResource(ConsulTestResource.class)
 @TestProfile(NoSchedulerTestProfile.class)
-public class ConsulConfigLoadingTest {
-    private static final Logger LOG = Logger.getLogger(ConsulConfigLoadingTest.class);
+public class ConsulConfigLoadingIT {
+    private static final Logger LOG = Logger.getLogger(ConsulConfigLoadingIT.class);
     
     @Inject
     Vertx vertx;

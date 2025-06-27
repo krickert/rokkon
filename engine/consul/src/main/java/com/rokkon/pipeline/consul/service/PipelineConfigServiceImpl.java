@@ -30,7 +30,9 @@ import java.util.*;
 public class PipelineConfigServiceImpl implements PipelineConfigService {
 
     private static final Logger LOG = LoggerFactory.getLogger(PipelineConfigServiceImpl.class);
-    private static final String KV_PREFIX = "rokkon-clusters";
+    
+    @ConfigProperty(name = "rokkon.consul.kv-prefix", defaultValue = "rokkon")
+    String kvPrefix;
 
     @Inject
     ObjectMapper objectMapper;
@@ -277,11 +279,11 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
     }
 
     private String buildPipelineKey(String clusterName, String pipelineId) {
-        return KV_PREFIX + "/" + clusterName + "/pipelines/" + pipelineId + "/config";
+        return kvPrefix + "/clusters/" + clusterName + "/pipelines/" + pipelineId + "/config";
     }
 
     private String buildClusterPrefix(String clusterName) {
-        return KV_PREFIX + "/" + clusterName + "/";
+        return kvPrefix + "/clusters/" + clusterName + "/";
     }
 
     private String extractPipelineIdFromKey(String key) {

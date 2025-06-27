@@ -170,7 +170,6 @@ public abstract class PipelineConfigServiceTestBase {
 
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testCreateCluster() throws Exception {
         // TODO: Start simple - create cluster first
         // This should be a service call to create/register a cluster
@@ -187,7 +186,6 @@ public abstract class PipelineConfigServiceTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testCreateSimplePipeline() throws Exception {
         // Create a minimal valid pipeline that meets validator requirements
         LOG.info("Starting simple pipeline creation test");
@@ -233,7 +231,6 @@ public abstract class PipelineConfigServiceTestBase {
     }
 
     @Test  
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testCreatePipelineWithConsul() throws Exception {
         // Create a minimal valid pipeline config that meets all validator requirements
         // 1. Must have INITIAL_PIPELINE step
@@ -331,7 +328,6 @@ public abstract class PipelineConfigServiceTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testUpdatePipeline() throws Exception {
         // First create a pipeline
         testCreatePipelineWithConsul();
@@ -416,7 +412,6 @@ public abstract class PipelineConfigServiceTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testDeletePipeline() throws Exception {
         // First create a pipeline
         testCreatePipelineWithConsul();
@@ -434,7 +429,6 @@ public abstract class PipelineConfigServiceTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testListPipelines() throws Exception {
         // Create multiple pipelines
         for (int i = 1; i <= 3; i++) {
@@ -506,7 +500,6 @@ public abstract class PipelineConfigServiceTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testConcurrentPipelineCreation() {
         int numAttempts = 10;
         AtomicInteger successCount = new AtomicInteger(0);
@@ -605,7 +598,6 @@ public abstract class PipelineConfigServiceTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testConcurrentPipelineUpdates() {
         // First create a pipeline
         PipelineStepConfig.ProcessorInfo sourceProcessor = new PipelineStepConfig.ProcessorInfo(

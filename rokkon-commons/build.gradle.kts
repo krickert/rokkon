@@ -27,6 +27,9 @@ dependencies {
     // Additional dependencies needed by this module
     implementation("io.quarkus:quarkus-jackson")
     implementation("io.quarkus:quarkus-config-yaml")
+    implementation("io.quarkus:quarkus-hibernate-validator")
+    implementation("io.quarkus:quarkus-smallrye-openapi")
+    implementation("io.swagger.core.v3:swagger-annotations:2.2.21")
 
     // gRPC health checking - using version from gradle.properties
     implementation("io.grpc:grpc-services:${grpcVersion}")

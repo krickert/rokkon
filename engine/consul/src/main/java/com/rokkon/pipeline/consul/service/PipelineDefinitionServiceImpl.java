@@ -19,6 +19,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,8 +34,10 @@ import java.util.stream.Collectors;
 public class PipelineDefinitionServiceImpl implements PipelineDefinitionService {
     
     private static final Logger LOG = LoggerFactory.getLogger(PipelineDefinitionServiceImpl.class);
-    private static final String PIPELINE_DEFINITIONS_PREFIX = "pipelines/definitions/";
     private static final String PIPELINE_METADATA_SUFFIX = "/metadata";
+    
+    @ConfigProperty(name = "rokkon.consul.kv-prefix", defaultValue = "rokkon")
+    String kvPrefix;
     
     @Inject
     ConsulConnectionManager connectionManager;
@@ -57,7 +60,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     
     @Override
     public Uni<List<PipelineDefinitionSummary>> listDefinitions() {
-        return UniHelper.toUni(getConsulClient().getKeys(PIPELINE_DEFINITIONS_PREFIX))
+        return UniHelper.toUni(getConsulClient().getKeys(kvPrefix + "/pipelines/definitions/"))
             .flatMap(keys -> {
                 
                 if (keys == null || keys.isEmpty()) {
@@ -67,7 +70,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                 // Filter out metadata keys and get unique pipeline IDs
                 Set<String> pipelineIds = keys.stream()
                     .filter(key -> !key.endsWith(PIPELINE_METADATA_SUFFIX))
-                    .map(key -> key.substring(PIPELINE_DEFINITIONS_PREFIX.length()))
+                    .map(key -> key.substring((kvPrefix + "/pipelines/definitions/").length()))
                     .filter(id -> !id.contains("/"))  // Skip nested keys
                     .collect(Collectors.toSet());
                 
@@ -116,7 +119,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     }
     
     private Uni<Map<String, String>> getMetadata(String pipelineId) {
-        String key = PIPELINE_DEFINITIONS_PREFIX + pipelineId + PIPELINE_METADATA_SUFFIX;
+        String key = kvPrefix + "/pipelines/definitions/" + pipelineId + PIPELINE_METADATA_SUFFIX;
         return UniHelper.toUni(getConsulClient().getValue(key))
             .map(keyValue -> {
                 if (keyValue != null && keyValue.getValue() != null) {
@@ -138,7 +141,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     
     @Override
     public Uni<PipelineConfig> getDefinition(String pipelineId) {
-        String key = PIPELINE_DEFINITIONS_PREFIX + pipelineId;
+        String key = kvPrefix + "/pipelines/definitions/" + pipelineId;
         return UniHelper.toUni(getConsulClient().getValue(key))
             .map(keyValue -> {
                 if (keyValue != null && keyValue.getValue() != null) {
@@ -172,7 +175,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                 try {
                     // Store in Consul
                     String json = objectMapper.writeValueAsString(definition);
-                    String key = PIPELINE_DEFINITIONS_PREFIX + pipelineId;
+                    String key = kvPrefix + "/pipelines/definitions/" + pipelineId;
                     
                     return UniHelper.toUni(getConsulClient().putValue(key, json))
                         .flatMap(success -> {
@@ -187,7 +190,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                             metadata.put("createdBy", "system"); // TODO: Add user context
                             
                             try {
-                                String metadataKey = PIPELINE_DEFINITIONS_PREFIX + pipelineId + PIPELINE_METADATA_SUFFIX;
+                                String metadataKey = kvPrefix + "/pipelines/definitions/" + pipelineId + PIPELINE_METADATA_SUFFIX;
                                 String metadataJson = objectMapper.writeValueAsString(metadata);
                                 
                                 return UniHelper.toUni(getConsulClient().putValue(metadataKey, metadataJson))
@@ -230,7 +233,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                 try {
                     // Update in Consul
                     String json = objectMapper.writeValueAsString(definition);
-                    String key = PIPELINE_DEFINITIONS_PREFIX + pipelineId;
+                    String key = kvPrefix + "/pipelines/definitions/" + pipelineId;
                     
                     return UniHelper.toUni(getConsulClient().putValue(key, json))
                         .flatMap(success -> {
@@ -244,7 +247,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                             metadata.put("modifiedBy", "system"); // TODO: Add user context
                             
                             try {
-                                String metadataKey = PIPELINE_DEFINITIONS_PREFIX + pipelineId + PIPELINE_METADATA_SUFFIX;
+                                String metadataKey = kvPrefix + "/pipelines/definitions/" + pipelineId + PIPELINE_METADATA_SUFFIX;
                                 String metadataJson = objectMapper.writeValueAsString(metadata);
                                 
                                 return UniHelper.toUni(getConsulClient().putValue(metadataKey, metadataJson))
@@ -286,8 +289,8 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                         }
                         
                         // Delete from Consul
-                        String key = PIPELINE_DEFINITIONS_PREFIX + pipelineId;
-                        String metadataKey = PIPELINE_DEFINITIONS_PREFIX + pipelineId + PIPELINE_METADATA_SUFFIX;
+                        String key = kvPrefix + "/pipelines/definitions/" + pipelineId;
+                        String metadataKey = kvPrefix + "/pipelines/definitions/" + pipelineId + PIPELINE_METADATA_SUFFIX;
                         
                         return UniHelper.toUni(getConsulClient().deleteValue(key))
                             .flatMap(success -> UniHelper.toUni(getConsulClient().deleteValue(metadataKey)))
@@ -301,7 +304,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     
     @Override
     public Uni<Boolean> definitionExists(String pipelineId) {
-        String key = PIPELINE_DEFINITIONS_PREFIX + pipelineId;
+        String key = kvPrefix + "/pipelines/definitions/" + pipelineId;
         return UniHelper.toUni(getConsulClient().getValue(key))
             .map(keyValue -> keyValue != null && keyValue.getValue() != null);
     }

@@ -13,6 +13,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.time.Instant;
@@ -25,7 +26,9 @@ import java.util.Set;
 @ApplicationScoped
 public class ClusterServiceImpl implements ClusterService {
     private static final Logger LOG = Logger.getLogger(ClusterServiceImpl.class);
-    private static final String CLUSTERS_PREFIX = "rokkon-clusters";
+    
+    @ConfigProperty(name = "rokkon.consul.kv-prefix", defaultValue = "rokkon")
+    String kvPrefix;
 
     @Inject
     ConsulConnectionManager connectionManager;
@@ -122,7 +125,7 @@ public class ClusterServiceImpl implements ClusterService {
     }
 
     public Uni<List<Cluster>> listClusters() {
-        return UniHelper.toUni(getConsulClient().getKeys(CLUSTERS_PREFIX))
+        return UniHelper.toUni(getConsulClient().getKeys(kvPrefix + "/clusters"))
             .onItem().transformToUni(keys -> {
                 if (keys == null || keys.isEmpty()) {
                     return Uni.createFrom().item(new ArrayList<Cluster>());
@@ -205,7 +208,7 @@ public class ClusterServiceImpl implements ClusterService {
     }
 
     private String buildClusterKey(String clusterName) {
-        return CLUSTERS_PREFIX + "/" + clusterName;
+        return kvPrefix + "/clusters/" + clusterName;
     }
 
     private Uni<ValidationResult> createInitialClusterConfig(String clusterName) {

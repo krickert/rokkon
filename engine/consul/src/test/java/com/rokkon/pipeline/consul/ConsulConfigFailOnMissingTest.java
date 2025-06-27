@@ -1,7 +1,11 @@
 package com.rokkon.pipeline.consul;
 
+import com.rokkon.pipeline.consul.test.UnifiedTestProfile;
+
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import org.jboss.logging.Logger;
 import org.junit.jupiter.api.Test;
 
 import java.util.Map;
@@ -14,8 +18,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * so we need to handle this differently.
  */
 @QuarkusTest
-@io.quarkus.test.junit.TestProfile(ConsulConfigFailOnMissingTest.FailOnMissingProfile.class)
+@TestProfile(UnifiedTestProfile.class)
 public class ConsulConfigFailOnMissingTest {
+    private static final Logger LOG = Logger.getLogger(ConsulConfigFailOnMissingTest.class);
     
     @Test
     void testApplicationStartsWhenConfigured() {
@@ -23,7 +28,7 @@ public class ConsulConfigFailOnMissingTest {
         // which means either:
         // 1. The required config key exists in Consul, or
         // 2. fail-on-missing-key is false
-        System.out.println("✓ Application started successfully with current consul-config settings");
+        LOG.info("✓ Application started successfully with current consul-config settings");
         assertThat(true).isTrue(); // Just to have an assertion
     }
     
@@ -35,6 +40,10 @@ public class ConsulConfigFailOnMissingTest {
         @Override
         public Map<String, String> getConfigOverrides() {
             return Map.of(
+                // Disable Consul for this test
+                "quarkus.consul-config.enabled", "false",
+                "quarkus.consul.enabled", "false",
+                
                 // Set to check a key that we'll create in another test
                 "quarkus.consul-config.properties-value-keys[0]", "config/application",
                 "quarkus.consul-config.properties-value-keys[1]", "config/test",

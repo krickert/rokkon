@@ -1,52 +1,27 @@
 package com.rokkon.pipeline.consul;
 
-import com.rokkon.pipeline.consul.test.ConsulTestResource;
-import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
-import io.quarkus.test.junit.QuarkusTestProfile;
-import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.ext.consul.ConsulClient;
-import io.vertx.ext.consul.ConsulClientOptions;
-import jakarta.inject.Inject;
-import org.eclipse.microprofile.config.inject.ConfigProperty;
-import org.junit.jupiter.api.BeforeEach;
+import org.jboss.logging.Logger;
 import org.junit.jupiter.api.Test;
 
-import java.util.Map;
-
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.junit.jupiter.api.Assertions.assertThrows;
 
 /**
- * Test both success and failure cases for consul-config.
- * This test uses different profiles to test different behaviors.
+ * Base class for testing Consul configuration operations.
+ * Provides common test logic for both unit and integration tests.
  */
-@QuarkusTest
-@QuarkusTestResource(ConsulTestResource.class)
-@io.quarkus.test.junit.TestProfile(ConsulConfigSuccessFailTest.SuccessProfile.class)
-public class ConsulConfigSuccessFailTest {
+public abstract class ConsulConfigSuccessFailTestBase {
+    private static final Logger LOG = Logger.getLogger(ConsulConfigSuccessFailTestBase.class);
     
-    @Inject
-    Vertx vertx;
-    
-    @ConfigProperty(name = "consul.host")
-    String consulHost;
-    
-    @ConfigProperty(name = "consul.port")
-    int consulPort;
-    
-    private ConsulClient consulClient;
-    
-    @BeforeEach
-    void setup() {
-        ConsulClientOptions options = new ConsulClientOptions()
-            .setHost(consulHost)
-            .setPort(consulPort);
-        consulClient = ConsulClient.create(vertx, options);
-    }
+    protected abstract ConsulClient getConsulClient();
+    protected abstract boolean isRealConsul();
     
     @Test
     void testSuccessWhenConfigExists() {
+        // This test can work with both real and mock Consul
+        
+        ConsulClient consulClient = getConsulClient();
+        
         // First, put configuration in Consul
         String yamlConfig = """
             rokkon:
@@ -65,22 +40,29 @@ public class ConsulConfigSuccessFailTest {
             .await().indefinitely();
         
         assertThat(readValue).isEqualTo(yamlConfig);
-        System.out.println("✓ Configuration successfully stored in Consul KV at config/test-success");
+        LOG.info("✓ Configuration successfully stored in Consul KV at config/test-success");
     }
     
     @Test
     void testConfigNotFoundBehavior() {
+        // This test can work with both real and mock Consul
+        
+        ConsulClient consulClient = getConsulClient();
+        
         // Try to read a key that doesn't exist
         String nonExistentValue = consulClient.getValue("config/non-existent")
             .map(kv -> kv != null ? kv.getValue() : null)
             .await().indefinitely();
         
         assertThat(nonExistentValue).isNull();
-        System.out.println("✓ Non-existent key returns null as expected");
+        LOG.info("✓ Non-existent key returns null as expected");
     }
     
     @Test
     void testUpdateExistingConfig() {
+        // This test can work with both real and mock Consul
+        
+        ConsulClient consulClient = getConsulClient();
         String key = "config/test-update";
         
         // Put initial value
@@ -106,11 +88,14 @@ public class ConsulConfigSuccessFailTest {
             .await().indefinitely();
         
         assertThat(readValue).isEqualTo(updatedConfig);
-        System.out.println("✓ Configuration update successful");
+        LOG.info("✓ Configuration update successful");
     }
     
     @Test
     void testDeleteConfig() {
+        // This test can work with both real and mock Consul
+        
+        ConsulClient consulClient = getConsulClient();
         String key = "config/test-delete";
         
         // Put value
@@ -132,19 +117,6 @@ public class ConsulConfigSuccessFailTest {
             .await().indefinitely();
         assertThat(deletedValue).isNull();
         
-        System.out.println("✓ Configuration deletion successful");
-    }
-    
-    /**
-     * Test profile that configures consul-config to look for test-specific keys.
-     */
-    public static class SuccessProfile implements QuarkusTestProfile {
-        @Override
-        public Map<String, String> getConfigOverrides() {
-            return Map.of(
-                "quarkus.consul-config.properties-value-keys[0]", "config/test-success",
-                "quarkus.consul-config.fail-on-missing-key", "false"
-            );
-        }
+        LOG.info("✓ Configuration deletion successful");
     }
 }

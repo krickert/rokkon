@@ -657,7 +657,7 @@ When refactoring tests:
    - [ ] Does it need real infrastructure? → Integration test
 
 2. **Check for Context Issues**:
-   - [ ] SmallRyeContextManager errors? → Move to integration test
+   - [ ] SmallRyeContextManager errors? → Ensure we can't mock the dependency causing the issue. If this is a test geared toward consul-soecific functionality or docker container functionality then it should go into an integration test. 
    - [ ] Complex async operations? → Consider integration test
    - [ ] Can be simplified with mocks? → Keep as unit test
 
@@ -673,6 +673,186 @@ When refactoring tests:
    - [ ] Unit tests in `src/test/java`
    - [ ] Integration tests in `src/integrationTest/java`
    - [ ] Keep `@Disabled` annotation with explanation for WIP tests
+
+## Quarkus-Specific Testing Guidelines
+
+Based on Quarkus testing best practices, we follow these conventions:
+
+### 1. Test Separation
+
+#### Unit Tests (@QuarkusTest)
+- **Location**: `src/test/java`
+- **Execution**: Maven Surefire plugin during `test` phase
+- **Purpose**: Test with mocked dependencies, fast feedback
+- **Example**:
+```java
+@QuarkusTest
+@TestProfile(NoConsulTestProfile.class)
+class ServiceUnitTest extends ServiceTestBase {
+    @InjectMock
+    ExternalService mockService;
+}
+```
+
+#### Integration Tests (@QuarkusIntegrationTest)
+- **Location**: `src/integrationTest/java`
+- **Execution**: Maven Failsafe plugin during `integration-test` phase
+- **Naming**: Must end with `IT` (e.g., `ServiceIT.java`)
+- **Purpose**: Test with real infrastructure via Testcontainers
+- **Example**:
+```java
+@QuarkusIntegrationTest
+@QuarkusTestResource(ConsulTestResource.class)
+class ServiceIT extends ServiceTestBase {
+    @Inject
+    ExternalService realService;
+}
+```
+
+### 2. Gradle Configuration
+
+Quarkus automatically configures the `integrationTest` source set when using the Quarkus Gradle plugin. No manual configuration is needed!
+
+**Integration tests are run with**:
+```bash
+# Run only integration tests
+./gradlew integrationTest
+
+# Run all tests (unit + integration)
+./gradlew test integrationTest
+
+# Or use Quarkus-specific task
+./gradlew quarkusIntTest
+```
+
+**The Quarkus plugin automatically**:
+- Creates the `src/integrationTest/java` source set
+- Configures proper classpaths
+- Sets up the `integrationTest` and `quarkusIntTest` tasks
+- Ensures integration tests run after the application is built
+
+### 3. Test Resources and Lifecycle
+
+#### QuarkusTestResource
+- Use `@QuarkusTestResource` for managing external services
+- Implement `QuarkusTestResourceLifecycleManager` for custom resources
+- Keep resources simple - only lifecycle management
+- Example:
+```java
+public class ConsulTestResource implements QuarkusTestResourceLifecycleManager {
+    private ConsulContainer consul;
+    
+    @Override
+    public Map<String, String> start() {
+        consul = new ConsulContainer("consul:latest");
+        consul.start();
+        return Map.of(
+            "quarkus.consul.host", consul.getHost(),
+            "quarkus.consul.port", String.valueOf(consul.getMappedPort(8500))
+        );
+    }
+    
+    @Override
+    public void stop() {
+        if (consul != null) consul.stop();
+    }
+}
+```
+
+### 4. Mocking with Quarkus
+
+#### @InjectMock (Preferred)
+- Requires `quarkus-junit5-mockito` dependency
+- Creates Mockito mocks automatically
+- Scoped to test class
+- Example:
+```java
+@QuarkusTest
+class ServiceTest {
+    @InjectMock
+    ExternalService externalService;
+    
+    @Test
+    void testWithMock() {
+        when(externalService.getData()).thenReturn("mocked");
+        // test logic
+    }
+}
+```
+
+#### CDI @Alternative
+- Place in `src/test/java`
+- Use `@Mock` stereotype (includes `@Alternative`, `@Priority(1)`, `@Dependent`)
+- Global for all tests
+
+### 5. Test Profiles Best Practices
+
+#### Profile Implementation
+```java
+public class NoConsulTestProfile implements QuarkusTestProfile {
+    @Override
+    public Map<String, String> getConfigOverrides() {
+        return Map.of(
+            "quarkus.consul-config.enabled", "false",
+            "quarkus.consul.enabled", "false",
+            "test.validators.mode", "empty"
+        );
+    }
+    
+    @Override
+    public String getConfigProfile() {
+        return "test-no-consul";
+    }
+}
+```
+
+#### Common Test Profiles in Rokkon
+1. **NoConsulTestProfile**: Disables Consul for unit tests
+2. **WithConsulTestProfile**: Enables Consul for integration tests
+3. **RealValidatorsTestProfile**: Uses real validators without Consul
+4. **MockValidatorsTestProfile**: Uses mock validators
+5. **EmptyValidatorsTestProfile**: No validation (fastest)
+
+### 6. Test Execution Order
+
+Quarkus uses `QuarkusTestProfileAwareClassOrderer` to minimize restarts:
+- Tests with same profile run together
+- Profile changes trigger application restart
+- Configure via `quarkus.test.class-orderer` property
+
+### 7. Dev Services Integration
+
+For integration tests, Quarkus Dev Services can automatically start containers:
+- Consul: `quarkus.consul.devservices.enabled=true`
+- Kafka: `quarkus.kafka.devservices.enabled=true`
+- Database: Various DB-specific dev services
+
+Access auto-configured properties:
+```java
+@QuarkusIntegrationTest
+class ServiceIT {
+    @Inject
+    DevServicesContext devServicesContext;
+    
+    @Test
+    void testWithDevServices() {
+        String consulUrl = devServicesContext.devServicesProperties()
+            .get("quarkus.consul.host");
+    }
+}
+```
+
+### 8. Continuous Testing in Dev Mode
+
+Run tests continuously during development:
+```bash
+./gradlew quarkusDev
+```
+
+Configure test execution:
+- `quarkus.test.continuous-testing=enabled`
+- `quarkus.test.include-tags=fast`
+- `quarkus.test.exclude-tags=slow`
 
 ### Test Execution Performance Improvements
 
@@ -777,6 +957,162 @@ new Cluster("test", null); // Compilation error!
 Cluster.emptyCluster("test"); // Works perfectly
 ```
 
+### Additional Patterns and Lessons from Test Migration
+
+#### MockConsulClient Pattern
+
+When testing Consul-dependent services without real Consul, we created a mock implementation of the Vertx Mutiny ConsulClient:
+
+```java
+public class MockConsulClient extends ConsulClient {
+    private final Map<String, String> kvStore = new HashMap<>();
+    
+    public MockConsulClient() {
+        super(null); // No delegate needed for mock
+    }
+    
+    @Override
+    public Uni<Boolean> putValue(String key, String value) {
+        kvStore.put(key, value);
+        return Uni.createFrom().item(true);
+    }
+    
+    @Override
+    public Uni<KeyValue> getValue(String key) {
+        String value = kvStore.get(key);
+        if (value == null) {
+            return Uni.createFrom().nullItem();
+        }
+        
+        // Return mock KeyValue using non-mutiny class
+        KeyValue kv = new KeyValue() {
+            @Override
+            public String getKey() { return key; }
+            @Override
+            public String getValue() { return value; }
+            // ... other required methods
+        };
+        
+        return Uni.createFrom().item(kv);
+    }
+}
+```
+
+**Key Learning**: The Vertx Mutiny ConsulClient returns non-mutiny `KeyValue` objects wrapped in Mutiny `Uni`. This is important to remember when mocking.
+
+#### State-Based Mocking for Complex Test Scenarios
+
+For complex test scenarios like the MethodicalBuildUpTest, we needed mocks that could change behavior based on test progression:
+
+```java
+@QuarkusTest
+class MethodicalBuildUpUnitTest extends MethodicalBuildUpTestBase {
+    
+    // Track state for mocking
+    private boolean pipelineHasStep = false;
+    
+    @BeforeEach
+    void setupMocks() {
+        // Reset state
+        pipelineHasStep = false;
+        
+        // Mock that changes behavior based on state
+        when(testSeedingService.seedStep5_FirstPipelineStepAdded())
+            .thenAnswer(invocation -> {
+                pipelineHasStep = true;
+                return Uni.createFrom().item(true);
+            });
+            
+        when(pipelineConfigService.getPipeline(anyString(), anyString()))
+            .thenAnswer(invocation -> {
+                if (pipelineHasStep) {
+                    // Return pipeline with step after seedStep5
+                    PipelineStepConfig step = createTestStep();
+                    return Uni.createFrom().item(Optional.of(
+                        new PipelineConfig("test-pipeline", Map.of("test-step-1", step))
+                    ));
+                } else {
+                    // Return empty pipeline before seedStep5
+                    return Uni.createFrom().item(Optional.of(
+                        new PipelineConfig("test-pipeline", Map.of())
+                    ));
+                }
+            });
+    }
+}
+```
+
+#### Working with Nested Classes in Mocks
+
+When creating mock data for complex models with nested classes (like `PipelineStepConfig.ProcessorInfo`), use the fully qualified class name:
+
+```java
+// ProcessorInfo is an inner class of PipelineStepConfig
+PipelineStepConfig.ProcessorInfo processorInfo = new PipelineStepConfig.ProcessorInfo(
+    "test-module",  // grpcServiceName
+    null            // internalProcessorBeanName
+);
+```
+
+#### Alternative Mock Services with CDI
+
+For services that are difficult to mock with Mockito (like ClusterService interface implementations), we created alternative CDI beans:
+
+```java
+@Alternative
+@ApplicationScoped
+public class MockClusterService implements ClusterService {
+    private final Map<String, ClusterMetadata> clusters = new ConcurrentHashMap<>();
+    
+    @Override
+    public Uni<ValidationResult> createCluster(String clusterName) {
+        if (clusterName == null || clusterName.trim().isEmpty()) {
+            return Uni.createFrom().item(
+                ValidationResultFactory.failure("Cluster name cannot be empty")
+            );
+        }
+        
+        if (clusters.containsKey(clusterName)) {
+            return Uni.createFrom().item(
+                ValidationResultFactory.failure("Cluster '" + clusterName + "' already exists")
+            );
+        }
+        
+        ClusterMetadata metadata = new ClusterMetadata(
+            clusterName,
+            Instant.now(),
+            null,
+            Map.of("status", "active", "created", Instant.now().toString())
+        );
+        
+        clusters.put(clusterName, metadata);
+        return Uni.createFrom().item(ValidationResultFactory.success());
+    }
+}
+```
+
+Then enable it in a test profile:
+
+```java
+public class MockClusterServiceProfile implements QuarkusTestProfile {
+    @Override
+    public Set<Class<?>> getEnabledAlternatives() {
+        return Set.of(MockClusterService.class);
+    }
+}
+```
+
+#### Test Migration Progress Tracking
+
+We created TEST_INVENTORY.md to track migration progress with clear status indicators:
+- ✅ Migrated to base/unit/integration pattern
+- 🔧 In progress
+- ❌ Not yet migrated
+- 🚫 Disabled/needs fixing
+- ⚠️ May need new test profile
+
+This helped manage the large-scale migration of 172 tests across the project.
+
 ### Summary
 
 The testing strategy has evolved from a monolithic approach where all tests required full infrastructure to a layered approach where:
@@ -792,6 +1128,16 @@ This aligns with the testing pyramid principle and provides:
 - Clear separation of concerns
 
 The key insight was recognizing that circular dependencies and tight coupling were "the center of why a lot of our tests were so hard to create and take so long." By breaking these dependencies and creating proper abstractions, we've made the codebase significantly more testable and maintainable.
+
+**Performance Improvements from Migration**:
+- BasicConsulConnectionUnitTest: 0.208s (was 30+ seconds)
+- ConsulConfigSuccessFailUnitTest: 0.112s (4 tests)
+- IsolatedConsulKvUnitTest: 0.117s (4 tests)
+- ParallelConsulKvUnitTest: 0.140s (5 tests)
+- ClusterServiceUnitTest: 0.119s (6 tests)
+- MethodicalBuildUpUnitTest: 3.239s (7 complex tests)
+
+All unit tests now run without Consul, providing reliable and fast feedback during development.
 
 ### Module Organization Rules
 

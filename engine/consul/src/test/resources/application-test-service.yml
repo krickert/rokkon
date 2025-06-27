@@ -1,0 +1,57 @@
+# Service test specific configuration
+quarkus:
+  application:
+    name: engine-consul-service-test
+  
+  # Test profile configurations
+  test:
+    profile: test-service
+  
+  # Enable Consul for service tests
+  consul-config:
+    enabled: true
+    agent:
+      host: ${consul.host:localhost}
+      port: ${consul.port:8500}
+    properties-value-keys:
+      - config/service-test  # Service test specific namespace
+    format: yaml
+    watch: false
+    fail-on-missing-key: false
+
+# Test consul connection with service-test namespace
+consul:
+  host: localhost
+  port: 8500
+
+# Service test specific configuration  
+rokkon:
+  engine:
+    grpc-port: 49100
+    rest-port: 8180
+    debug: false
+  
+  consul:
+    # Use service-test prefix to isolate from other tests
+    kv-prefix: "service-test"
+    cleanup:
+      enabled: true
+      interval: 5m
+      zombie-threshold: 2m
+      cleanup-stale-whitelist: true
+    health:
+      check-interval: 10s
+      deregister-after: 1m
+      timeout: 5s
+  
+  modules:
+    auto-discover: false
+    service-prefix: "service-test-module-"
+    require-whitelist: true
+    connection-timeout: 30s
+    max-instances-per-module: 10
+  
+  default-cluster:
+    name: service-test-default
+    auto-create: true
+    description: "Default cluster for service tests"

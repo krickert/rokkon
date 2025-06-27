@@ -22,6 +22,7 @@ import jakarta.enterprise.event.Observes;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
 
 import java.util.List;
@@ -45,8 +46,9 @@ import io.quarkus.scheduler.Scheduled;
 public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryService {
     
     private static final Logger LOG = Logger.getLogger(GlobalModuleRegistryServiceImpl.class);
-    private static final String MODULE_KV_PREFIX = "rokkon/modules/registered/";
-    private static final String ARCHIVE_PREFIX = "rokkon/archive";
+    
+    @ConfigProperty(name = "rokkon.consul.kv-prefix", defaultValue = "rokkon")
+    String kvPrefix;
     
     @Inject
     ConsulConnectionManager connectionManager;
@@ -427,7 +429,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
         )
         .onItem().transformToUni(v -> {
             // Then remove from KV store
-            String kvKey = MODULE_KV_PREFIX + moduleId;
+            String kvKey = kvPrefix + "/modules/registered/" + moduleId;
             return Uni.createFrom().completionStage(
                 client.deleteValue(kvKey).toCompletionStage()
             );
@@ -516,7 +518,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
         String moduleId = service.getId();
         
         // First, try to get the enabled state from KV store
-        String kvKey = MODULE_KV_PREFIX + moduleId;
+        String kvKey = kvPrefix + "/modules/registered/" + moduleId;
         
         return Uni.createFrom().completionStage(
             client.getValue(kvKey).toCompletionStage()
@@ -571,7 +573,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
     
     private Uni<Void> storeModuleMetadata(ModuleRegistration registration) {
         ConsulClient client = getConsulClient();
-        String kvKey = MODULE_KV_PREFIX + registration.moduleId();
+        String kvKey = kvPrefix + "/modules/registered/" + registration.moduleId();
         
         // Convert registration to JSON (simplified for now)
         String jsonValue = String.format("""
@@ -703,7 +705,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
             
             // Store in archive namespace
             String archiveKey = String.format("%s/services/%s-%s", 
-                ARCHIVE_PREFIX, serviceName, timestamp.replace(":", "-").replace(".", "-"));
+                kvPrefix + "/archive", serviceName, timestamp.replace(":", "-").replace(".", "-"));
             
             return Uni.createFrom().completionStage(
                 client.putValue(archiveKey, archiveJson).toCompletionStage()
@@ -756,7 +758,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
         );
         
         String archiveKey = String.format("%s/services/%s-%s", 
-            ARCHIVE_PREFIX, serviceName, timestamp.replace(":", "-").replace(".", "-"));
+            kvPrefix + "/archive", serviceName, timestamp.replace(":", "-").replace(".", "-"));
         
         return Uni.createFrom().completionStage(
             client.putValue(archiveKey, archiveJson).toCompletionStage()
@@ -1005,7 +1007,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
                         .map(module -> {
                             LOG.infof("Removing stale whitelist entry: %s (%s)", 
                                      module.moduleId(), module.moduleName());
-                            String kvKey = MODULE_KV_PREFIX + module.moduleId();
+                            String kvKey = kvPrefix + "/modules/registered/" + module.moduleId();
                             return Uni.createFrom().completionStage(
                                 client.deleteValue(kvKey).toCompletionStage()
                             )

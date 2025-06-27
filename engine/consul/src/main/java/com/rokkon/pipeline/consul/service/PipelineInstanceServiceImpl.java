@@ -19,6 +19,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -33,7 +34,9 @@ import java.util.stream.Collectors;
 public class PipelineInstanceServiceImpl implements PipelineInstanceService {
     
     private static final Logger LOG = LoggerFactory.getLogger(PipelineInstanceServiceImpl.class);
-    private static final String PIPELINE_INSTANCES_PREFIX = "pipelines/instances/";
+    
+    @ConfigProperty(name = "rokkon.consul.kv-prefix", defaultValue = "rokkon")
+    String kvPrefix;
     
     @Inject
     ConsulConnectionManager connectionManager;
@@ -52,7 +55,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
     
     @Override
     public Uni<List<PipelineInstance>> listInstances(String clusterName) {
-        String prefix = PIPELINE_INSTANCES_PREFIX + clusterName + "/";
+        String prefix = kvPrefix + "/pipelines/instances/" + clusterName + "/";
         return UniHelper.toUni(getConsulClient().getKeys(prefix))
             .map(keys -> {
                 
@@ -82,7 +85,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
     
     @Override
     public Uni<PipelineInstance> getInstance(String clusterName, String instanceId) {
-        String key = PIPELINE_INSTANCES_PREFIX + clusterName + "/" + instanceId;
+        String key = kvPrefix + "/pipelines/instances/" + clusterName + "/" + instanceId;
         return UniHelper.toUni(getConsulClient().getValue(key))
             .map(keyValue -> {
                 if (keyValue != null && keyValue.getValue() != null) {
@@ -144,7 +147,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
                 
                 try {
                     // Store in Consul
-                    String key = PIPELINE_INSTANCES_PREFIX + clusterName + "/" + request.instanceId();
+                    String key = kvPrefix + "/pipelines/instances/" + clusterName + "/" + request.instanceId();
                     String json = objectMapper.writeValueAsString(instance);
                     
                     return UniHelper.toUni(getConsulClient().putValue(key, json))
@@ -195,7 +198,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
                 
                 try {
                     // Store in Consul
-                    String key = PIPELINE_INSTANCES_PREFIX + clusterName + "/" + instanceId;
+                    String key = kvPrefix + "/pipelines/instances/" + clusterName + "/" + instanceId;
                     String json = objectMapper.writeValueAsString(updated);
                     
                     return UniHelper.toUni(getConsulClient().putValue(key, json))
@@ -231,7 +234,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
                 }
                 
                 // Delete from Consul
-                String key = PIPELINE_INSTANCES_PREFIX + clusterName + "/" + instanceId;
+                String key = kvPrefix + "/pipelines/instances/" + clusterName + "/" + instanceId;
                 
                 return UniHelper.toUni(getConsulClient().deleteValue(key))
                     .map(result -> {
@@ -278,7 +281,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
                 
                 try {
                     // Store in Consul
-                    String key = PIPELINE_INSTANCES_PREFIX + clusterName + "/" + instanceId;
+                    String key = kvPrefix + "/pipelines/instances/" + clusterName + "/" + instanceId;
                     String json = objectMapper.writeValueAsString(updated);
                     
                     return UniHelper.toUni(getConsulClient().putValue(key, json))
@@ -336,7 +339,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
                 
                 try {
                     // Store in Consul
-                    String key = PIPELINE_INSTANCES_PREFIX + clusterName + "/" + instanceId;
+                    String key = kvPrefix + "/pipelines/instances/" + clusterName + "/" + instanceId;
                     String json = objectMapper.writeValueAsString(updated);
                     
                     return UniHelper.toUni(getConsulClient().putValue(key, json))
@@ -363,7 +366,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
     
     @Override
     public Uni<Boolean> instanceExists(String clusterName, String instanceId) {
-        String key = PIPELINE_INSTANCES_PREFIX + clusterName + "/" + instanceId;
+        String key = kvPrefix + "/pipelines/instances/" + clusterName + "/" + instanceId;
         return UniHelper.toUni(getConsulClient().getValue(key))
             .map(keyValue -> keyValue != null && keyValue.getValue() != null)
             .onFailure().recoverWithItem(error -> {
@@ -374,7 +377,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
     
     @Override
     public Uni<List<PipelineInstance>> listInstancesByDefinition(String pipelineDefinitionId) {
-        return UniHelper.toUni(getConsulClient().getKeys(PIPELINE_INSTANCES_PREFIX))
+        return UniHelper.toUni(getConsulClient().getKeys(kvPrefix + "/pipelines/instances/"))
             .map(keys -> {
                 
                 if (keys == null || keys.isEmpty()) {

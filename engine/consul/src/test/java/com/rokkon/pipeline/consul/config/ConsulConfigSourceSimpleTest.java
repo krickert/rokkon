@@ -1,11 +1,13 @@
 package com.rokkon.pipeline.consul.config;
 
+import com.rokkon.pipeline.consul.test.UnifiedTestProfile;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Tag;
 
 import java.time.Duration;
 
@@ -17,8 +19,9 @@ import static org.assertj.core.api.Assertions.assertThat;
  * and that default values are loaded from application.yml.
  */
 @QuarkusTest
-@TestProfile(SimpleConfigTestProfile.class)
+@TestProfile(UnifiedTestProfile.class)
 @DisplayName("Configuration Property Tests")
+@Tag("config-tests") // Tag for running separately if needed
 class ConsulConfigSourceSimpleTest {
     
     // Test individual properties to verify they're loaded

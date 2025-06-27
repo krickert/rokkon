@@ -4,7 +4,6 @@ import com.rokkon.pipeline.config.model.ClusterMetadata;
 import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.validation.ValidationResult;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.jboss.logging.Logger;
 
@@ -19,7 +18,6 @@ public abstract class ClusterServiceTestBase {
     protected abstract ClusterService getClusterService();
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testCreateCluster() {
         String clusterName = "base-test-cluster";
 
@@ -38,7 +36,6 @@ public abstract class ClusterServiceTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testGetCluster() {
         String clusterName = "base-get-test-cluster";
 
@@ -62,7 +59,6 @@ public abstract class ClusterServiceTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testClusterExists() {
         String clusterName = "base-exists-test-cluster";
 
@@ -92,7 +88,6 @@ public abstract class ClusterServiceTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testCreateDuplicateCluster() {
         String clusterName = "base-duplicate-test-cluster";
 
@@ -116,7 +111,6 @@ public abstract class ClusterServiceTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testDeleteCluster() {
         String clusterName = "base-delete-test-cluster";
 
@@ -154,7 +148,6 @@ public abstract class ClusterServiceTestBase {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testEmptyClusterName() {
         // Test with empty string
         ValidationResult result = getClusterService().createCluster("")
