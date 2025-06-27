@@ -1,7 +1,11 @@
 package com.rokkon.pipeline.consul.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rokkon.pipeline.config.model.*;
+import com.rokkon.pipeline.config.model.Cluster;
+import com.rokkon.pipeline.config.model.ClusterMetadata;
+import com.rokkon.pipeline.config.model.PipelineClusterConfig;
+import com.rokkon.pipeline.config.model.PipelineGraphConfig;
+import com.rokkon.pipeline.config.model.PipelineModuleMap;
 import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
 import com.rokkon.pipeline.validation.ValidationResult;
@@ -158,7 +162,7 @@ public class ClusterServiceImpl implements ClusterService {
                                 return Optional.of(new Cluster(
                                     name,
                                     createdAtStr,
-                                    new ClusterMetadata(name, meta.createdAt(), meta.defaultPipeline(), meta.metadata())
+                                    meta
                                 ));
                             }
                             return Optional.<Cluster>empty();
