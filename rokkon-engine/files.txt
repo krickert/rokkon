@@ -1,0 +1,706 @@
+.
+├── build
+│   └── resources
+│       └── main
+│           ├── application-dev.yml
+│           ├── application-docker-dev.yml
+│           └── META-INF
+│               └── resources
+│                   ├── css
+│                   │   └── dashboard.css
+│                   ├── index.html.old
+│                   ├── index-old.html
+│                   ├── js
+│                   │   ├── api.js
+│                   │   ├── clusters.js
+│                   │   ├── main.js
+│                   │   ├── modules.js
+│                   │   ├── pipelines.js
+│                   │   ├── services.js
+│                   │   └── validation.js
+│                   ├── test.html
+│                   └── working.html
+├── build.gradle.kts
+├── dev2.log
+├── dev.log
+├── docker-compose.yml
+├── engine.pid
+├── files.txt
+├── gradle
+│   └── wrapper
+│       ├── gradle-wrapper.jar
+│       └── gradle-wrapper.properties
+├── gradle.properties
+├── gradlew
+├── gradlew.bat
+├── out
+│   ├── integrationTest
+│   │   ├── classes
+│   │   │   └── com
+│   │   │       └── rokkon
+│   │   │           └── pipeline
+│   │   │               └── engine
+│   │   │                   ├── api
+│   │   │                   │   └── PingResourceIT.class
+│   │   │                   ├── ApiDiscoveryIT.class
+│   │   │                   ├── BasicHealthCheckIT.class
+│   │   │                   ├── EngineLifecycleIT$RandomClusterProfile.class
+│   │   │                   ├── EngineLifecycleIT.class
+│   │   │                   ├── EngineStartupIT.class
+│   │   │                   ├── FullPipelineE2EIT.class
+│   │   │                   ├── ModuleRegistrationIT.class
+│   │   │                   ├── registration
+│   │   │                   │   ├── ModuleRegistrationContainerIT.class
+│   │   │                   │   └── ModuleRegistrationIT.class
+│   │   │                   ├── service
+│   │   │                   │   └── StorkServiceDiscoveryIT.class
+│   │   │                   └── test
+│   │   │                       ├── ConsulTestResource.class
+│   │   │                       ├── DummyProcessorIT.class
+│   │   │                       └── TestModuleProcessorIT.class
+│   │   └── resources
+│   │       └── application.yml
+│   ├── production
+│   │   ├── classes
+│   │   │   └── com
+│   │   │       └── rokkon
+│   │   │           ├── pipeline
+│   │   │           │   └── engine
+│   │   │           │       ├── api
+│   │   │           │       │   ├── ConsulConnectionResource$ConnectionStatus.class
+│   │   │           │       │   ├── ConsulConnectionResource$ConnectionUpdateRequest.class
+│   │   │           │       │   ├── ConsulConnectionResource$ConnectionUpdateResult.class
+│   │   │           │       │   ├── ConsulConnectionResource.class
+│   │   │           │       │   ├── ConsulStatusResource.class
+│   │   │           │       │   ├── ModuleDiscoveryResource$BaseServiceInfo.class
+│   │   │           │       │   ├── ModuleDiscoveryResource$BaseServiceInstanceInfo.class
+│   │   │           │       │   ├── ModuleDiscoveryResource$DashboardData.class
+│   │   │           │       │   ├── ModuleDiscoveryResource$ModuleInfo.class
+│   │   │           │       │   ├── ModuleDiscoveryResource$ModuleInstanceInfo.class
+│   │   │           │       │   ├── ModuleDiscoveryResource$ModuleServiceInfo.class
+│   │   │           │       │   ├── ModuleDiscoveryResource$ServiceInfo.class
+│   │   │           │       │   ├── ModuleDiscoveryResource$ServiceInstance.class
+│   │   │           │       │   ├── ModuleDiscoveryResource$ServiceStatistics.class
+│   │   │           │       │   ├── ModuleDiscoveryResource.class
+│   │   │           │       │   └── PingResource.class
+│   │   │           │       ├── config
+│   │   │           │       │   └── StorkConfiguration.class
+│   │   │           │       ├── EngineLifecycle.class
+│   │   │           │       ├── event
+│   │   │           │       │   └── ConsulStatusEvent.class
+│   │   │           │       ├── grpc
+│   │   │           │       │   ├── ConnectorEngineImpl.class
+│   │   │           │       │   ├── ModuleRegistrationServiceImpl.class
+│   │   │           │       │   └── PipeStreamEngineImpl.class
+│   │   │           │       ├── service
+│   │   │           │       │   ├── ConsulHealthService$1.class
+│   │   │           │       │   ├── ConsulHealthService$ConsulHealthStatus.class
+│   │   │           │       │   ├── ConsulHealthService$ConsulStatus.class
+│   │   │           │       │   ├── ConsulHealthService.class
+│   │   │           │       │   ├── EngineRegistrationService.class
+│   │   │           │       │   ├── EventDrivenRouter$RoutingResult.class
+│   │   │           │       │   ├── EventDrivenRouter.class
+│   │   │           │       │   ├── EventDrivenRouterImpl$RoutingEvent$Status.class
+│   │   │           │       │   ├── EventDrivenRouterImpl$RoutingEvent.class
+│   │   │           │       │   ├── EventDrivenRouterImpl.class
+│   │   │           │       │   ├── GrpcClientFactory.class
+│   │   │           │       │   ├── GrpcClientFactoryImpl.class
+│   │   │           │       │   ├── GrpcTransportHandler.class
+│   │   │           │       │   ├── KafkaRouter.class
+│   │   │           │       │   ├── KafkaRouterStub.class
+│   │   │           │       │   ├── KafkaTransportHandler.class
+│   │   │           │       │   ├── ModuleRouter.class
+│   │   │           │       │   ├── ModuleRouterImpl.class
+│   │   │           │       │   ├── PipelineExecutorService$1.class
+│   │   │           │       │   ├── PipelineExecutorService$PipeStreamExecutionContext.class
+│   │   │           │       │   ├── PipelineExecutorService.class
+│   │   │           │       │   ├── ServiceDiscovery.class
+│   │   │           │       │   ├── StorkServiceDiscovery.class
+│   │   │           │       │   └── TransportHandler.class
+│   │   │           │       └── util
+│   │   │           │           └── JsonProtoConverter.class
+│   │   │           ├── search
+│   │   │           │   ├── engine
+│   │   │           │   │   ├── ConnectorEngineBean.class
+│   │   │           │   │   ├── ConnectorEngine.class
+│   │   │           │   │   ├── ConnectorEngineClient.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$1.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$2.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$3.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$AsyncService.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$ConnectorEngineBaseDescriptorSupplier.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$ConnectorEngineBlockingStub.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$ConnectorEngineFileDescriptorSupplier.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$ConnectorEngineFutureStub.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$ConnectorEngineImplBase.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$ConnectorEngineMethodDescriptorSupplier.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$ConnectorEngineStub.class
+│   │   │           │   │   ├── ConnectorEngineGrpc$MethodHandlers.class
+│   │   │           │   │   ├── ConnectorEngineGrpc.class
+│   │   │           │   │   ├── ConnectorRequest$1.class
+│   │   │           │   │   ├── ConnectorRequest$Builder.class
+│   │   │           │   │   ├── ConnectorRequest$ContextParamsDefaultEntryHolder.class
+│   │   │           │   │   ├── ConnectorRequest.class
+│   │   │           │   │   ├── ConnectorRequestOrBuilder.class
+│   │   │           │   │   ├── ConnectorResponse$1.class
+│   │   │           │   │   ├── ConnectorResponse$Builder.class
+│   │   │           │   │   ├── ConnectorResponse.class
+│   │   │           │   │   ├── ConnectorResponseOrBuilder.class
+│   │   │           │   │   ├── ConnectorServiceProto.class
+│   │   │           │   │   ├── EngineServiceProto.class
+│   │   │           │   │   ├── MutinyConnectorEngineGrpc$ConnectorEngineImplBase.class
+│   │   │           │   │   ├── MutinyConnectorEngineGrpc$MethodHandlers.class
+│   │   │           │   │   ├── MutinyConnectorEngineGrpc$MutinyConnectorEngineStub.class
+│   │   │           │   │   ├── MutinyConnectorEngineGrpc.class
+│   │   │           │   │   ├── MutinyPipeStreamEngineGrpc$MethodHandlers.class
+│   │   │           │   │   ├── MutinyPipeStreamEngineGrpc$MutinyPipeStreamEngineStub.class
+│   │   │           │   │   ├── MutinyPipeStreamEngineGrpc$PipeStreamEngineImplBase.class
+│   │   │           │   │   ├── MutinyPipeStreamEngineGrpc.class
+│   │   │           │   │   ├── PipeStreamEngineBean.class
+│   │   │           │   │   ├── PipeStreamEngine.class
+│   │   │           │   │   ├── PipeStreamEngineClient.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$1.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$2.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$3.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$AsyncService.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$MethodHandlers.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$PipeStreamEngineBaseDescriptorSupplier.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$PipeStreamEngineBlockingStub.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$PipeStreamEngineFileDescriptorSupplier.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$PipeStreamEngineFutureStub.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$PipeStreamEngineImplBase.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$PipeStreamEngineMethodDescriptorSupplier.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc$PipeStreamEngineStub.class
+│   │   │           │   │   ├── PipeStreamEngineGrpc.class
+│   │   │           │   │   ├── ProcessResponse$1.class
+│   │   │           │   │   ├── ProcessResponse$Builder.class
+│   │   │           │   │   ├── ProcessResponse.class
+│   │   │           │   │   ├── ProcessResponseOrBuilder.class
+│   │   │           │   │   ├── ProcessStatus$1.class
+│   │   │           │   │   └── ProcessStatus.class
+│   │   │           │   ├── grpc
+│   │   │           │   │   ├── HeartbeatAck$1.class
+│   │   │           │   │   ├── HeartbeatAck$Builder.class
+│   │   │           │   │   ├── HeartbeatAck.class
+│   │   │           │   │   ├── HeartbeatAckOrBuilder.class
+│   │   │           │   │   ├── ModuleHealthStatus$1.class
+│   │   │           │   │   ├── ModuleHealthStatus$Builder.class
+│   │   │           │   │   ├── ModuleHealthStatus$MetadataDefaultEntryHolder.class
+│   │   │           │   │   ├── ModuleHealthStatus.class
+│   │   │           │   │   ├── ModuleHealthStatusOrBuilder.class
+│   │   │           │   │   ├── ModuleHeartbeat$1.class
+│   │   │           │   │   ├── ModuleHeartbeat$Builder.class
+│   │   │           │   │   ├── ModuleHeartbeat$StatusInfoDefaultEntryHolder.class
+│   │   │           │   │   ├── ModuleHeartbeat.class
+│   │   │           │   │   ├── ModuleHeartbeatOrBuilder.class
+│   │   │           │   │   ├── ModuleId$1.class
+│   │   │           │   │   ├── ModuleId$Builder.class
+│   │   │           │   │   ├── ModuleId.class
+│   │   │           │   │   ├── ModuleIdOrBuilder.class
+│   │   │           │   │   ├── ModuleInfo$1.class
+│   │   │           │   │   ├── ModuleInfo$Builder.class
+│   │   │           │   │   ├── ModuleInfo$MetadataDefaultEntryHolder.class
+│   │   │           │   │   ├── ModuleInfo.class
+│   │   │           │   │   ├── ModuleInfoOrBuilder.class
+│   │   │           │   │   ├── ModuleList$1.class
+│   │   │           │   │   ├── ModuleList$Builder.class
+│   │   │           │   │   ├── ModuleList.class
+│   │   │           │   │   ├── ModuleListOrBuilder.class
+│   │   │           │   │   ├── ModuleRegistrationBean.class
+│   │   │           │   │   ├── ModuleRegistration.class
+│   │   │           │   │   ├── ModuleRegistrationClient.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$1.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$2.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$3.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$AsyncService.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$MethodHandlers.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$ModuleRegistrationBaseDescriptorSupplier.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$ModuleRegistrationBlockingStub.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$ModuleRegistrationFileDescriptorSupplier.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$ModuleRegistrationFutureStub.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$ModuleRegistrationImplBase.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$ModuleRegistrationMethodDescriptorSupplier.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc$ModuleRegistrationStub.class
+│   │   │           │   │   ├── ModuleRegistrationGrpc.class
+│   │   │           │   │   ├── ModuleRegistrationProto.class
+│   │   │           │   │   ├── MutinyModuleRegistrationGrpc$MethodHandlers.class
+│   │   │           │   │   ├── MutinyModuleRegistrationGrpc$ModuleRegistrationImplBase.class
+│   │   │           │   │   ├── MutinyModuleRegistrationGrpc$MutinyModuleRegistrationStub.class
+│   │   │           │   │   ├── MutinyModuleRegistrationGrpc.class
+│   │   │           │   │   ├── RegistrationStatus$1.class
+│   │   │           │   │   ├── RegistrationStatus$Builder.class
+│   │   │           │   │   ├── RegistrationStatus.class
+│   │   │           │   │   ├── RegistrationStatusOrBuilder.class
+│   │   │           │   │   ├── UnregistrationStatus$1.class
+│   │   │           │   │   ├── UnregistrationStatus$Builder.class
+│   │   │           │   │   ├── UnregistrationStatus.class
+│   │   │           │   │   └── UnregistrationStatusOrBuilder.class
+│   │   │           │   ├── model
+│   │   │           │   │   ├── ActionType$1.class
+│   │   │           │   │   ├── ActionType.class
+│   │   │           │   │   ├── BatchInfo$1.class
+│   │   │           │   │   ├── BatchInfo$Builder.class
+│   │   │           │   │   ├── BatchInfo.class
+│   │   │           │   │   ├── BatchInfoOrBuilder.class
+│   │   │           │   │   ├── Blob$1.class
+│   │   │           │   │   ├── Blob$Builder.class
+│   │   │           │   │   ├── Blob$MetadataDefaultEntryHolder.class
+│   │   │           │   │   ├── Blob.class
+│   │   │           │   │   ├── BlobOrBuilder.class
+│   │   │           │   │   ├── ChunkEmbedding$1.class
+│   │   │           │   │   ├── ChunkEmbedding$Builder.class
+│   │   │           │   │   ├── ChunkEmbedding.class
+│   │   │           │   │   ├── ChunkEmbeddingOrBuilder.class
+│   │   │           │   │   ├── Embedding$1.class
+│   │   │           │   │   ├── Embedding$Builder.class
+│   │   │           │   │   ├── Embedding.class
+│   │   │           │   │   ├── EmbeddingOrBuilder.class
+│   │   │           │   │   ├── ErrorData$1.class
+│   │   │           │   │   ├── ErrorData$Builder.class
+│   │   │           │   │   ├── ErrorData.class
+│   │   │           │   │   ├── ErrorDataOrBuilder.class
+│   │   │           │   │   ├── FailedStepInputState$1.class
+│   │   │           │   │   ├── FailedStepInputState$Builder.class
+│   │   │           │   │   ├── FailedStepInputState$ConfigParamsDefaultEntryHolder.class
+│   │   │           │   │   ├── FailedStepInputState.class
+│   │   │           │   │   ├── FailedStepInputStateOrBuilder.class
+│   │   │           │   │   ├── ParsedDocument$1.class
+│   │   │           │   │   ├── ParsedDocument$Builder.class
+│   │   │           │   │   ├── ParsedDocument$MetadataDefaultEntryHolder.class
+│   │   │           │   │   ├── ParsedDocument.class
+│   │   │           │   │   ├── ParsedDocumentOrBuilder.class
+│   │   │           │   │   ├── ParsedDocumentReply$1.class
+│   │   │           │   │   ├── ParsedDocumentReply$Builder.class
+│   │   │           │   │   ├── ParsedDocumentReply.class
+│   │   │           │   │   ├── ParsedDocumentReplyOrBuilder.class
+│   │   │           │   │   ├── PipeDoc$1.class
+│   │   │           │   │   ├── PipeDoc$Builder$NamedEmbeddingsConverter.class
+│   │   │           │   │   ├── PipeDoc$Builder.class
+│   │   │           │   │   ├── PipeDoc$MetadataDefaultEntryHolder.class
+│   │   │           │   │   ├── PipeDoc$NamedEmbeddingsDefaultEntryHolder.class
+│   │   │           │   │   ├── PipeDoc.class
+│   │   │           │   │   ├── PipeDocOrBuilder.class
+│   │   │           │   │   ├── PipeStream$1.class
+│   │   │           │   │   ├── PipeStream$Builder.class
+│   │   │           │   │   ├── PipeStream$ContextParamsDefaultEntryHolder.class
+│   │   │           │   │   ├── PipeStream.class
+│   │   │           │   │   ├── PipeStreamOrBuilder.class
+│   │   │           │   │   ├── RokkonCoreTypesProto.class
+│   │   │           │   │   ├── SemanticChunk$1.class
+│   │   │           │   │   ├── SemanticChunk$Builder$MetadataConverter.class
+│   │   │           │   │   ├── SemanticChunk$Builder.class
+│   │   │           │   │   ├── SemanticChunk$MetadataDefaultEntryHolder.class
+│   │   │           │   │   ├── SemanticChunk.class
+│   │   │           │   │   ├── SemanticChunkOrBuilder.class
+│   │   │           │   │   ├── SemanticProcessingResult$1.class
+│   │   │           │   │   ├── SemanticProcessingResult$Builder$MetadataConverter.class
+│   │   │           │   │   ├── SemanticProcessingResult$Builder.class
+│   │   │           │   │   ├── SemanticProcessingResult$MetadataDefaultEntryHolder.class
+│   │   │           │   │   ├── SemanticProcessingResult.class
+│   │   │           │   │   ├── SemanticProcessingResultOrBuilder.class
+│   │   │           │   │   ├── StepExecutionRecord$1.class
+│   │   │           │   │   ├── StepExecutionRecord$Builder.class
+│   │   │           │   │   ├── StepExecutionRecord.class
+│   │   │           │   │   ├── StepExecutionRecordOrBuilder.class
+│   │   │           │   │   └── TikaParserProto.class
+│   │   │           │   ├── registration
+│   │   │           │   │   └── api
+│   │   │           │   │       ├── HealthCheckType$1.class
+│   │   │           │   │       ├── HealthCheckType.class
+│   │   │           │   │       ├── ModuleRegistrationProto.class
+│   │   │           │   │       ├── ModuleRegistrationServiceBean.class
+│   │   │           │   │       ├── ModuleRegistrationService.class
+│   │   │           │   │       ├── ModuleRegistrationServiceClient.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$1.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$2.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$3.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$AsyncService.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$MethodHandlers.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$ModuleRegistrationServiceBaseDescriptorSupplier.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$ModuleRegistrationServiceBlockingStub.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$ModuleRegistrationServiceFileDescriptorSupplier.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$ModuleRegistrationServiceFutureStub.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$ModuleRegistrationServiceImplBase.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$ModuleRegistrationServiceMethodDescriptorSupplier.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc$ModuleRegistrationServiceStub.class
+│   │   │           │   │       ├── ModuleRegistrationServiceGrpc.class
+│   │   │           │   │       ├── MutinyModuleRegistrationServiceGrpc$MethodHandlers.class
+│   │   │           │   │       ├── MutinyModuleRegistrationServiceGrpc$ModuleRegistrationServiceImplBase.class
+│   │   │           │   │       ├── MutinyModuleRegistrationServiceGrpc$MutinyModuleRegistrationServiceStub.class
+│   │   │           │   │       ├── MutinyModuleRegistrationServiceGrpc.class
+│   │   │           │   │       ├── RegisterModuleRequest$1.class
+│   │   │           │   │       ├── RegisterModuleRequest$AdditionalTagsDefaultEntryHolder.class
+│   │   │           │   │       ├── RegisterModuleRequest$Builder.class
+│   │   │           │   │       ├── RegisterModuleRequest.class
+│   │   │           │   │       ├── RegisterModuleRequestOrBuilder.class
+│   │   │           │   │       ├── RegisterModuleResponse$1.class
+│   │   │           │   │       ├── RegisterModuleResponse$Builder.class
+│   │   │           │   │       ├── RegisterModuleResponse.class
+│   │   │           │   │       └── RegisterModuleResponseOrBuilder.class
+│   │   │           │   └── sdk
+│   │   │           │       ├── MutinyPipeStepProcessorGrpc$MethodHandlers.class
+│   │   │           │       ├── MutinyPipeStepProcessorGrpc$MutinyPipeStepProcessorStub.class
+│   │   │           │       ├── MutinyPipeStepProcessorGrpc$PipeStepProcessorImplBase.class
+│   │   │           │       ├── MutinyPipeStepProcessorGrpc.class
+│   │   │           │       ├── PipeStepProcessorBean.class
+│   │   │           │       ├── PipeStepProcessor.class
+│   │   │           │       ├── PipeStepProcessorClient.class
+│   │   │           │       ├── PipeStepProcessorGrpc$1.class
+│   │   │           │       ├── PipeStepProcessorGrpc$2.class
+│   │   │           │       ├── PipeStepProcessorGrpc$3.class
+│   │   │           │       ├── PipeStepProcessorGrpc$AsyncService.class
+│   │   │           │       ├── PipeStepProcessorGrpc$MethodHandlers.class
+│   │   │           │       ├── PipeStepProcessorGrpc$PipeStepProcessorBaseDescriptorSupplier.class
+│   │   │           │       ├── PipeStepProcessorGrpc$PipeStepProcessorBlockingStub.class
+│   │   │           │       ├── PipeStepProcessorGrpc$PipeStepProcessorFileDescriptorSupplier.class
+│   │   │           │       ├── PipeStepProcessorGrpc$PipeStepProcessorFutureStub.class
+│   │   │           │       ├── PipeStepProcessorGrpc$PipeStepProcessorImplBase.class
+│   │   │           │       ├── PipeStepProcessorGrpc$PipeStepProcessorMethodDescriptorSupplier.class
+│   │   │           │       ├── PipeStepProcessorGrpc$PipeStepProcessorStub.class
+│   │   │           │       ├── PipeStepProcessorGrpc.class
+│   │   │           │       ├── PipeStepProcessorServiceProto.class
+│   │   │           │       ├── ProcessConfiguration$1.class
+│   │   │           │       ├── ProcessConfiguration$Builder.class
+│   │   │           │       ├── ProcessConfiguration$ConfigParamsDefaultEntryHolder.class
+│   │   │           │       ├── ProcessConfiguration.class
+│   │   │           │       ├── ProcessConfigurationOrBuilder.class
+│   │   │           │       ├── ProcessRequest$1.class
+│   │   │           │       ├── ProcessRequest$Builder.class
+│   │   │           │       ├── ProcessRequest.class
+│   │   │           │       ├── ProcessRequestOrBuilder.class
+│   │   │           │       ├── ProcessResponse$1.class
+│   │   │           │       ├── ProcessResponse$Builder.class
+│   │   │           │       ├── ProcessResponse.class
+│   │   │           │       ├── ProcessResponseOrBuilder.class
+│   │   │           │       ├── RegistrationRequest$1.class
+│   │   │           │       ├── RegistrationRequest$Builder.class
+│   │   │           │       ├── RegistrationRequest.class
+│   │   │           │       ├── RegistrationRequestOrBuilder.class
+│   │   │           │       ├── ServiceMetadata$1.class
+│   │   │           │       ├── ServiceMetadata$Builder.class
+│   │   │           │       ├── ServiceMetadata$ContextParamsDefaultEntryHolder.class
+│   │   │           │       ├── ServiceMetadata.class
+│   │   │           │       ├── ServiceMetadataOrBuilder.class
+│   │   │           │       ├── ServiceRegistrationResponse$1.class
+│   │   │           │       ├── ServiceRegistrationResponse$Builder.class
+│   │   │           │       ├── ServiceRegistrationResponse$MetadataDefaultEntryHolder.class
+│   │   │           │       ├── ServiceRegistrationResponse.class
+│   │   │           │       └── ServiceRegistrationResponseOrBuilder.class
+│   │   │           └── test
+│   │   │               ├── CheckHealthCommand$1.class
+│   │   │               ├── CheckHealthCommand$Builder.class
+│   │   │               ├── CheckHealthCommand.class
+│   │   │               ├── CheckHealthCommandOrBuilder.class
+│   │   │               ├── ConfigureModuleCommand$1.class
+│   │   │               ├── ConfigureModuleCommand$Builder.class
+│   │   │               ├── ConfigureModuleCommand.class
+│   │   │               ├── ConfigureModuleCommandOrBuilder.class
+│   │   │               ├── DocumentProcessedEvent$1.class
+│   │   │               ├── DocumentProcessedEvent$Builder.class
+│   │   │               ├── DocumentProcessedEvent.class
+│   │   │               ├── DocumentProcessedEventOrBuilder.class
+│   │   │               ├── DocumentReceivedEvent$1.class
+│   │   │               ├── DocumentReceivedEvent$Builder.class
+│   │   │               ├── DocumentReceivedEvent.class
+│   │   │               ├── DocumentReceivedEventOrBuilder.class
+│   │   │               ├── ErrorEvent$1.class
+│   │   │               ├── ErrorEvent$Builder.class
+│   │   │               ├── ErrorEvent.class
+│   │   │               ├── ErrorEventOrBuilder.class
+│   │   │               ├── GenericEvent$1.class
+│   │   │               ├── GenericEvent$Builder.class
+│   │   │               ├── GenericEvent.class
+│   │   │               ├── GenericEventOrBuilder.class
+│   │   │               ├── HealthCheckEvent$1.class
+│   │   │               ├── HealthCheckEvent$Builder.class
+│   │   │               ├── HealthCheckEvent$HealthStatus$1.class
+│   │   │               ├── HealthCheckEvent$HealthStatus.class
+│   │   │               ├── HealthCheckEvent.class
+│   │   │               ├── HealthCheckEventOrBuilder.class
+│   │   │               ├── ModuleRegisteredEvent$1.class
+│   │   │               ├── ModuleRegisteredEvent$Builder.class
+│   │   │               ├── ModuleRegisteredEvent.class
+│   │   │               ├── ModuleRegisteredEventOrBuilder.class
+│   │   │               ├── ModuleStatus$1.class
+│   │   │               ├── ModuleStatus$Builder.class
+│   │   │               ├── ModuleStatus$CurrentConfigDefaultEntryHolder.class
+│   │   │               ├── ModuleStatus.class
+│   │   │               ├── ModuleStatusOrBuilder.class
+│   │   │               ├── MutinyTestHarnessGrpc$MethodHandlers.class
+│   │   │               ├── MutinyTestHarnessGrpc$MutinyTestHarnessStub.class
+│   │   │               ├── MutinyTestHarnessGrpc$TestHarnessImplBase.class
+│   │   │               ├── MutinyTestHarnessGrpc.class
+│   │   │               ├── ProcessDocumentCommand$1.class
+│   │   │               ├── ProcessDocumentCommand$Builder.class
+│   │   │               ├── ProcessDocumentCommand.class
+│   │   │               ├── ProcessDocumentCommandOrBuilder.class
+│   │   │               ├── SimulateScenarioCommand$1.class
+│   │   │               ├── SimulateScenarioCommand$Builder.class
+│   │   │               ├── SimulateScenarioCommand$Scenario$1.class
+│   │   │               ├── SimulateScenarioCommand$Scenario.class
+│   │   │               ├── SimulateScenarioCommand.class
+│   │   │               ├── SimulateScenarioCommandOrBuilder.class
+│   │   │               ├── TestCommand$1.class
+│   │   │               ├── TestCommand$Builder.class
+│   │   │               ├── TestCommand$CommandCase.class
+│   │   │               ├── TestCommand.class
+│   │   │               ├── TestCommandOrBuilder.class
+│   │   │               ├── TestEvent$1.class
+│   │   │               ├── TestEvent$Builder.class
+│   │   │               ├── TestEvent$EventCase.class
+│   │   │               ├── TestEvent.class
+│   │   │               ├── TestEventOrBuilder.class
+│   │   │               ├── TestHarnessBean.class
+│   │   │               ├── TestHarness.class
+│   │   │               ├── TestHarnessClient.class
+│   │   │               ├── TestHarnessGrpc$1.class
+│   │   │               ├── TestHarnessGrpc$2.class
+│   │   │               ├── TestHarnessGrpc$3.class
+│   │   │               ├── TestHarnessGrpc$AsyncService.class
+│   │   │               ├── TestHarnessGrpc$MethodHandlers.class
+│   │   │               ├── TestHarnessGrpc$TestHarnessBaseDescriptorSupplier.class
+│   │   │               ├── TestHarnessGrpc$TestHarnessBlockingStub.class
+│   │   │               ├── TestHarnessGrpc$TestHarnessFileDescriptorSupplier.class
+│   │   │               ├── TestHarnessGrpc$TestHarnessFutureStub.class
+│   │   │               ├── TestHarnessGrpc$TestHarnessImplBase.class
+│   │   │               ├── TestHarnessGrpc$TestHarnessMethodDescriptorSupplier.class
+│   │   │               ├── TestHarnessGrpc$TestHarnessStub.class
+│   │   │               ├── TestHarnessGrpc.class
+│   │   │               ├── TestHarnessOuterClass.class
+│   │   │               ├── TestResult$1.class
+│   │   │               ├── TestResult$Builder.class
+│   │   │               ├── TestResult.class
+│   │   │               ├── TestResultOrBuilder.class
+│   │   │               ├── VerifyRegistrationCommand$1.class
+│   │   │               ├── VerifyRegistrationCommand$Builder.class
+│   │   │               ├── VerifyRegistrationCommand.class
+│   │   │               ├── VerifyRegistrationCommandOrBuilder.class
+│   │   │               ├── WaitForEventCommand$1.class
+│   │   │               ├── WaitForEventCommand$Builder.class
+│   │   │               ├── WaitForEventCommand.class
+│   │   │               └── WaitForEventCommandOrBuilder.class
+│   │   └── resources
+│   │       ├── application-krick-local.yml
+│   │       ├── application.yml
+│   │       └── META-INF
+│   │           ├── beans.xml
+│   │           └── resources
+│   │               ├── index.html
+│   │               ├── index.html.old
+│   │               ├── index-old.html
+│   │               ├── test.html
+│   │               └── working.html
+│   └── test
+│       ├── classes
+│       │   └── com
+│       │       └── rokkon
+│       │           └── pipeline
+│       │               ├── consul
+│       │               │   └── test
+│       │               │       └── ConsulTestResource.class
+│       │               └── engine
+│       │                   ├── api
+│       │                   │   └── PingResourceTest.class
+│       │                   ├── CustomClusterLifecycleTest$CustomClusterProfile.class
+│       │                   ├── CustomClusterLifecycleTest.class
+│       │                   ├── EngineLifecycleTest.class
+│       │                   ├── registration
+│       │                   │   ├── ConsulGrpcHealthCheckNetworkTest.class
+│       │                   │   ├── ContainerAwareRegistrationTest.class
+│       │                   │   ├── ModuleMetadataValidationTest.class
+│       │                   │   ├── ModuleRegistrationTestBase.class
+│       │                   │   ├── ModuleRegistrationTest.class
+│       │                   │   ├── NetworkDebugTest.class
+│       │                   │   ├── SharedNetworkConsulResource.class
+│       │                   │   └── SimpleSharedNetworkTest.class
+│       │                   ├── service
+│       │                   │   └── StorkServiceDiscoveryTest.class
+│       │                   ├── setup
+│       │                   │   ├── RokkonPipelineTestBase.class
+│       │                   │   └── TestModuleProcessorTest.class
+│       │                   └── test
+│       │                       ├── DummyProcessorService.class
+│       │                       ├── DummyProcessorTestBase.class
+│       │                       ├── DummyProcessorTestProfile.class
+│       │                       ├── DummyProcessorUnitTest.class
+│       │                       ├── TestModuleProcessorTestBase.class
+│       │                       └── TestModuleProcessorUnitTest.class
+│       └── resources
+│           └── application.yml
+├── quarkus-output.log
+├── README.md
+└── src
+    ├── integrationTest
+    │   ├── java
+    │   │   └── com
+    │   │       └── rokkon
+    │   │           ├── engine
+    │   │           │   ├── api
+    │   │           │   │   ├── PipelineConfigResourceTest.java
+    │   │           │   │   └── PipelineDefinitionResourceIT.java
+    │   │           │   └── ConsulIntegrationTest.java
+    │   │           └── pipeline
+    │   │               ├── consul
+    │   │               │   └── test
+    │   │               │       └── ConsulTestResource.java
+    │   │               ├── engine
+    │   │               │   ├── api
+    │   │               │   │   └── PingResourceIT.java
+    │   │               │   ├── ApiDiscoveryIT.java
+    │   │               │   ├── BasicHealthCheckIT.java
+    │   │               │   ├── engine
+    │   │               │   │   ├── api
+    │   │               │   │   │   └── PingResourceTest.java
+    │   │               │   │   ├── CustomClusterLifecycleTest.java
+    │   │               │   │   ├── EngineLifecycleTest.java
+    │   │               │   │   ├── registration
+    │   │               │   │   │   ├── ConsulGrpcHealthCheckNetworkTest.java
+    │   │               │   │   │   ├── ModuleMetadataValidationTest.java
+    │   │               │   │   │   ├── ModuleRegistrationTestBase.java
+    │   │               │   │   │   ├── ModuleRegistrationTest.java
+    │   │               │   │   │   └── SimpleSharedNetworkTest.java
+    │   │               │   │   ├── service
+    │   │               │   │   │   ├── EventDrivenRouterTest.java
+    │   │               │   │   │   ├── GrpcTransportHandlerTest.java
+    │   │               │   │   │   ├── README.md
+    │   │               │   │   │   └── StorkServiceDiscoveryTest.java
+    │   │               │   │   ├── setup
+    │   │               │   │   │   ├── RokkonPipelineTestBase.java
+    │   │               │   │   │   └── TestModuleProcessorTest.java
+    │   │               │   │   └── test
+    │   │               │   │       ├── ConsulTestResource.java
+    │   │               │   │       ├── DummyProcessorService.java
+    │   │               │   │       ├── DummyProcessorTestBase.java
+    │   │               │   │       ├── DummyProcessorTest.java.bak
+    │   │               │   │       ├── DummyProcessorTestProfile.java
+    │   │               │   │       ├── DummyProcessorUnitTest.java
+    │   │               │   │       ├── TestModuleProcessorTestBase.java
+    │   │               │   │       └── TestModuleProcessorUnitTest.java
+    │   │               │   ├── EngineLifecycleIT.java
+    │   │               │   ├── EngineStartupIT.java
+    │   │               │   ├── FullPipelineE2EIT.java
+    │   │               │   ├── ModuleRegistrationIT.java
+    │   │               │   ├── registration
+    │   │               │   │   ├── ContainerAwareRegistrationIT.java
+    │   │               │   │   ├── ModuleRegistrationContainerIT.java
+    │   │               │   │   ├── ModuleRegistrationIT.java
+    │   │               │   │   ├── NetworkDebugIT.java
+    │   │               │   │   └── SharedNetworkConsulResource.java
+    │   │               │   ├── RokkonPipelineSetupIT.java.bak
+    │   │               │   ├── service
+    │   │               │   │   └── StorkServiceDiscoveryIT.java
+    │   │               │   └── test
+    │   │               │       ├── ConsulTestResource.java
+    │   │               │       ├── DummyProcessorIT.java
+    │   │               │       └── TestModuleProcessorIT.java
+    │   │               └── rest
+    │   │                   └── ModuleResourceTest.java
+    │   └── resources
+    │       └── application.yml
+    ├── main
+    │   ├── bash
+    │   │   ├── consul-dev.sh
+    │   │   ├── test-all.sh
+    │   │   └── test-grpc.sh
+    │   ├── docker
+    │   │   ├── Dockerfile.dev
+    │   │   ├── Dockerfile.jvm
+    │   │   ├── Dockerfile.legacy-jar
+    │   │   ├── Dockerfile.native
+    │   │   └── Dockerfile.native-micro
+    │   ├── java
+    │   │   └── com
+    │   │       └── rokkon
+    │   │           ├── engine
+    │   │           │   ├── api
+    │   │           │   │   ├── ClusterResource.java
+    │   │           │   │   ├── GlobalModuleResource.java
+    │   │           │   │   ├── PipelineConfigResource.java
+    │   │           │   │   ├── PipelineDefinitionRequestDTO.java
+    │   │           │   │   ├── PipelineDefinitionResource.java
+    │   │           │   │   ├── PipelineInstanceResource.java
+    │   │           │   │   ├── PipelineStepRequestDTO.java
+    │   │           │   │   └── PipelineUIController.java
+    │   │           │   └── grpc
+    │   │           │       └── ModuleRegistrationServiceImpl.java
+    │   │           └── pipeline
+    │   │               └── engine
+    │   │                   ├── api
+    │   │                   │   ├── ConsulConnectionResource.java
+    │   │                   │   ├── ConsulStatusResource.java
+    │   │                   │   ├── ModuleDiscoveryResource.java
+    │   │                   │   └── PingResource.java
+    │   │                   ├── config
+    │   │                   │   ├── ConsulConfigSourceFactory.java
+    │   │                   │   └── StorkConfiguration.java
+    │   │                   ├── EngineLifecycle.java
+    │   │                   ├── event
+    │   │                   │   └── ConsulStatusEvent.java
+    │   │                   ├── grpc
+    │   │                   │   ├── ConnectorEngineImpl.java
+    │   │                   │   ├── ModuleRegistrationServiceImpl.java
+    │   │                   │   └── PipeStreamEngineImpl.java
+    │   │                   ├── service
+    │   │                   │   ├── ConsulHealthService.java
+    │   │                   │   ├── EngineRegistrationService.java
+    │   │                   │   ├── EventDrivenRouterImpl.java
+    │   │                   │   ├── EventDrivenRouter.java
+    │   │                   │   ├── GrpcClientFactoryImpl.java
+    │   │                   │   ├── GrpcClientFactory.java
+    │   │                   │   ├── GrpcTransportHandler.java
+    │   │                   │   ├── KafkaRouter.java
+    │   │                   │   ├── KafkaRouterStub.java
+    │   │                   │   ├── KafkaTransportHandler.java
+    │   │                   │   ├── ModuleRouterImpl.java
+    │   │                   │   ├── ModuleRouter.java
+    │   │                   │   ├── PipelineExecutorService.java
+    │   │                   │   ├── ServiceDiscovery.java
+    │   │                   │   ├── StorkServiceDiscovery.java
+    │   │                   │   └── TransportHandler.java
+    │   │                   ├── startup
+    │   │                   │   └── ConsulConfigSeeder.java
+    │   │                   └── util
+    │   │                       └── JsonProtoConverter.java
+    │   └── resources
+    │       ├── application-dev.yml
+    │       ├── application-docker-dev.yml
+    │       ├── application-krick-local.yml
+    │       ├── application.yml
+    │       └── META-INF
+    │           ├── beans.xml
+    │           └── resources
+    │               ├── css
+    │               │   └── dashboard.css
+    │               ├── index.html
+    │               ├── index.html.old
+    │               ├── index-old.html
+    │               ├── js
+    │               │   ├── api.js
+    │               │   ├── clusters.js
+    │               │   ├── main.js
+    │               │   ├── modules.js
+    │               │   ├── pipelines.js
+    │               │   ├── services.js
+    │               │   └── validation.js
+    │               ├── test.html
+    │               └── working.html
+    └── test
+        ├── java
+        │   └── com
+        │       └── rokkon
+        │           ├── engine
+        │           │   ├── api
+        │           │   │   ├── GlobalModuleResourceTest.java
+        │           │   │   ├── PipelineDefinitionResourceTestBase.java
+        │           │   │   ├── PipelineDefinitionResourceTest.java
+        │           │   │   ├── PipelineInstanceResourceTest.java
+        │           │   │   └── SimpleClusterResourceTest.java
+        │           │   └── grpc
+        │           │       └── ModuleRegistrationServiceImplTest.java
+        │           └── pipeline
+        └── resources
+            ├── application-test.properties
+            ├── application.yml
+            └── junit-platform.properties
+
+114 directories, 590 files
