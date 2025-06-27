@@ -1,4 +1,4 @@
-package com.rokkon.search.utils;
+package com.rokkon.search.util;
 
 import com.google.protobuf.Timestamp;
 import java.time.Instant;

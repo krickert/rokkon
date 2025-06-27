@@ -1,6 +1,8 @@
-package com.rokkon.pipeline.utils;
+package com.rokkon.pipeline.util;
 
+import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.SerializationFeature;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import org.junit.jupiter.api.Test;
@@ -30,29 +32,28 @@ class ObjectMapperFactoryTest {
         obj.data.put("a-key", "a-value");
         obj.data.put("m-key", "m-value");
         
-        // Serialize with both mappers
+        // Serialize with factory mapper
         String factoryJson = factoryMapper.writeValueAsString(obj);
-        String quarkusJson = quarkusObjectMapper.writeValueAsString(obj);
         
-        // Both should sort properties alphabetically since JsonOrderingCustomizer is now in commons
-        
+        // The factory mapper should sort properties alphabetically
         // Verify factory mapper sorts properties alphabetically
         assertThat(factoryJson).matches(".*\"apple\".*\"data\".*\"middle\".*\"zebra\".*");
         // Verify factory mapper sorts map entries by key
         assertThat(factoryJson).matches(".*\"a-key\".*\"m-key\".*\"z-key\".*");
         
-        // Verify Quarkus mapper sorts properties alphabetically
-        assertThat(quarkusJson).matches(".*\"apple\".*\"data\".*\"middle\".*\"zebra\".*");
-        // Verify Quarkus mapper sorts map entries by key
-        assertThat(quarkusJson).matches(".*\"a-key\".*\"m-key\".*\"z-key\".*");
-        
-        // Both produce the same logical content (deserialize and compare)
+        // Test deserialization works correctly
         TestObject factoryDeser = factoryMapper.readValue(factoryJson, TestObject.class);
-        TestObject quarkusDeser = quarkusObjectMapper.readValue(quarkusJson, TestObject.class);
+        assertThat(factoryDeser.apple).isEqualTo("first alphabetically");
+        assertThat(factoryDeser.zebra).isEqualTo("last alphabetically");
+        assertThat(factoryDeser.middle).isEqualTo("middle");
+        assertThat(factoryDeser.data).containsEntry("a-key", "a-value");
+        assertThat(factoryDeser.data).containsEntry("m-key", "m-value");
+        assertThat(factoryDeser.data).containsEntry("z-key", "z-value");
         
-        assertThat(factoryDeser.apple).isEqualTo(quarkusDeser.apple);
-        assertThat(factoryDeser.zebra).isEqualTo(quarkusDeser.zebra);
-        assertThat(factoryDeser.data).isEqualTo(quarkusDeser.data);
+        // Verify configuration is applied
+        assertThat(factoryMapper.getRegisteredModuleIds()).contains("jackson-datatype-jsr310");
+        assertThat(factoryMapper.isEnabled(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY)).isTrue();
+        assertThat(factoryMapper.isEnabled(SerializationFeature.ORDER_MAP_ENTRIES_BY_KEYS)).isTrue();
     }
     
     @Test

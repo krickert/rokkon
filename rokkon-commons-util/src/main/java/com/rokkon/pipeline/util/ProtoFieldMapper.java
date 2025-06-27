@@ -1,4 +1,4 @@
-package com.rokkon.pipeline.utils;
+package com.rokkon.pipeline.util;
 
 import com.google.protobuf.*;
 import com.google.protobuf.DescriptorProtos.DescriptorProto;

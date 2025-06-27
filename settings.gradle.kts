@@ -14,6 +14,7 @@ rootProject.name = "rokkon-pristine"
 // Include only the modules we've migrated
 include("rokkon-bom")
 include("rokkon-commons")
+include("rokkon-commons-util")
 include("rokkon-protobuf")
 include("test-utilities")
 include("rokkon-engine")

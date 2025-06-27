@@ -1,4 +1,4 @@
-package com.rokkon.pipeline.utils;
+package com.rokkon.pipeline.util;
 
 import com.rokkon.search.model.PipeDoc; // Using PipeDoc from com.rokkon.search.model package
 import org.junit.jupiter.api.BeforeEach;

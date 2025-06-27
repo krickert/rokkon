@@ -24,7 +24,7 @@ import jakarta.inject.Inject;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rokkon.pipeline.utils.ObjectMapperFactory;
+import com.rokkon.pipeline.util.ObjectMapperFactory;
 
 import java.util.*;
 import java.time.Instant;

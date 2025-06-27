@@ -1,4 +1,4 @@
-package com.rokkon.pipeline.utils;
+package com.rokkon.pipeline.util;
 
 import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;

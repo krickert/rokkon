@@ -3,7 +3,7 @@ package com.rokkon.echo;
 import com.google.protobuf.util.JsonFormat;
 import com.rokkon.search.model.*;
 import com.rokkon.search.sdk.*;
-import com.rokkon.search.utils.SampleDataLoader;
+import com.rokkon.search.util.SampleDataLoader;
 import io.quarkus.grpc.GrpcClient;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;

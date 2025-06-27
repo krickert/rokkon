@@ -2,8 +2,8 @@ package com.rokkon.modules.embedder.comprehensive;
 
 import com.google.protobuf.Struct;
 import com.google.protobuf.util.JsonFormat;
-import com.rokkon.pipeline.utils.ProcessingBuffer;
-import com.rokkon.pipeline.utils.ProcessingBufferFactory;
+import com.rokkon.pipeline.util.ProcessingBuffer;
+import com.rokkon.pipeline.util.ProcessingBufferFactory;
 import com.rokkon.search.model.PipeDoc;
 import com.rokkon.search.sdk.PipeStepProcessor;
 import com.rokkon.search.sdk.ProcessConfiguration;

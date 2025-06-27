@@ -1,4 +1,4 @@
-package com.rokkon.search.model.util;
+package com.rokkon.pipeline.util;
 
 import com.google.protobuf.DescriptorProtos.DescriptorProto;
 import com.google.protobuf.DescriptorProtos.FieldDescriptorProto;
@@ -7,7 +7,7 @@ import com.google.protobuf.Descriptors.DescriptorValidationException;
 import com.google.protobuf.Descriptors.FieldDescriptor;
 import com.google.protobuf.Descriptors.FileDescriptor;
 import com.google.protobuf.*;
-import com.rokkon.pipeline.utils.ProtoFieldMapper;
+import com.rokkon.pipeline.util.ProtoFieldMapper;
 import org.junit.jupiter.api.BeforeAll;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.function.Executable;
