@@ -1,5 +1,6 @@
 package com.rokkon.engine.api;
 
+import com.rokkon.engine.api.WithConsulTestProfile;
 import com.rokkon.pipeline.engine.test.ConsulTestResource;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusIntegrationTest;
@@ -29,7 +30,7 @@ import static io.restassured.RestAssured.given;
  */
 @QuarkusIntegrationTest
 @QuarkusTestResource(ConsulTestResource.class)
-@TestProfile(PipelineDefinitionResourceIT.RandomClusterProfile.class)
+@TestProfile(WithConsulTestProfile.class)
 @TestInstance(Lifecycle.PER_CLASS)
 public class PipelineDefinitionResourceIT extends PipelineDefinitionResourceTestBase {
 

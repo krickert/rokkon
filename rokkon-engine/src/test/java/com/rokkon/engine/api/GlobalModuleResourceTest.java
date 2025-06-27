@@ -1,10 +1,11 @@
 package com.rokkon.engine.api;
 
-import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService;
-import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService.ModuleRegistration;
-import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService.ZombieCleanupResult;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService.ModuleRegistration;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService.ZombieCleanupResult;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.BeforeEach;
@@ -18,10 +19,11 @@ import static io.restassured.RestAssured.given;
 import static org.hamcrest.CoreMatchers.*;
 
 @QuarkusTest
+@TestProfile(NoConsulTestProfile.class)
 class GlobalModuleResourceTest {
     
     @InjectMock
-    DELETE_ME_GlobalModuleRegistryService moduleRegistry;
+    GlobalModuleRegistryService moduleRegistry;
 
     @BeforeEach
     void setup() {

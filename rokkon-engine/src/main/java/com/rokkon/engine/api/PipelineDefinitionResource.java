@@ -1,8 +1,8 @@
 package com.rokkon.engine.api;
 
 import com.rokkon.pipeline.config.model.PipelineConfig;
+import com.rokkon.pipeline.config.model.PipelineDefinitionSummary;
 import com.rokkon.pipeline.config.service.PipelineDefinitionService;
-import com.rokkon.pipeline.consul.model.PipelineDefinitionSummary;
 import io.quarkus.runtime.LaunchMode;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
@@ -28,7 +28,7 @@ import java.util.Collections;
 import java.util.stream.Collectors;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
 import com.rokkon.pipeline.config.model.PipelineStepConfig;
 import com.rokkon.pipeline.config.model.StepType; // Assuming this is the correct StepType
 import com.rokkon.pipeline.config.model.PipelineStepConfig.ProcessorInfo;
@@ -51,7 +51,7 @@ public class PipelineDefinitionResource {
     PipelineDefinitionService pipelineDefinitionService;
 
     @Inject
-    DELETE_ME_GlobalModuleRegistryService moduleRegistryService;
+    GlobalModuleRegistryService moduleRegistryService;
 
     @Inject
     ObjectMapper objectMapper;

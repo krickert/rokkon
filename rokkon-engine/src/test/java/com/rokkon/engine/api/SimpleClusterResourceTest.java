@@ -1,7 +1,8 @@
 package com.rokkon.engine.api;
 
 import com.rokkon.pipeline.config.service.ClusterService;
-import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
@@ -25,7 +26,7 @@ class SimpleClusterResourceTest {
         String clusterName = "rest-test-cluster";
 
         // Setup mock response - @InjectMock creates a Mockito mock automatically
-        ValidationResult validResult = new DefaultValidationResult(true, null, null);
+        ValidationResult validResult = ValidationResultFactory.success();
         org.mockito.Mockito.when(clusterService.createCluster(clusterName))
             .thenReturn(Uni.createFrom().item(validResult));
 

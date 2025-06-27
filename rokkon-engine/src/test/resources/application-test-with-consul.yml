@@ -1,0 +1,50 @@
+quarkus:
+  # Enable Consul for integration tests
+  consul:
+    enabled: true
+    host: localhost
+    port: 8500
+    
+  consul-config:
+    enabled: true
+    properties-value-keys:
+      - test/config/application
+      - test/${rokkon.cluster.name}/config/application
+    fail-on-missing-key: false
+    
+  # Enable Stork service discovery with Consul
+  stork:
+    service-discovery:
+      type: consul
+      consul:
+        host: localhost
+        port: 8500
+        
+  # Health checks enabled for integration tests
+  health:
+    extensions:
+      enabled: true
+      
+  # Logging configuration for integration tests
+  log:
+    level: INFO
+    category:
+      "com.rokkon": DEBUG
+      "io.quarkus.consul": DEBUG
+      "io.vertx.ext.consul": DEBUG
+      
+# Application-specific configuration
+rokkon:
+  cluster:
+    name: integration-test-cluster
+    auto-create: true
+    
+  # Enable schedulers for integration tests
+  scheduler:
+    enabled: true
+    
+  # Test-specific module registry configuration
+  module-registry:
+    cleanup:
+      enabled: false  # Disable automatic cleanup in tests
+      interval: 1h

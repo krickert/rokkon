@@ -4,7 +4,8 @@ import com.rokkon.pipeline.config.model.PipelineInstance;
 import com.rokkon.pipeline.config.model.PipelineInstance.PipelineInstanceStatus;
 import com.rokkon.pipeline.config.model.CreateInstanceRequest;
 import com.rokkon.pipeline.config.service.PipelineInstanceService;
-import com.rokkon.pipeline.validation.DefaultValidationResult;
+import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
 import io.restassured.http.ContentType;
@@ -109,11 +110,7 @@ class PipelineInstanceResourceTest {
             "pipelineDefinitionId", "pipeline-def-1"
         );
         
-        ValidationResult failureResult = new DefaultValidationResult(
-            false, 
-            List.of("Instance ID already exists"), 
-            List.of()
-        );
+        ValidationResult failureResult = ValidationResultFactory.failure("Instance ID already exists");
         
         org.mockito.Mockito.when(pipelineInstanceService.createInstance(
             org.mockito.ArgumentMatchers.eq(CLUSTER_NAME),
@@ -139,11 +136,7 @@ class PipelineInstanceResourceTest {
             "pipelineDefinitionId", "non-existent-def"
         );
         
-        ValidationResult failureResult = new DefaultValidationResult(
-            false, 
-            List.of("Pipeline definition not found"), 
-            List.of()
-        );
+        ValidationResult failureResult = ValidationResultFactory.failure("Pipeline definition not found");
         
         org.mockito.Mockito.when(pipelineInstanceService.createInstance(
             org.mockito.ArgumentMatchers.eq(CLUSTER_NAME),
@@ -167,7 +160,7 @@ class PipelineInstanceResourceTest {
         
         PipelineInstance updateInstance = PipelineInstance.create(instanceId, "pipeline-def-1", CLUSTER_NAME);
         
-        ValidationResult successResult = new DefaultValidationResult(true, List.of(), List.of());
+        ValidationResult successResult = ValidationResultFactory.success();
         
         org.mockito.Mockito.when(pipelineInstanceService.updateInstance(
             org.mockito.ArgumentMatchers.eq(CLUSTER_NAME),
@@ -192,11 +185,7 @@ class PipelineInstanceResourceTest {
         
         PipelineInstance updateInstance = PipelineInstance.create(instanceId, "pipeline-def-1", CLUSTER_NAME);
         
-        ValidationResult failureResult = new DefaultValidationResult(
-            false, 
-            List.of("Pipeline instance not found"), 
-            List.of()
-        );
+        ValidationResult failureResult = ValidationResultFactory.failure("Pipeline instance not found");
         
         org.mockito.Mockito.when(pipelineInstanceService.updateInstance(
             org.mockito.ArgumentMatchers.eq(CLUSTER_NAME),
@@ -219,7 +208,7 @@ class PipelineInstanceResourceTest {
     void testDeleteInstance() {
         String instanceId = "delete-instance";
         
-        ValidationResult successResult = new DefaultValidationResult(true, List.of(), List.of());
+        ValidationResult successResult = ValidationResultFactory.success();
         
         org.mockito.Mockito.when(pipelineInstanceService.deleteInstance(CLUSTER_NAME, instanceId))
             .thenReturn(Uni.createFrom().item(successResult));
@@ -235,11 +224,7 @@ class PipelineInstanceResourceTest {
     void testDeleteNonExistentInstance() {
         String instanceId = "non-existent-instance";
         
-        ValidationResult failureResult = new DefaultValidationResult(
-            false, 
-            List.of("Pipeline instance not found"), 
-            List.of()
-        );
+        ValidationResult failureResult = ValidationResultFactory.failure("Pipeline instance not found");
         
         org.mockito.Mockito.when(pipelineInstanceService.deleteInstance(CLUSTER_NAME, instanceId))
             .thenReturn(Uni.createFrom().item(failureResult));
@@ -256,11 +241,7 @@ class PipelineInstanceResourceTest {
     void testDeleteRunningInstance() {
         String instanceId = "running-instance";
         
-        ValidationResult failureResult = new DefaultValidationResult(
-            false, 
-            List.of("Cannot delete running instance"), 
-            List.of()
-        );
+        ValidationResult failureResult = ValidationResultFactory.failure("Cannot delete running instance");
         
         org.mockito.Mockito.when(pipelineInstanceService.deleteInstance(CLUSTER_NAME, instanceId))
             .thenReturn(Uni.createFrom().item(failureResult));
@@ -277,7 +258,7 @@ class PipelineInstanceResourceTest {
     void testStartInstance() {
         String instanceId = "start-instance";
         
-        ValidationResult successResult = new DefaultValidationResult(true, List.of(), List.of());
+        ValidationResult successResult = ValidationResultFactory.success();
         
         org.mockito.Mockito.when(pipelineInstanceService.startInstance(CLUSTER_NAME, instanceId))
             .thenReturn(Uni.createFrom().item(successResult));
@@ -296,11 +277,7 @@ class PipelineInstanceResourceTest {
     void testStartNonExistentInstance() {
         String instanceId = "non-existent-instance";
         
-        ValidationResult failureResult = new DefaultValidationResult(
-            false, 
-            List.of("Pipeline instance not found"), 
-            List.of()
-        );
+        ValidationResult failureResult = ValidationResultFactory.failure("Pipeline instance not found");
         
         org.mockito.Mockito.when(pipelineInstanceService.startInstance(CLUSTER_NAME, instanceId))
             .thenReturn(Uni.createFrom().item(failureResult));
@@ -319,11 +296,7 @@ class PipelineInstanceResourceTest {
     void testStartAlreadyRunningInstance() {
         String instanceId = "running-instance";
         
-        ValidationResult failureResult = new DefaultValidationResult(
-            false, 
-            List.of("Instance is already running"), 
-            List.of()
-        );
+        ValidationResult failureResult = ValidationResultFactory.failure("Instance is already running");
         
         org.mockito.Mockito.when(pipelineInstanceService.startInstance(CLUSTER_NAME, instanceId))
             .thenReturn(Uni.createFrom().item(failureResult));
@@ -342,7 +315,7 @@ class PipelineInstanceResourceTest {
     void testStopInstance() {
         String instanceId = "stop-instance";
         
-        ValidationResult successResult = new DefaultValidationResult(true, List.of(), List.of());
+        ValidationResult successResult = ValidationResultFactory.success();
         
         org.mockito.Mockito.when(pipelineInstanceService.stopInstance(CLUSTER_NAME, instanceId))
             .thenReturn(Uni.createFrom().item(successResult));
@@ -361,11 +334,7 @@ class PipelineInstanceResourceTest {
     void testStopNonExistentInstance() {
         String instanceId = "non-existent-instance";
         
-        ValidationResult failureResult = new DefaultValidationResult(
-            false, 
-            List.of("Pipeline instance not found"), 
-            List.of()
-        );
+        ValidationResult failureResult = ValidationResultFactory.failure("Pipeline instance not found");
         
         org.mockito.Mockito.when(pipelineInstanceService.stopInstance(CLUSTER_NAME, instanceId))
             .thenReturn(Uni.createFrom().item(failureResult));
@@ -384,11 +353,7 @@ class PipelineInstanceResourceTest {
     void testStopAlreadyStoppedInstance() {
         String instanceId = "stopped-instance";
         
-        ValidationResult failureResult = new DefaultValidationResult(
-            false, 
-            List.of("Instance is not running"), 
-            List.of()
-        );
+        ValidationResult failureResult = ValidationResultFactory.failure("Instance is not running");
         
         org.mockito.Mockito.when(pipelineInstanceService.stopInstance(CLUSTER_NAME, instanceId))
             .thenReturn(Uni.createFrom().item(failureResult));

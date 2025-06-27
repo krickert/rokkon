@@ -1,5 +1,6 @@
 package com.rokkon.engine.grpc;
 
+import com.rokkon.engine.api.NoConsulTestProfile;
 import com.rokkon.search.grpc.ModuleInfo;
 import com.rokkon.search.grpc.ModuleId;
 import com.rokkon.search.grpc.RegistrationStatus;
@@ -7,15 +8,15 @@ import com.rokkon.search.grpc.UnregistrationStatus;
 import com.rokkon.search.grpc.ModuleHealthStatus;
 import com.rokkon.search.grpc.ModuleList;
 import com.rokkon.search.grpc.MutinyModuleRegistrationGrpc;
-import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService;
-import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService.ModuleRegistration;
-import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService.ServiceHealthStatus;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService.ModuleRegistration;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService.ServiceHealthStatus;
 import com.google.protobuf.Empty;
 import io.quarkus.grpc.GrpcClient;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 import io.quarkus.test.InjectMock;
 import io.smallrye.mutiny.Uni;
-import io.vertx.ext.consul.CheckStatus;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.mockito.Mockito;
@@ -29,13 +30,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Unit tests for ModuleRegistrationServiceImpl using gRPC client
  */
 @QuarkusTest
+@TestProfile(NoConsulTestProfile.class)
 class ModuleRegistrationServiceImplTest {
 
     @GrpcClient("moduleRegistration")
     MutinyModuleRegistrationGrpc.MutinyModuleRegistrationStub registrationClient;
 
     @InjectMock
-    DELETE_ME_GlobalModuleRegistryService mockRegistryService;
+    GlobalModuleRegistryService mockRegistryService;
     
     @BeforeEach
     void setup() {
@@ -167,7 +169,7 @@ class ModuleRegistrationServiceImplTest {
 
         ServiceHealthStatus healthStatus = new ServiceHealthStatus(
             createMockRegistration(),
-            CheckStatus.PASSING,
+            GlobalModuleRegistryService.HealthStatus.PASSING,
             true
         );
 
@@ -194,7 +196,7 @@ class ModuleRegistrationServiceImplTest {
 
         ServiceHealthStatus healthStatus = new ServiceHealthStatus(
             createMockRegistration(),
-            CheckStatus.CRITICAL,
+            GlobalModuleRegistryService.HealthStatus.CRITICAL,
             true
         );
 

@@ -1,8 +1,8 @@
 package com.rokkon.engine.api;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService;
-import com.rokkon.pipeline.consul.service.DELETE_ME_GlobalModuleRegistryService.ModuleRegistration;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService.ModuleRegistration;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
 import jakarta.validation.Valid;
@@ -26,7 +26,7 @@ public class GlobalModuleResource {
     private static final Logger LOG = Logger.getLogger(GlobalModuleResource.class);
     
     @Inject
-    DELETE_ME_GlobalModuleRegistryService moduleRegistry;
+    GlobalModuleRegistryService moduleRegistry;
 
     public record RegisterModuleRequest(
         @JsonProperty("module_name") @NotBlank String moduleName,

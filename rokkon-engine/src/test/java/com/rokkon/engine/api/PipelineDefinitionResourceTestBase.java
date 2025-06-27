@@ -1,7 +1,7 @@
 package com.rokkon.engine.api;
 
 import com.rokkon.pipeline.config.model.PipelineConfig;
-import com.rokkon.pipeline.consul.model.PipelineDefinitionSummary;
+import com.rokkon.pipeline.config.model.PipelineDefinitionSummary;
 import io.restassured.http.ContentType;
 
 import static io.restassured.RestAssured.given;

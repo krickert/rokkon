@@ -1,0 +1,44 @@
+quarkus:
+  # Disable Consul completely
+  consul:
+    enabled: false
+  
+  consul-config:
+    enabled: false
+    
+  # Disable Stork service discovery that might use Consul
+  stork:
+    service-discovery:
+      enabled: false
+    
+  # Use a simple in-memory implementation
+  datasource:
+    db-kind: h2
+    jdbc:
+      url: jdbc:h2:mem:test;MODE=PostgreSQL;DB_CLOSE_DELAY=-1
+      
+  # Disable health checks that might depend on external services
+  health:
+    extensions:
+      enabled: false
+      
+  # Disable dev services
+  devservices:
+    enabled: false
+    
+  # Logging configuration for tests
+  log:
+    level: INFO
+    category:
+      "com.rokkon": DEBUG
+      "io.quarkus.consul": OFF
+      
+# Application-specific configuration
+rokkon:
+  cluster:
+    name: unit-test-cluster
+    auto-create: false
+    
+  # Disable any background jobs or schedulers
+  scheduler:
+    enabled: false
