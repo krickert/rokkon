@@ -1,66 +1,62 @@
-# Development profile overrides for local Consul
-# This file is used to configure the application for local development with Consul.
-
-# General application properties
+# Development profile - manual Consul setup required
 application:
-  name: stork-engine
+  name: rokkon-engine
   version: 1.0.0
-  description: Stork Engine for local development
+  description: Rokkon Engine for local development
 
-# Quarkus configuration for HTTP and gRPC servers
-# Use
 quarkus:
+  # HTTP configuration
   http:
     port: 8080
-    host: 0.0.0.0  # Bind to all interfaces in container
+    host: 0.0.0.0
   
+  # gRPC configuration  
   grpc:
     server:
-      host: 0.0.0.0  # Bind to all interfaces for local development
       port: 49000
+      host: 0.0.0.0
   
+  # Consul config - disabled for dev mode
+  # Start Consul manually with: docker run -d -p 8500:8500 consul:latest agent -dev -ui -client=0.0.0.0
   consul-config:
-    enabled: true
-    agent:
-      host-port: localhost:8500
+    enabled: false
     properties-value-keys: 
       - config/application
       - config/dev
     format: yaml
-    watch: true
-    watch-period: 10s
     fail-on-missing-key: false
 
-# Override Consul settings for local development
+# Rokkon configuration
+rokkon:
+  engine:
+    grpc-port: 49000
+    rest-port: 8080
+    debug: true
+      
+  # Tell the engine to register itself with Consul
+  consul:
+    host: localhost
+    port: 8500
+
+# Consul configuration for engine registration
 consul:
-  host: ${CONSUL_HOST:consul}  # Use consul service name in docker network
-  port: ${CONSUL_PORT:8500}
+  host: localhost
+  port: 8500
 
-# Override Stork settings for local Consul
-stork:
-  default:
-    service-discovery:
-      consul-host: ${CONSUL_HOST:consul}
-      consul-port: ${CONSUL_PORT:8500}
-  echo-service:
-    service-discovery:
-      consul-host: ${CONSUL_HOST:consul}
-      consul-port: ${CONSUL_PORT:8500}
-  chunker-service:
-    service-discovery:
-      consul-host: ${CONSUL_HOST:consul}
-      consul-port: ${CONSUL_PORT:8500}
-  parser-service:
-    service-discovery:
-      consul-host: ${CONSUL_HOST:consul}
-      consul-port: ${CONSUL_PORT:8500}
-  embedder-service:
-    service-discovery:
-      consul-host: ${CONSUL_HOST:consul}
-      consul-port: ${CONSUL_PORT:8500}
+# Engine host configuration for Consul registration
+engine:
+  host: host.docker.internal  # Allow Docker containers to reach the host
 
-# Disable validation for dev
-smallrye:
-  config:
-    mapping:
-      validate-unknown: false
+# Dev mode specific settings
+"%dev":
+  quarkus:
+    # Live reload
+    live-reload:
+      instrumentation: true
+      
+    # Logging
+    log:
+      category:
+        "com.rokkon": DEBUG
+        "io.quarkus.consul": DEBUG
+        "io.smallrye.stork": DEBUG

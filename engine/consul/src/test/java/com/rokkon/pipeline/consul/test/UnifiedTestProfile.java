@@ -23,6 +23,7 @@ public class UnifiedTestProfile implements QuarkusTestProfile {
      * Configuration options for tests
      */
     public static class TestConfiguration {
+        // Consul is DISABLED by default for all tests
         public boolean consulEnabled = false;
         public boolean consulConfigEnabled = false;
         public boolean schedulerEnabled = false;
@@ -134,8 +135,8 @@ public class UnifiedTestProfile implements QuarkusTestProfile {
         }
         
         // Default for most unit tests
-        if (className.endsWith("UnitTest")) {
-            // NoConsulTestProfile behavior
+        if (className.endsWith("UnitTest") || className.endsWith("Test")) {
+            // NoConsulTestProfile behavior - disable all Consul-related features
             config.consulEnabled = false;
             config.consulConfigEnabled = false;
             config.schedulerEnabled = false;
@@ -156,6 +157,12 @@ public class UnifiedTestProfile implements QuarkusTestProfile {
         
         Map<String, String> overrides = new HashMap<>();
         
+        // ALWAYS disable consul by default - must be explicitly enabled
+        overrides.put("quarkus.consul.enabled", "false");
+        overrides.put("quarkus.consul-config.enabled", "false");
+        overrides.put("quarkus.consul.devservices.enabled", "false");
+        overrides.put("quarkus.devservices.enabled", "false");
+        
         // Base configuration
         overrides.put("rokkon.cluster.name", "unit-test-cluster");
         
@@ -164,10 +171,19 @@ public class UnifiedTestProfile implements QuarkusTestProfile {
         if (config.testClassName != null) {
             if (config.testClassName.contains("Service") && !config.testClassName.contains("Mock")) {
                 kvPrefix = "service-test/" + config.testClassName;
-                // Service tests need consul enabled
-                config.consulEnabled = true;
+                // Service unit tests should NOT need consul - they should use mocks
+                // Only integration tests (IT suffix) should use real Consul
+                if (config.testClassName.endsWith("IT")) {
+                    config.consulEnabled = true;
+                }
             } else if (config.testClassName.contains("ConsulConfigSource")) {
                 kvPrefix = "config-test/" + config.testClassName;
+                // ConsulConfigSource tests need special handling
+                if (config.testClassName.equals("ConsulConfigSourceSimpleTest")) {
+                    // This test needs to be converted to use @QuarkusTestResource
+                    config.consulEnabled = false;
+                    config.consulConfigEnabled = false;
+                }
             } else {
                 kvPrefix = "test/" + config.testClassName;
             }
@@ -179,6 +195,12 @@ public class UnifiedTestProfile implements QuarkusTestProfile {
         overrides.put("quarkus.consul-config.enabled", String.valueOf(config.consulConfigEnabled));
         overrides.put("quarkus.health.extensions.enabled", String.valueOf(config.healthEnabled));
         overrides.put("quarkus.scheduler.enabled", String.valueOf(config.schedulerEnabled));
+        
+        // Disable Consul Dev Services for unit tests
+        if (!config.consulEnabled) {
+            overrides.put("quarkus.consul.devservices.enabled", "false");
+            overrides.put("quarkus.devservices.enabled", "false");
+        }
         
         // Validators
         overrides.put("test.validators.mode", config.realValidators ? "real" : "empty");

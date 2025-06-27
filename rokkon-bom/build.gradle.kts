@@ -22,6 +22,10 @@ dependencies {
     api("com.rokkon.pipeline:rokkon-protobuf:${project.version}") // Proto definitions - used everywhere
     api("com.rokkon.pipeline:rokkon-commons:${project.version}") // Common utilities - used everywhere
     
+    // Annotations needed for generated gRPC code
+    api("javax.annotation:javax.annotation-api") // gRPC still generates code using javax.annotation.Generated
+    api("jakarta.annotation:jakarta.annotation-api") // For Jakarta EE compatibility
+    
     // Additional module constraints
     constraints {
         // Other Rokkon modules

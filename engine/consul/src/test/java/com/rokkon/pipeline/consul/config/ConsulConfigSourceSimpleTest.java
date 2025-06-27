@@ -8,6 +8,8 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.Tag;
+import org.junit.jupiter.api.Disabled;
+import org.junit.jupiter.api.TestInstance;
 
 import java.time.Duration;
 
@@ -17,11 +19,14 @@ import static org.assertj.core.api.Assertions.assertThat;
  * Simple tests for configuration properties.
  * These test that our configuration structure is properly defined
  * and that default values are loaded from application.yml.
+ * 
+ * This is a unit test that does not require Consul to be running.
  */
 @QuarkusTest
 @TestProfile(UnifiedTestProfile.class)
 @DisplayName("Configuration Property Tests")
 @Tag("config-tests") // Tag for running separately if needed
+@TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class ConsulConfigSourceSimpleTest {
     
     // Test individual properties to verify they're loaded

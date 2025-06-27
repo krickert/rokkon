@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.MapperFeature;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.databind.PropertyNamingStrategies;
 import com.fasterxml.jackson.databind.SerializationFeature;
+import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
 
 /**
  * Factory for creating ObjectMapper instances with consistent configuration.
@@ -31,6 +32,9 @@ public class ObjectMapperFactory {
     public static ObjectMapper createConfiguredMapper() {
         ObjectMapper mapper = new ObjectMapper();
         
+        // Register Java 8 time module for Instant, Duration, etc.
+        mapper.registerModule(new JavaTimeModule());
+        
         // Apply same configuration as JsonOrderingCustomizer
         // Sort all properties alphabetically for consistent output
         mapper.configure(MapperFeature.SORT_PROPERTIES_ALPHABETICALLY, true);
@@ -56,6 +60,9 @@ public class ObjectMapperFactory {
      */
     public static ObjectMapper createMinimalMapper() {
         ObjectMapper mapper = new ObjectMapper();
+        
+        // Register Java 8 time module even for minimal mapper
+        mapper.registerModule(new JavaTimeModule());
         
         // Only apply Quarkus defaults, no ordering
         mapper.configure(SerializationFeature.WRITE_DATES_AS_TIMESTAMPS, false);

@@ -1,35 +1,24 @@
-# Test configuration
-# Disable validation for unknown config properties
-smallrye:
-  config:
-    mapping:
-      validate-unknown: false
-
-# Test-specific configuration - disable ALL dev services
-"%test":
-  quarkus:
-    devservices:
-      enabled: false
-    consul:
-      devservices:
-        enabled: false
-
+# Unified test profile configuration
+# This configuration is used by all tests using UnifiedTestProfile
 quarkus:
   application:
-    name: engine-consul-test
+    name: engine-consul-unified-test
   
-  # Consul config disabled by default for tests - integration tests will enable it
+  # Test profile
+  test:
+    profile: test-unified
+  
+  # Enable/disable features dynamically via UnifiedTestProfile
   consul-config:
-    enabled: false
+    enabled: ${quarkus.consul-config.enabled:false}
     agent:
       host: ${consul.host:localhost}
       port: ${consul.port:8500}
     properties-value-keys:
-      - config/application  # Load from /config/application in Consul KV
-      - config/test         # Test-specific config
+      - config/unified-test  # Unified test namespace
     format: yaml
-    watch: false  # Disable watch for tests to avoid timing issues
-    fail-on-missing-key: false  # Don't fail if keys don't exist yet
+    watch: false
+    fail-on-missing-key: false
   
   # HTTP configuration for tests
   http:
@@ -51,15 +40,7 @@ consul:
   host: localhost
   port: 8500
 
-# Test configuration values
-# Override any profile-specific values
-"%test":
-  rokkon:
-    engine:
-      grpc-port: 49000
-      rest-port: 8080
-      debug: false
-
+# Unified test configuration with dynamic KV prefix
 rokkon:
   engine:
     grpc-port: 49000
@@ -67,6 +48,8 @@ rokkon:
     debug: false
   
   consul:
+    # KV prefix is set dynamically by UnifiedTestProfile
+    kv-prefix: ${rokkon.consul.kv-prefix:test}
     cleanup:
       enabled: true
       interval: 5m
@@ -87,4 +70,4 @@ rokkon:
   default-cluster:
     name: default
     auto-create: true
-    description: "Default cluster for Rokkon pipelines"
+    description: "Default cluster for unified tests"

@@ -28,8 +28,8 @@ quarkus:
 
   # Consul configuration
   consul-config:
-    # Enable consul-config to read configuration from Consul KV
-    enabled: true
+    # Disabled by default - enable in specific profiles when Consul is available
+    enabled: false
     fail-on-missing-key: false  # Don't fail if config doesn't exist in Consul
     agent:
       host-port: ${consul.host:localhost}:${consul.port:8500}
@@ -223,5 +223,13 @@ smallrye:
         port: 0  # Random port for tests
     consul-config:
       enabled: false  # Disable in tests unless explicitly needed
+    log:
+      level: INFO
+
+# Production profile
+"%prod":
+  quarkus:
+    consul-config:
+      enabled: true  # Enable Consul config in production
     log:
       level: INFO

@@ -12,8 +12,10 @@ import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.config.service.ModuleWhitelistService;
 import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.consul.test.TestSeedingService;
+import com.rokkon.pipeline.consul.test.UnifiedTestProfile;
 import io.quarkus.test.InjectMock;
 import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.TestProfile;
 import io.smallrye.mutiny.Uni;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.TestInstance;
@@ -33,6 +35,7 @@ import static org.mockito.Mockito.when;
  * This tests the service interaction logic without requiring real Consul or containers.
  */
 @QuarkusTest
+@TestProfile(UnifiedTestProfile.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 class MethodicalBuildUpUnitTest extends MethodicalBuildUpTestBase {
 

@@ -98,3 +98,37 @@ quarkus {
         systemProperty("quarkus.grpc.codegen.type", "mutiny")
     }
 }
+
+// Custom tasks for development
+tasks.register<Exec>("startConsul") {
+    group = "development"
+    description = "Start Consul in Docker for development"
+    commandLine("bash", "-c", """
+        if nc -z localhost 8500 2>/dev/null; then
+            echo "Consul is already running"
+        else
+            echo "Starting Consul..."
+            docker run -d --name rokkon-consul-dev -p 8500:8500 -p 8600:8600/udp hashicorp/consul:latest agent -dev -ui -client=0.0.0.0
+            sleep 5
+        fi
+    """)
+}
+
+tasks.register<Exec>("stopConsul") {
+    group = "development"
+    description = "Stop Consul Docker container"
+    commandLine("bash", "-c", """
+        docker stop rokkon-consul-dev 2>/dev/null || true
+        docker rm rokkon-consul-dev 2>/dev/null || true
+    """)
+}
+
+tasks.register("devWithConsul") {
+    group = "development"
+    description = "Start Quarkus dev mode with Consul"
+    dependsOn("startConsul")
+    finalizedBy("quarkusDev")
+    doLast {
+        System.setProperty("quarkus.consul-config.enabled", "true")
+    }
+}

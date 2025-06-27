@@ -53,6 +53,8 @@ public class EngineRegistrationService {
     Instance<BindableService> grpcServices;
     
     private volatile boolean isRegistered = false;
+    private volatile String serviceId = null;
+    private volatile String registeredAddress = null;
     
     @jakarta.annotation.PostConstruct
     void init() {
@@ -100,7 +102,7 @@ public class EngineRegistrationService {
                     }
                     
                     // Not registered, proceed with registration
-                    String serviceId = applicationName + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+                    serviceId = applicationName + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
                     
                     // Dynamically discover all gRPC services
                     String providedServices = discoverGrpcServices();
@@ -131,6 +133,9 @@ public class EngineRegistrationService {
                 .setMeta(meta)
                 .setCheckOptions(checkOptions);
             
+                    // Store the address we're registering with
+                    registeredAddress = hostAddress;
+                    
                     // Register the service using the Mutiny client
                     return client.registerService(serviceOptions)
                         .onItem().transform(success -> {
@@ -268,4 +273,58 @@ public class EngineRegistrationService {
                     .toLowerCase();
     }
     
+    // Public getters for registration info
+    public boolean isRegistered() {
+        return isRegistered;
+    }
+    
+    public String getServiceId() {
+        return serviceId;
+    }
+    
+    public String getServiceName() {
+        return applicationName;
+    }
+    
+    public String getRegisteredAddress() {
+        return registeredAddress;
+    }
+    
+    /**
+     * Fetch registration details from Consul.
+     */
+    public io.smallrye.mutiny.Uni<java.util.Map<String, Object>> getRegistrationDetailsFromConsul() {
+        if (serviceId == null || !isRegistered) {
+            return io.smallrye.mutiny.Uni.createFrom().nullItem();
+        }
+        
+        return consulConnectionManager.getMutinyClient()
+            .map(client -> client.catalogServiceNodes(applicationName)
+                .onItem().transform(services -> {
+                    // Find our specific instance by serviceId
+                    for (var service : services.getList()) {
+                        if (serviceId.equals(service.getId())) {
+                            java.util.Map<String, Object> details = new java.util.HashMap<>();
+                            details.put("ID", service.getId());
+                            details.put("Service", service.getName());
+                            details.put("Address", service.getAddress());
+                            details.put("Port", service.getPort());
+                            details.put("Tags", service.getTags());
+                            details.put("Meta", service.getMeta());
+                            return details;
+                        }
+                    }
+                    return null;
+                }))
+            .orElse(io.smallrye.mutiny.Uni.createFrom().nullItem());
+    }
+    
+    /**
+     * Get health check details for the service.
+     */
+    public java.util.Map<String, Object> getHealthCheckDetails() {
+        // This would need to be implemented to fetch actual health check data
+        // For now, return null which the API will handle
+        return null;
+    }
 }

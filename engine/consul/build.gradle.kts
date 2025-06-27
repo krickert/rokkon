@@ -87,6 +87,44 @@ tasks.test {
     exclude("**/*IT.class")
 }
 
+// Create separate test tasks for different test groups
+val testServiceTests by tasks.registering(Test::class) {
+    description = "Runs only service tests"
+    group = "verification"
+    
+    useJUnitPlatform {
+        includeEngines("junit-jupiter")
+        includeTags("service-tests")
+    }
+    
+    // Use service-specific junit platform properties if they exist
+    systemProperty("junit.platform.config.file", "junit-platform-service-tests.properties")
+    
+    shouldRunAfter(tasks.test)
+}
+
+val testConfigTests by tasks.registering(Test::class) {
+    description = "Runs only config tests"
+    group = "verification"
+    
+    useJUnitPlatform {
+        includeEngines("junit-jupiter")
+        includeTags("config-tests")
+    }
+    
+    // Use config-specific junit platform properties if they exist
+    systemProperty("junit.platform.config.file", "junit-platform-config-tests.properties")
+    
+    shouldRunAfter(tasks.test)
+}
+
+val testAllSeparately by tasks.registering {
+    description = "Runs all test groups separately to avoid context conflicts"
+    group = "verification"
+    
+    dependsOn(tasks.test, testServiceTests, testConfigTests)
+}
+
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.addAll(listOf("-parameters", "--enable-preview"))

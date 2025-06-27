@@ -154,58 +154,37 @@ public class PipelineControlResourceTest {
 
 **Example: Testing Real Module Registration with Consul**
 
-TODO: QUARKUS COMES WITH A CONSUL VERTX CLIENT!!!! DO NOT USE THIS ONE!!
-
 ```java
-// In rokkon-engine/src/integrationTest/java/com/rokkon/engine/registration/ModuleRegistrationIntegrationTest.java
+// In engine/consul/src/integrationTest/java/com/rokkon/pipeline/consul/service/ClusterServiceIT.java
 import io.quarkus.test.junit.QuarkusIntegrationTest;
+import io.quarkus.test.common.QuarkusTestResource;
+import com.rokkon.pipeline.consul.test.ConsulTestResource;
+import com.rokkon.pipeline.config.service.ClusterService;
 import org.junit.jupiter.api.Test;
-import org.testcontainers.containers.GenericContainer;
-import org.testcontainers.junit.jupiter.Container;
-import org.testcontainers.junit.jupiter.Testcontainers;
-import io.quarkus.consul.runtime.ConsulClient; // Assuming this is the Quarkus client
-import io.vertx.ext.consul.Service; // Vert.x Consul client for Service model
 import javax.inject.Inject;
-import static org.junit.jupiter.api.Assertions.*;
+import static org.assertj.core.api.Assertions.assertThat;
 
- @engine/consul/src/test/resources/testcontainers.properties @QuarkusIntegrationTest
-public class ModuleRegistrationIntegrationTest {
-
-    // Testcontainers will start a Consul container for this test
-    @rokkon-engine/src/integrationTest/java/com/rokkon/pipeline/engine/registration/ContainerAwareRegistrationIT.java
-    public static GenericContainer<?> consulContainer = new GenericContainer<>("consul:latest")
-            .withExposedPorts(8500);
-
-    // This configures the running Quarkus app to use the dynamic port of our test container
-    static {
-        System.setProperty("quarkus.consul-config.host", "localhost");
-        System.setProperty("quarkus.consul-config.port", String.valueOf(consulContainer.getMappedPort(8500)));
-    }
-
-    @rokkon-engine/src/test/resources/application-test.properties
-    void testRegisterModuleFlow() {
-        // Arrange: Create a client to talk to the Rokkon Engine and Consul
-        // The gRPC client would call the real ModuleRegistrationService on the running app
-        // For simplicity, let's assume registration is triggered and we verify the result in Consul
-        String serviceName = "test-parser-module";
-        String serviceId = "test-parser-module-instance-1";
-
-        // ACT: (This part would be replaced with a real gRPC call to the engine)
-        // registerModule(serviceName, serviceId, "1.2.3", "10.0.0.5", 9090);
-
-        // ASSERT: Verify the service was actually created in the real Consul container
-        @Inject
-        ConsulClient quarkusConsulClient; // Injected Quarkus Consul client
-
-        // Use Awaitility for async operations
-        await().atMost(10, TimeUnit.SECONDS).until(() ->
-            quarkusConsulClient.getServices().toCompletionStage().toCompletableFuture().get().containsKey(serviceId)
-        );
-
-        Service registeredService = quarkusConsulClient.getServices().toCompletionStage().toCompletableFuture().get().get(serviceId);
-        assertNotNull(registeredService);
-        assertEquals(serviceName, registeredService.getService());
-        assertTrue(registeredService.getTags().contains("version:1.2.3"));
+@QuarkusIntegrationTest
+@QuarkusTestResource(ConsulTestResource.class)  // Automatically starts Consul container
+public class ClusterServiceIT extends ClusterServiceTestBase {
+    
+    @Inject
+    ClusterService clusterService;
+    
+    @Test
+    void testCreateClusterInRealConsul() {
+        // This test runs against a real Consul instance started by ConsulTestResource
+        var result = clusterService.createCluster("test-cluster")
+            .await().indefinitely();
+            
+        assertThat(result.valid()).isTrue();
+        
+        // Verify the cluster was actually created in Consul
+        var cluster = clusterService.getCluster("test-cluster")
+            .await().indefinitely();
+            
+        assertThat(cluster).isPresent();
+        assertThat(cluster.get().name()).isEqualTo("test-cluster");
     }
 }
 ```
@@ -235,6 +214,35 @@ public class ModuleRegistrationIntegrationTest {
 -----
 
 ## Updated Testing Patterns and Lessons Learned
+
+### UnifiedTestProfile - Solving Quarkus Test Profile Conflicts
+
+One of the major challenges we encountered was Quarkus test profile conflicts. When different tests use different `@TestProfile` annotations, Quarkus must restart the application context between tests, leading to slow test execution and potential port conflicts. To solve this, we created the **UnifiedTestProfile**.
+
+#### The UnifiedTestProfile Pattern
+
+The UnifiedTestProfile acts as a single profile that adapts its behavior based on the test being run:
+
+```java
+@QuarkusTest
+@TestProfile(UnifiedTestProfile.class)
+class MyUnitTest {
+    // Test implementation
+}
+```
+
+Key features:
+- **Single Profile**: All tests use the same profile, preventing Quarkus restarts
+- **Dynamic Configuration**: Determines configuration based on test class name and annotations
+- **Automatic Consul Handling**: Unit tests get Consul disabled, integration tests get it enabled
+- **Test Isolation**: Each test gets its own KV prefix in Consul to prevent conflicts
+
+The profile automatically configures:
+- Consul enabled/disabled based on test type (unit vs integration)
+- Test-specific KV prefixes for isolation
+- Mock vs real validators
+- Health check settings
+- Scheduler settings
 
 ### Test Organization Pattern: Base/Unit/Integration
 

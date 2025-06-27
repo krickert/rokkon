@@ -1,0 +1,82 @@
+version: '3.8'
+
+services:
+  # Consul service for service discovery and configuration
+  consul:
+    image: hashicorp/consul:1.21.2
+    container_name: rokkon-consul-dev
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    command: agent -dev -ui -client=0.0.0.0
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - rokkon-network
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Rokkon Engine service
+  rokkon-engine:
+    build:
+      context: ..
+      dockerfile: rokkon-engine/src/main/docker/Dockerfile.dev
+    container_name: rokkon-engine-dev
+    environment:
+      - CONSUL_HOST=localhost  # Connect to sidecar
+      - CONSUL_PORT=8500
+      - QUARKUS_PROFILE=docker-dev
+      - JAVA_ENABLE_DEBUG=true
+    depends_on:
+      consul:
+        condition: service_healthy
+    networks:
+      - rokkon-network
+    # No port exposure needed - sidecar handles it
+
+  # Consul Connect sidecar for rokkon-engine
+  rokkon-engine-sidecar:
+    image: hashicorp/consul:1.21.2
+    container_name: rokkon-engine-sidecar
+    command: consul connect proxy -sidecar-for rokkon-engine
+    network_mode: "service:rokkon-engine"  # Share network namespace with engine
+    depends_on:
+      - rokkon-engine
+      - consul
+    environment:
+      - CONSUL_HTTP_ADDR=consul:8500
+      - CONSUL_GRPC_ADDR=consul:8502
+
+  # Example: Echo module with sidecar
+  echo-module:
+    image: rokkon/echo-module:latest
+    container_name: echo-module
+    environment:
+      - CONSUL_HOST=localhost  # Connect to its own sidecar
+      - CONSUL_PORT=8500
+    networks:
+      - rokkon-network
+
+  echo-module-sidecar:
+    image: hashicorp/consul:1.21.2
+    container_name: echo-module-sidecar
+    command: consul connect proxy -sidecar-for echo-module
+    network_mode: "service:echo-module"
+    depends_on:
+      - echo-module
+      - consul
+    environment:
+      - CONSUL_HTTP_ADDR=consul:8500
+      - CONSUL_GRPC_ADDR=consul:8502
+
+networks:
+  rokkon-network:
+    name: rokkon-network
+    driver: bridge
+
+volumes:
+  gradle-cache:
+    name: gradle-cache
