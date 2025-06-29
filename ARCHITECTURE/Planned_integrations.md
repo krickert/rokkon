@@ -4,7 +4,7 @@ The Rokkon Engine is designed as a flexible and extensible platform. Its true po
 
 The ability to rapidly develop and integrate these new modules stems from Rokkon's core architecture:
 *   **gRPC-based Microservices:** Any language supporting gRPC can be used to write a module.
-*   **Clear Contracts (`rokkon-protobuf`):** Standardized interfaces for module interaction.
+*   **Clear Contracts (`commons/protobuf`):** Standardized interfaces for module interaction.
 *   **Dynamic Configuration & Discovery (Consul):** Easy integration of new modules into pipelines.
 
 This means development teams can work in parallel, leveraging existing libraries and domain expertise to build new integrations quickly.

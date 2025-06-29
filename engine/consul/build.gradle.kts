@@ -5,10 +5,7 @@ plugins {
     idea
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 dependencies {
     implementation(platform(project(":rokkon-bom")))

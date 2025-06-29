@@ -6,10 +6,7 @@ plugins {
     idea
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 
 // gRPC version for grpc-services dependency

@@ -57,7 +57,7 @@ src/main/proto/
 Add dependency in `build.gradle.kts`:
 ```kotlin
 dependencies {
-    implementation("com.rokkon.pipeline:rokkon-protobuf:1.0.0-SNAPSHOT")
+    implementation("com.rokkon.pipeline:commons-protobuf:1.0.0-SNAPSHOT")
 }
 ```
 
@@ -66,7 +66,7 @@ Configure proto scanning in `application.yml`:
 quarkus:
   generate-code:
     grpc:
-      scan-for-proto: "com.rokkon.pipeline:rokkon-protobuf"
+      scan-for-proto: "com.rokkon.pipeline:commons-protobuf"
 ```
 
 ### For Other Languages

@@ -501,7 +501,7 @@ To understand how such pipelines are constructed and managed within the Rokkon E
 
 * Pipeline Design (`Pipeline_design.md`): This document details the logical design of pipeline clusters, pipelines, pipeline steps, and modules. It also covers the dynamic configuration system.
 * Module Deployment (`Module_deployment.md`): Explains the process of deploying and registering modules with the Rokkon Engine.
-* Rokkon Protobufs (`rokkon-protobuf/README.md`): Describes the gRPC service definitions and message types that form the communication backbone of the engine and its modules.
+* Rokkon Protobufs (`commons/protobuf/README.md`): Describes the gRPC service definitions and message types that form the communication backbone of the engine and its modules.
 * Developer Notes (`DEVELOPER_NOTES/`): Contains various notes relevant to the design and implementation details, including specific architectural decisions and plans. (Refer to DEVELOPER_NOTES/rokkon-engine/ARCHITECTURE_AND_PLAN.md for more engine-specific details).
 
 

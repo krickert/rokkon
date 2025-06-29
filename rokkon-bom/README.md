@@ -13,11 +13,12 @@ The Rokkon BOM:
 2. Automatically includes core dependencies every Rokkon module needs:
    - `io.quarkus:quarkus-arc` - CDI container (required for all Quarkus apps)
    - `io.quarkus:quarkus-grpc` - gRPC support (core to Rokkon architecture)
-   - `com.rokkon.pipeline:rokkon-protobuf` - Proto definitions used throughout
-   - `com.rokkon.pipeline:rokkon-commons` - Common utilities and helpers
+   - `com.rokkon.pipeline:commons-protobuf` - Proto definitions used throughout
+   - `com.rokkon.pipeline:commons-interface` - Common interfaces and models
+   - `com.rokkon.pipeline:commons-util` - Common utilities and helpers
 
 3. Provides version constraints for:
-   - Rokkon internal modules (rokkon-protobuf, rokkon-commons, engine-models)
+   - Rokkon internal modules (commons-protobuf, commons-interface, commons-util)
    - Additional dependencies not managed by Quarkus
 
 ## How to Use
@@ -30,7 +31,7 @@ dependencies {
     implementation(platform(project(":rokkon-bom")))
     
     // Core dependencies are automatically included:
-    // - quarkus-arc, quarkus-grpc, rokkon-protobuf, rokkon-commons
+    // - quarkus-arc, quarkus-grpc, commons-protobuf, commons-interface
     
     // Add only what you need beyond the core:
     implementation("io.quarkus:quarkus-jackson")
@@ -44,8 +45,9 @@ dependencies {
 ## Common Dependencies
 
 Most modules will need these core dependencies:
-- `com.rokkon.pipeline:rokkon-protobuf` - Proto definitions
-- `com.rokkon.pipeline:rokkon-commons` - Common utilities and helpers
+- `com.rokkon.pipeline:commons-protobuf` - Proto definitions
+- `com.rokkon.pipeline:commons-interface` - Common interfaces and models
+- `com.rokkon.pipeline:commons-util` - Common utilities and helpers
 - `io.quarkus:quarkus-grpc` - For gRPC services
 - `io.quarkus:quarkus-jackson` - For JSON processing
 

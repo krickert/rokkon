@@ -3,10 +3,7 @@ plugins {
     id("io.quarkus")
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 dependencies {
     // Use our BOM

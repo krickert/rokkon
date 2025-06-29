@@ -8,11 +8,6 @@ plugins {
 allprojects {
     group = "com.rokkon.pipeline"
     version = "1.0.0-SNAPSHOT"
-
-    repositories {
-        mavenLocal()
-        mavenCentral()
-    }
 }
 
 // Fix Quarkus task dependencies for all subprojects

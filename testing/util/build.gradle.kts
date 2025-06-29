@@ -5,10 +5,7 @@ plugins {
     `java-library`
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 dependencies {
     implementation("io.quarkiverse.docker:quarkus-docker-client:0.0.4")

@@ -4,10 +4,7 @@ plugins {
     `maven-publish`
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 dependencies {
     // Import the rokkon BOM which includes Quarkus BOM

@@ -3,10 +3,7 @@ plugins {
     id("io.quarkus")
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 val quarkusPlatformGroupId: String by project
 val quarkusPlatformArtifactId: String by project
@@ -34,6 +31,7 @@ dependencies {
     // --- Stork (Client-side Load Balancing) ---
     implementation("io.quarkus:quarkus-smallrye-stork")
     implementation("io.smallrye.stork:stork-service-discovery-consul")
+    implementation("io.smallrye.stork:stork-service-registration-consul")
     // Annotation processor for generating Stork configuration at build time.
     implementation("io.smallrye.stork:stork-configuration-generator")
 

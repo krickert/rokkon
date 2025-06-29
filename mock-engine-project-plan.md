@@ -102,7 +102,7 @@ dependencies {
     implementation("io.quarkus:quarkus-config-yaml")
     
     // Rokkon dependencies
-    implementation("com.rokkon.pipeline:rokkon-protobuf")
+    implementation("com.rokkon.pipeline:commons-protobuf")
     
     // Testing
     testImplementation("io.quarkus:quarkus-junit5")

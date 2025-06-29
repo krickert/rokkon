@@ -3,10 +3,7 @@ plugins {
     id("io.quarkus")
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 val quarkusPlatformGroupId: String by project
 val quarkusPlatformArtifactId: String by project

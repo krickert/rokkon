@@ -76,7 +76,7 @@ This document tracks all tests in the Rokkon project and their migration status 
 #### Integration Tests (src/integrationTest/java)
 - 11 corresponding IT files for validators
 
-### engine/models (13 unit tests, 10 integration tests)
+### engine/models (13 unit tests, 10 integration tests) - NOTE: This module was merged into commons/interface
 #### Unit Tests (src/test/java)
 - ❌ AbstractJsonSerdeTest.java (base class)
 - ❌ GrpcTransportConfigTest.java
@@ -135,7 +135,7 @@ This document tracks all tests in the Rokkon project and their migration status 
 - ❌ TestProcessorHelperTest.java
 - ❌ TestProcessorUnitTest.java
 
-### rokkon-commons (12 tests)
+### commons/* (12 tests) - NOTE: Split into commons/interface, commons/util, commons/protobuf
 - ❌ events/ConsulConnectionEventTest.java
 - ❌ events/ModuleRegistrationRequestEventTest.java
 - ❌ events/ModuleRegistrationResponseEventTest.java
@@ -147,13 +147,13 @@ This document tracks all tests in the Rokkon project and their migration status 
 - ❌ utils/ProcessingBufferTest.java
 - ❌ utils/ProtoFieldMapperTest.java
 
-### test-utilities (4 unit, 4 integration)
+### testing/util (4 unit, 4 integration)
 - ❌ containers/ModuleContainerResourceTest.java
 - ❌ data/DebugTest.java
 - ❌ data/ProtobufTestDataHelperTest.java
 - ❌ data/ResourceLoadingTest.java
 
-### engine/cli-register (2 tests)
+### cli/register-module (2 tests)
 - ❌ RegisterCommandTest.java
 - ❌ service/ModuleRegistrationServiceTest.java
 
@@ -162,7 +162,7 @@ This document tracks all tests in the Rokkon project and their migration status 
 - ❌ model/ConfigurationModelTest.java
 - ❌ util/ConfigFileHandlerTest.java
 
-### rokkon-protobuf (1 test)
+### commons/protobuf (1 test)
 - ❌ ProtoJarPackagingTest.java
 
 ## Next Steps

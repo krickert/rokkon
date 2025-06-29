@@ -80,10 +80,10 @@ docker run -p 8080:8080 \
 
 - **engine-registration** - Module registration service implementation
 - **engine-consul** - Consul writer component (handles all Consul writes)
-- **engine-models** - Shared data models for pipeline configuration
 - **engine-validators** - Configuration validation logic
-- **rokkon-protobuf** - Protocol buffer definitions
-- **rokkon-commons** - Shared utilities
+- **commons-interface** - Shared interfaces and data models for pipeline configuration
+- **commons-protobuf** - Protocol buffer definitions
+- **commons-util** - Shared utilities
 
 ## Integration Points
 

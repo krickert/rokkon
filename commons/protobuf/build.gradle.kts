@@ -8,10 +8,7 @@ plugins {
 group = "com.rokkon.pipeline"
 version = "1.0.0-SNAPSHOT"
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21

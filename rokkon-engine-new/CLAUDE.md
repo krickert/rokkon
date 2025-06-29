@@ -23,7 +23,7 @@ The mock engine MUST support both:
 
 ### 2. Isolation
 - No dependencies on `rokkon-engine` code
-- Only import `rokkon-protobuf` for proto definitions
+- Only import `commons-protobuf` for proto definitions
 - Create minimal shared components in `rokkon-engine-new/commons` if needed
 
 ### 3. Testing Focus
@@ -48,8 +48,8 @@ dependencies {
     
     // Core dependencies from BOM
     // io.quarkus:quarkus-grpc is included
-    // rokkon-protobuf for proto definitions
-    implementation(project(":rokkon-protobuf"))
+    // commons-protobuf for proto definitions
+    implementation(project(":commons-protobuf"))
     
     // Additional dependencies
     implementation("io.quarkus:quarkus-rest-jackson")
@@ -77,7 +77,7 @@ quarkus:
   # Generate Mutiny-based gRPC code
   generate-code:
     grpc:
-      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
+      scan-for-proto: com.rokkon.pipeline:commons-protobuf,com.google.api.grpc:proto-google-common-protos
   
   # gRPC server configuration
   grpc:

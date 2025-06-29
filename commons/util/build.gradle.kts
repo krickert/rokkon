@@ -5,10 +5,7 @@ plugins {
     idea
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 dependencies {
     // Import the rokkon BOM

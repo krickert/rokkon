@@ -8,7 +8,7 @@ Modules are typically packaged as Docker containers, each running a gRPC service
 
 1.  **Development and Packaging:**
     *   Developers create a module in any gRPC-supported language (Java/Quarkus, Python, Go, Node.js, etc.).
-    *   The module implements the necessary gRPC services defined in `rokkon-protobuf`.
+    *   The module implements the necessary gRPC services defined in `commons/protobuf`.
     *   A `Dockerfile` is created to package the module application, its dependencies, and any necessary startup scripts.
     *   Common practice includes:
         *   Exposing the module's gRPC port (e.g., `9090`).

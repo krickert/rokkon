@@ -101,7 +101,7 @@ Each Gradle sub-project (especially Quarkus-based ones) utilizes standard Gradle
 1.  **Compilation:**
     *   `./gradlew :<project-name>:compileJava` (for Java projects)
     *   `./gradlew :<project-name>:compileKotlin` (if Kotlin is used)
-    *   The `rokkon-protobuf` project uses the Protobuf Gradle plugin to generate Java (or other languages) sources from `.proto` files during the `generateProto` task, which is typically hooked into the compilation lifecycle.
+    *   The `commons/protobuf` project uses the Protobuf Gradle plugin to generate Java (or other languages) sources from `.proto` files during the `generateProto` task, which is typically hooked into the compilation lifecycle.
 
 2.  **Testing:**
     *   `./gradlew :<project-name>:test`: Runs unit tests.
@@ -153,7 +153,7 @@ Each Gradle sub-project (especially Quarkus-based ones) utilizes standard Gradle
             implementation(platform(project(":rokkon-bom"))) // Import the BOM
             implementation("io.quarkus:quarkus-resteasy-reactive-jackson") // Version managed by Quarkus BOM
             implementation("com.google.guava:guava") // Version managed by rokkon-bom
-            implementation(project(":rokkon-commons")) // Dependency on another sub-project
+            implementation(project(":commons:interface")) // Dependency on another sub-project
         }
         ```
 
