@@ -19,6 +19,7 @@ dependencies {
     
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("org.assertj:assertj-core") // Version managed by BOM
+    implementation("jakarta.annotation:jakarta.annotation-api")
 }
 
 group = "com.rokkon.pipeline"

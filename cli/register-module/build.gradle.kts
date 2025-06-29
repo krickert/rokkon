@@ -6,6 +6,7 @@ plugins {
 
 
 
+
 dependencies {
     // Import the rokkon BOM which includes Quarkus BOM
     implementation(platform(project(":rokkon-bom")))
@@ -28,7 +29,7 @@ dependencies {
     // Testing dependencies
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.quarkus:quarkus-junit5-mockito")
-    testImplementation("org.assertj:assertj-core") // Version from BOM
+    testImplementation("org.assertj:assertj-core")
 }
 
 group = "com.rokkon.pipeline"
