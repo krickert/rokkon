@@ -1,4 +1,3 @@
-c
 # Rokkon Engine: Multi-Layered Testing Strategy
 
 Based on the comprehensive architecture documents and our detailed discussion, here is a full summary of the multi-layered testing strategy for the Rokkon Engine. This framework is designed to address the challenges of a complex, distributed system by providing fast feedback during development while ensuring robust, comprehensive validation for releases.
@@ -18,7 +17,7 @@ The core of this strategy is to separate tests into distinct layers, each with a
 
 * **Goal:** To verify the correctness of a single class or method (a "unit") in complete isolation from the framework and external systems.
 * **Scope:** Focus on business logic, algorithms, data transformations, and state changes within a class.
-* **What to Test:** Utility classes, validator logic (`engine-validators`), specific data model transformations, and individual service methods with their dependencies mocked.
+* **What to Test:** Utility classes, validator logic (`engine/validators`), specific data model transformations, and individual service methods with their dependencies mocked.
 * **Key Guidelines:**
     * **Strict Isolation:** These tests **must not** start the Quarkus application context. They must not access the network, filesystem, or any external processes.
     * **Mock Everything:** All external dependencies are replaced with "mocks" or "stubs." This includes `ConsulClient`, `KafkaProducer`, gRPC clients, and any other injected CDI beans.
@@ -28,17 +27,17 @@ The core of this strategy is to separate tests into distinct layers, each with a
 **Example: Testing a Simple Validator**
 
 ```java
-// In engine-validators/src/test/java/com/rokkon/validators/PipelineConfigValidatorTest.java
+// In engine/validators/src/test/java/com/rokkon/pipeline/validation/validators/PipelineConfigValidatorTest.java
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-import com.rokkon.models.PipelineConfig; // Assuming this model exists
+import com.rokkon.pipeline.config.model.PipelineConfig; // From commons/interface
 
 class PipelineConfigValidatorTest {
 
     private final PipelineConfigValidator validator = new PipelineConfigValidator();
 
-    @rokkon-engine/src/test/resources/application-test.properties
+    @Test
     void whenPipelineNameIsMissing_validationShouldFail() {
         // Arrange
         PipelineConfig config = new PipelineConfig();
@@ -49,7 +48,7 @@ class PipelineConfigValidatorTest {
         assertFalse(validator.isValid(config), "Validation should fail for null pipeline ID");
     }
 
-    @rokkon-engine/src/test/resources/application-test.properties
+    @Test
     void whenPipelineHasNoSteps_validationShouldFail() {
         // Arrange
         PipelineConfig config = new PipelineConfig();
@@ -94,7 +93,7 @@ public class PipelineControlResourceTest {
     @InjectMock
     PipelineManager pipelineManager; // Inject a mock of the underlying service
 
-    @rokkon-engine/src/test/resources/application-test.properties
+    @Test
     public void testDeployPipelineEndpoint() {
         // Arrange: Define the mock's behavior
         when(pipelineManager.deploy(anyString())).thenReturn(true);
@@ -107,7 +106,7 @@ public class PipelineControlResourceTest {
              .statusCode(200); // Verify the HTTP response
     }
 
-    @rokkon-engine/src/test/resources/application-test.properties
+    @Test
     public void testDeployNonExistentPipelineEndpoint() {
         // Arrange
         when(pipelineManager.deploy("unknown-pipeline")).thenReturn(false);
@@ -492,14 +491,14 @@ public class RealValidatorsTestProfile implements QuarkusTestProfile {
 A major breakthrough in our testing strategy was refactoring the validation framework to break circular dependencies between modules. This was "the center of why a lot of our tests were so hard to create and take so long."
 
 **The Problem**: 
-- Validation interfaces in `rokkon-commons` were importing model classes from `engine/models`
+- Validation interfaces in the former `rokkon-commons` (now split into commons/interface, commons/util, commons/protobuf) were importing model classes from `engine/models` (now merged into commons/interface)
 - This created circular dependencies that made mocking difficult
 - Tests couldn't easily inject or mock validators
 
 **The Solution - Tagged/Marker Interfaces**:
 
 ```java
-// In rokkon-commons - generic interfaces with no model dependencies
+// In commons/interface - generic interfaces with no model dependencies
 public interface ConfigValidatable {
     // Marker interface for validatable configurations
 }
@@ -512,7 +511,7 @@ public interface ConfigValidator<T extends ConfigValidatable> {
 ```
 
 ```java
-// In engine/models - specific implementations
+// In commons/interface - specific implementations
 public record PipelineConfig(
     String name,
     Map<String, PipelineStepConfig> pipelineSteps
@@ -1155,9 +1154,9 @@ All unit tests now run without Consul, providing reliable and fast feedback duri
 
 To maintain clean architecture and prevent circular dependencies, we follow strict module organization rules:
 
-#### 1. **rokkon-commons** - Interfaces and Contracts Only
-- **Contains**: Service interfaces, marker interfaces, base abstractions
-- **No Dependencies**: Must not depend on any other Rokkon modules
+#### 1. **commons/interface** - Interfaces and Contracts Only
+- **Contains**: Service interfaces, marker interfaces, base abstractions, models, configuration classes
+- **No Dependencies**: Must not depend on any other Rokkon modules except commons/protobuf
 - **Examples**:
   ```java
   // Good - generic interface with no model dependencies
@@ -1169,9 +1168,13 @@ To maintain clean architecture and prevent circular dependencies, we follow stri
   import com.rokkon.pipeline.config.model.PipelineConfig; // DON'T DO THIS!
   ```
 
-#### 2. **engine/models** - Pure Data Models
-- **Contains**: Records, POJOs, DTOs with no business logic
-- **Allowed Dependencies**: Can depend on rokkon-commons for interfaces
+#### 2. **commons/protobuf** - Protocol Buffer Definitions
+- **Contains**: All .proto files and generated protobuf classes
+- **No Dependencies**: Standalone module with protobuf definitions
+
+#### 3. **commons/util** - Utility Classes
+- **Contains**: Helper classes, utilities, factories
+- **Allowed Dependencies**: Can depend on commons/interface and commons/protobuf
 - **Examples**:
   ```java
   // Good - data model implementing commons interface
@@ -1193,9 +1196,10 @@ To maintain clean architecture and prevent circular dependencies, we follow stri
   }
   ```
 
-#### 3. **test-utilities** - Shared Test Infrastructure
+#### 4. **testing/util** - Shared Test Infrastructure
 - **Contains**: Test containers, mock implementations, test data builders
 - **Purpose**: Reusable test components across modules
+- **Related Modules**: testing/e2e-test, testing/integration-test, testing/mocks
 - **Examples**:
   ```java
   // Good - reusable test container
@@ -1222,42 +1226,53 @@ To maintain clean architecture and prevent circular dependencies, we follow stri
   }
   ```
 
-#### 4. **engine/consul** - Consul-Specific Implementations
+#### 5. **engine/consul** - Consul-Specific Implementations
 - **Contains**: Service implementations that interact with Consul
-- **Dependencies**: Can depend on models, commons, and Consul client libraries
+- **Dependencies**: Can depend on commons/interface, commons/util, and Consul client libraries
 - **Not Allowed**: Other modules should not depend on consul internals
 
-#### 5. **engine/validators** - Validation Logic
+#### 6. **engine/validators** - Validation Logic
 - **Contains**: Concrete validator implementations, composite validators
-- **Dependencies**: Can depend on models and commons
+- **Dependencies**: Can depend on commons/interface and commons/util
 - **Produces**: CDI beans for validators that can be injected
+
+#### 7. **cli/register-module** - CLI Registration Tool
+- **Contains**: CLI tool for module registration
+- **Dependencies**: Can depend on commons modules and gRPC clients
+- **Purpose**: Standalone tool for registering modules with the engine
 
 ### Dependency Flow
 
 ```
-rokkon-commons (interfaces)
-    ↑
-engine/models (data)
+commons/interface (interfaces, models, config)
+commons/protobuf (protobuf definitions)
+commons/util (utilities)
     ↑
 engine/validators (validation logic)
 engine/consul (service implementations)
+engine/seed-config (configuration seeding)
     ↑
 rokkon-engine (main application)
     ↑
-test-utilities (test helpers)
+cli/register-module (CLI tools)
+    ↑
+testing/util (test helpers)
+testing/integration-test
+testing/e2e-test
+testing/mocks
 ```
 
 ### Anti-Patterns to Avoid
 
 1. **Circular Dependencies**:
    ```java
-   // BAD - commons depending on models
-   // In rokkon-commons
-   import com.rokkon.pipeline.config.model.PipelineConfig;
-   
-   // BAD - models depending on service implementations
-   // In engine/models
+   // BAD - cross-module dependencies
+   // In engine/validators
    import com.rokkon.pipeline.consul.service.ClusterServiceImpl;
+   
+   // BAD - util depending on implementations
+   // In commons/util
+   import com.rokkon.engine.service.PipelineManagerImpl;
    ```
 
 2. **Business Logic in Models**:
@@ -1409,11 +1424,11 @@ Before diving deep into unit and integration tests, we're taking a strategic app
 - ✅ 50 tests passing in consul module
 - ❌ 8 tests failing in rokkon-engine
 - ❌ 13 tests failing in engine/validators
-- ❌ 13 tests failing in engine/models
+- ❌ 13 tests failing in engine/models (NOTE: this module was merged into commons/interface)
 - ❌ 31 tests failing in modules/*
-- ❌ 12 tests failing in rokkon-commons
-- ❌ 4 tests failing in test-utilities
-- ❌ 2 tests failing in engine/cli-register
+- ❌ 12 tests failing in commons/* (interface/util/protobuf)
+- ❌ 4 tests failing in testing/util
+- ❌ 2 tests failing in cli/register-module
 - ❌ 3 tests failing in engine/seed-config
 
 **Approach**:

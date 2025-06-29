@@ -32,7 +32,7 @@ Communication between steps can occur synchronously via gRPC or asynchronously v
 graph TD
     subgraph "Rokkon Engine Core"
         direction LR
-        Engine[Rokkon Engine API/Orchestrator]
+        Engine[rokkon-engine API/Orchestrator]
         Consul[Consul Service Discovery & KV Store]
         Kafka[Apache Kafka Messaging]
 
@@ -90,9 +90,9 @@ graph TD
     end
 
     subgraph "Configuration Management"
-        AdminUI[Admin UI/CLI] -- Writes Pipeline Config --> EngineConsulWriter[Engine-Consul Writer Service]
+        AdminUI[Admin UI/CLI] -- Writes Pipeline Config --> EngineConsulWriter[engine/consul Writer Service]
         EngineConsulWriter -- Stores Config --> ConsulKV[(Consul KV Store)]
-        RokkonEngine[Rokkon Engine] -- Reads Pipeline Config --> ConsulKV
+        rokkon-engine[rokkon-engine] -- Reads Pipeline Config --> ConsulKV
         ModuleA[Module A] -- Reads Own Config --> ConsulKV
     end
 
@@ -205,7 +205,7 @@ To understand how such pipelines are constructed and managed within the Rokkon E
 
 *   **Pipeline Design (`Pipeline_design.md`):** This document details the logical design of pipeline clusters, pipelines, pipeline steps, and modules. It also covers the dynamic configuration system.
 *   **Module Deployment (`Module_deployment.md`):** Explains the process of deploying and registering modules with the Rokkon Engine.
-*   **Rokkon Protobufs (`rokkon-protobuf/README.md`):** Describes the gRPC service definitions and message types that form the communication backbone of the engine and its modules.
+*   **Rokkon Protobufs (`commons/protobuf/README.md`):** Describes the gRPC service definitions and message types that form the communication backbone of the engine and its modules.
 *   **Developer Notes (`DEVELOPER_NOTES/`):** Contains various notes relevant to the design and implementation details, including specific architectural decisions and plans. (Refer to `DEVELOPER_NOTES/rokkon-engine/ARCHITECTURE_AND_PLAN.md` for more engine-specific details).
 
 By leveraging gRPC for inter-module communication and Consul for service discovery and configuration, the Rokkon Engine provides a robust platform for building sophisticated, distributed data processing applications.

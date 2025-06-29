@@ -9,12 +9,12 @@ The Rokkon ecosystem is composed of several sub-projects, each with its own `bui
 Key sub-projects typically include:
 
 *   **`rokkon-engine`:** The core engine application (Quarkus based).
-*   **`engine-consul`:** Handles all write operations to Consul.
-*   **`engine-models`:** Contains shared data models (POJOs, potentially generated from Protobufs).
-*   **`engine-validators`:** Provides validation logic for configurations and data.
-*   **`engine-cli-register`:** The command-line tool for module registration.
-*   **`rokkon-protobuf`:** Contains all Protocol Buffer definitions and generates gRPC stubs.
-*   **`rokkon-commons`:** Shared utility classes and libraries.
+*   **`engine/consul`:** Handles all write operations to Consul.
+*   **`commons/interface`:** Contains shared data models (POJOs, potentially generated from Protobufs).
+*   **`engine/validators`:** Provides validation logic for configurations and data.
+*   **`cli/register-module`:** The command-line tool for module registration.
+*   **`commons/protobuf`:** Contains all Protocol Buffer definitions and generates gRPC stubs.
+*   **`commons/util`:** Shared utility classes and libraries.
 *   **`modules/` directory:**
     *   `modules/test-module`
     *   `modules/parser`
@@ -24,7 +24,7 @@ Key sub-projects typically include:
     *   `modules/proxy-module`
     *   (Each module is its own Gradle sub-project, often a Quarkus application if Java-based, or a simple project if in another language but still managed under the Gradle umbrella for build/Docker tasks).
 *   **`rokkon-bom` (Bill of Materials):** Manages dependency versions across projects.
-*   **`test-utilities`:** Common code and resources for testing.
+*   **`testing/util`:** Common code and resources for testing.
 
 ```mermaid
 graph TD
@@ -32,17 +32,17 @@ graph TD
 
     subgraph "Core Engine Projects"
         Engine[rokkon-engine]
-        EngineConsul[engine-consul]
-        EngineModels[engine-models]
-        EngineValidators[engine-validators]
-        EngineCLI[engine-cli-register]
+        EngineConsul[engine/consul]
+        EngineValidators[engine/validators]
+        EngineCLI[cli/register-module]
     end
 
     subgraph "Shared Libraries"
-        Protobuf[rokkon-protobuf]
-        Commons[rokkon-commons]
+        Protobuf[commons/protobuf]
+        Commons[commons/util]
+        Interface[commons/interface]
         BOM[rokkon-bom]
-        TestUtils[test-utilities]
+        TestUtils[testing/util]
     end
 
     subgraph "Pipeline Modules (Examples)"
@@ -55,11 +55,11 @@ graph TD
 
     RootProject --> Engine
     RootProject --> EngineConsul
-    RootProject --> EngineModels
     RootProject --> EngineValidators
     RootProject --> EngineCLI
     RootProject --> Protobuf
     RootProject --> Commons
+    RootProject --> Interface
     RootProject --> BOM
     RootProject --> TestUtils
     RootProject --> ModuleTest
@@ -68,12 +68,11 @@ graph TD
 
     %% Dependencies (Illustrative)
     Engine --> EngineConsul
-    Engine --> EngineModels
     Engine --> EngineValidators
     Engine --> Protobuf
     Engine --> Commons
-    EngineConsul --> EngineModels
-    EngineModels -- Generated from --> Protobuf
+    EngineConsul --> Interface
+    Interface -- Generated from --> Protobuf
 
     ModuleTest --> Protobuf
     ModuleTest --> Commons
@@ -90,8 +89,8 @@ graph TD
     classDef module fill:#lightcoral,stroke:#333,stroke-width:2px;
 
     class RootProject root;
-    class Engine,EngineConsul,EngineModels,EngineValidators,EngineCLI core;
-    class Protobuf,Commons,BOM,TestUtils shared;
+    class Engine,EngineConsul,EngineValidators,EngineCLI core;
+    class Protobuf,Commons,Interface,BOM,TestUtils shared;
     class ModuleTest,ModuleParser,ModuleChunker module;
 ```
 
@@ -162,16 +161,16 @@ Each Gradle sub-project (especially Quarkus-based ones) utilizes standard Gradle
 
 The Rokkon ecosystem includes several Command Line Interfaces (CLIs), and their interaction with Docker is important for module deployment and operations.
 
-1.  **`engine-cli-register` (`rokkon-cli.jar`):**
+1.  **`cli/register-module` (`rokkon-cli.jar`):**
     *   **Purpose:** Used by modules (typically within their `module-entrypoint.sh` script) to register themselves with the Rokkon Engine.
-    *   **Build:** This is a Quarkus application packaged as an executable JAR via `./gradlew :engine:cli-register:quarkusBuild`.
+    *   **Build:** This is a Quarkus application packaged as an executable JAR via `./gradlew :cli:register-module:quarkusBuild`.
     *   **Docker Integration:**
         *   The `rokkon-cli.jar` is often copied into module Docker images during their build process.
             ```gradle
             // In a module's build.gradle.kts (example task)
             tasks.register<Copy>("copyRokkonCliForDocker") {
-                dependsOn(":engine:cli-register:quarkusBuild") // Ensure CLI is built first
-                from(project(":engine:cli-register").tasks.named("quarkusBuild").map { it.outputs.files.singleFile })
+                dependsOn(":cli:register-module:quarkusBuild") // Ensure CLI is built first
+                from(project(":cli:register-module").tasks.named("quarkusBuild").map { it.outputs.files.singleFile })
                 into(layout.buildDirectory.dir("docker-context")) // Or directly into where Dockerfile expects it
                 rename { "rokkon-cli.jar" }
             }

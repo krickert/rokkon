@@ -14,7 +14,7 @@ The core of this strategy is to separate tests into distinct layers, each with a
 
 * **Goal:** To verify the correctness of a single class or method (a "unit") in complete isolation from the framework and external systems.
 * **Scope:** Focus on business logic, algorithms, data transformations, and state changes within a class.
-* **What to Test:** Utility classes, validator logic (`engine-validators`), specific data model transformations, and individual service methods with their dependencies mocked.
+* **What to Test:** Utility classes, validator logic (`engine/validators`), specific data model transformations, and individual service methods with their dependencies mocked.
 * **Key Guidelines:**
     * **Strict Isolation:** These tests **must not** start the Quarkus application context. They must not access the network, filesystem, or any external processes.
     * **Mock Everything:** All external dependencies are replaced with "mocks" or "stubs." This includes `ConsulClient`, `KafkaProducer`, gRPC clients, and any other injected CDI beans.
@@ -24,7 +24,7 @@ The core of this strategy is to separate tests into distinct layers, each with a
 **Example: Testing a Simple Validator**
 
 ```java
-// In engine-validators/src/test/java/com/rokkon/validators/PipelineConfigValidatorTest.java
+// In engine/validators/src/test/java/com/rokkon/validators/PipelineConfigValidatorTest.java
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;

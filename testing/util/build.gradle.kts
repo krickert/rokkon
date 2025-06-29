@@ -54,6 +54,7 @@ java {
     // Configure sourcesJar task to handle duplicates
     tasks.named<Jar>("sourcesJar") {
         duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+        dependsOn("compileQuarkusGeneratedSourcesJava")
     }
 }
 

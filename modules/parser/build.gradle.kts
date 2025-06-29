@@ -41,12 +41,13 @@ dependencies {
     testImplementation("io.grpc:grpc-services") // Version from BOM
     testImplementation("org.testcontainers:testcontainers") // Version from BOM
     testImplementation("org.testcontainers:junit-jupiter") // Version from BOM
-    testImplementation(project(":testing:util"))
+    testImplementation("com.rokkon.pipeline:testing-util:1.0.0-SNAPSHOT")
 
     // Apache Commons IO for file operations
-    testImplementation("commons-io:commons-io:2.15.1")
+    testImplementation("commons-io:commons-io:2.19.0")
     // Apache Commons Compress for reading from JARs/ZIPs
-    testImplementation("org.apache.commons:commons-compress:1.25.0")
+    // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
+    testImplementation("org.apache.commons:commons-compress:1.27.1")
 }
 
 group = "com.rokkon.pipeline"

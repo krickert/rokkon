@@ -228,6 +228,6 @@ public class PipelineResource {
     *   Quarkus Guides on Consul Config, gRPC, REST, Security (OIDC, RBAC), Stork.
     *   Quarkus deployment guides for Docker and Kubernetes.
 *   **Consul Documentation:** For understanding KV store interaction and service discovery mechanisms.
-*   **`DEVELOPER_NOTES/engine/seed-config/INSTRUCTIONS.md`:** For specifics on the seeding utility.
+*   **`DEVELOPER_NOTES/engine/seed-config/README.md`:** For specifics on the seeding utility.
 
 By combining Quarkus's robust application framework with Consul's service discovery and configuration management capabilities, the Rokkon Engine can achieve a flexible and reliable initialization process across diverse deployment environments, with strong potential for integrating advanced security features.

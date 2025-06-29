@@ -136,13 +136,13 @@ sequenceDiagram
 
 Modules (connectors, sinks, pipeline steps) are fundamentally gRPC services that adhere to specific interfaces defined by Rokkon's Protocol Buffers (protobufs). This allows them to be integrated into the Rokkon Engine.
 
-### Core Protobuf Definitions (`rokkon-protobuf`)
+### Core Protobuf Definitions (`commons/protobuf`)
 
-The `rokkon-protobuf` project defines the contracts for module communication. Key services and messages include:
+The `commons/protobuf` project defines the contracts for module communication. Key services and messages include:
 
 *   **`PipeStepProcessor.proto`:** Defines the primary service that processing modules (steps, connectors, sinks) must implement.
     ```protobuf
-    // Located in rokkon-protobuf/src/main/proto/services/pipe_step_processor.proto
+    // Located in commons/protobuf/src/main/proto/services/pipe_step_processor.proto
     service PipeStepProcessor {
       // Processes a single PipeDoc or a stream of PipeDocs
       // Can be unary or client/server streaming depending on the module's nature
@@ -192,7 +192,7 @@ import grpc
 from concurrent import futures
 import time
 
-# Assume these are generated from rokkon-protobuf
+# Assume these are generated from commons/protobuf
 import pipe_step_processor_pb2 as ps_pb2
 import pipe_step_processor_pb2_grpc as ps_grpc_pb2
 from google.protobuf import empty_pb2

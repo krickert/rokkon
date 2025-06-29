@@ -77,7 +77,7 @@ Modules are typically packaged as Docker containers, each running a gRPC service
 
 Once a module container starts, it must register itself with the Rokkon Engine and/or Consul so it can be discovered and utilized in pipelines. The primary mechanism for this involves the module announcing its presence and capabilities.
 
-**Role of the Engine CLI (`rokkon-cli`) / Entrypoint Script:**
+**Role of the Engine CLI (`cli/register-module`) / Entrypoint Script:**
 
 As outlined in `DEVELOPER_NOTES/modules/README-registration.md`, an automated registration process is often facilitated by an entrypoint script (`module-entrypoint.sh`) within the module's container and a CLI tool (`rokkon-cli.jar`).
 
@@ -99,7 +99,7 @@ As outlined in `DEVELOPER_NOTES/modules/README-registration.md`, an automated re
     done
     ```
 
-3.  **Registration via `rokkon-cli`:** Once healthy, the script calls the `rokkon-cli register` command.
+3.  **Registration via `cli/register-module`:** Once healthy, the script calls the `rokkon-cli register` command.
     ```bash
     # module-entrypoint.sh (simplified)
     echo "Registering module with engine..."
@@ -138,9 +138,9 @@ sequenceDiagram
     participant Container as Module Container
     participant EntrypointScript as module-entrypoint.sh
     participant ModuleApp as Module gRPC App
-    participant RokkonCLI as rokkon-cli.jar
-    participant RokkonEngine as Rokkon Engine (ModuleRegistrationService)
-    participant EngineConsul as Engine-Consul Writer
+    participant RokkonCLI as cli/register-module
+    participant RokkonEngine as rokkon-engine (ModuleRegistrationService)
+    participant EngineConsul as engine/consul Writer
     participant Consul as Consul Server
 
     Container ->> EntrypointScript: Start Script
