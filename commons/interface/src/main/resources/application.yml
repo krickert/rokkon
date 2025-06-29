@@ -1,0 +1,2 @@
+# rokkon-commons configuration
+# No gRPC scanning needed - uses pre-generated classes from rokkon-protobuf

@@ -14,7 +14,7 @@ dependencies {
     implementation(platform(project(":rokkon-bom")))
 
     // Core dependencies (arc, grpc, protobuf, commons) come from BOM
-    
+
     // Additional Quarkus extensions needed by this module
     implementation("io.quarkus:quarkus-container-image-docker")
     implementation("io.quarkus:quarkus-config-yaml")
@@ -23,14 +23,17 @@ dependencies {
     implementation("io.quarkus:quarkus-micrometer")
     implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
     implementation("io.quarkus:quarkus-opentelemetry")
-    
+
     // Apache Tika dependencies - use standard package which includes most parsers
     implementation("org.apache.tika:tika-core:3.2.0")
     implementation("org.apache.tika:tika-parsers-standard-package:3.2.0")
-    
+
+    // Rokkon commons util for ProcessingBuffer and other utilities
+    implementation(project(":commons:util"))
+
     // JSON Schema validation
     implementation("com.networknt:json-schema-validator:1.5.2")
-    
+
     // Testing dependencies
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.rest-assured:rest-assured")
@@ -38,8 +41,8 @@ dependencies {
     testImplementation("io.grpc:grpc-services") // Version from BOM
     testImplementation("org.testcontainers:testcontainers") // Version from BOM
     testImplementation("org.testcontainers:junit-jupiter") // Version from BOM
-    testImplementation(project(":test-utilities"))
-    
+    testImplementation(project(":testing:util"))
+
     // Apache Commons IO for file operations
     testImplementation("commons-io:commons-io:2.15.1")
     // Apache Commons Compress for reading from JARs/ZIPs
@@ -76,10 +79,22 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
+// Configuration to consume the CLI jar from cli-register-module
+val cliJar by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "cli-jar"))
+    }
+}
+
+dependencies {
+    cliJar(project(":cli:register-module", "cliJar"))
+}
+
 // Copy CLI jar for Docker build
 tasks.register<Copy>("copyDockerAssets") {
-    dependsOn(":engine:cli-register:quarkusBuild")
-    from(project(":engine:cli-register").file("build/quarkus-app/quarkus-run.jar")) {
+    from(cliJar) {
         rename { "rokkon-cli.jar" }
     }
     into(layout.buildDirectory.dir("docker"))
@@ -87,15 +102,6 @@ tasks.register<Copy>("copyDockerAssets") {
 
 // Hook the copy task before Docker build
 tasks.named("quarkusBuild") {
-    dependsOn("copyDockerAssets")
-}
-
-// Fix task dependencies
-tasks.named("quarkusGenerateCode") {
-    dependsOn("copyDockerAssets")
-}
-
-tasks.named("processResources") {
     dependsOn("copyDockerAssets")
 }
 

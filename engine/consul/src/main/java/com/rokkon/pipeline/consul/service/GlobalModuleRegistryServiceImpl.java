@@ -149,8 +149,8 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
                     }
                 }
                 
-                // Validate the module is accessible using engine connection
-                return validateModuleConnection(engineHost, enginePort, moduleName);
+                // Validate the module is accessible
+                return validateModuleConnection(host, port, moduleName);
             })
             .onItem().transformToUni(valid -> {
                 if (!valid) {

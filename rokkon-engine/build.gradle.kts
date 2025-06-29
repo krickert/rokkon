@@ -53,11 +53,10 @@ dependencies {
     // --- Engine Modules ---
     implementation(project(":engine:consul")) // Now includes gRPC registration service
     implementation(project(":engine:validators"))
-    implementation(project(":engine:models"))
 
     // --- Shared Libraries ---
-    implementation(project(":rokkon-protobuf"))
-    implementation(project(":rokkon-commons"))
+    implementation(project(":commons:protobuf"))
+    implementation(project(":commons:interface"))
     implementation("com.networknt:json-schema-validator:1.5.7")
 
     // --- Testing ---
@@ -66,11 +65,8 @@ dependencies {
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("org.assertj:assertj-core:3.26.3")
     testImplementation("org.awaitility:awaitility:4.3.0")
-    testImplementation(project(":test-utilities"))
+    testImplementation(project(":testing:util"))
 }
-
-group = "com.rokkon.pipeline"
-version = "1.0.0-SNAPSHOT"
 
 java {
     sourceCompatibility = JavaVersion.VERSION_21
@@ -82,10 +78,6 @@ tasks.withType<Test> {
     useJUnitPlatform()
 }
 
-// Exclude integration tests from regular test task
-tasks.test {
-    exclude("**/*IT.class")
-}
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"

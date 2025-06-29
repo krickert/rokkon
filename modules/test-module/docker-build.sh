@@ -9,8 +9,8 @@ cd "$(dirname "$0")/../.."
 # Ensure directory exists (workaround for Quarkus issue)
 mkdir -p modules/test-module/build/classes/java/main
 
-# Build everything in one command - CLI and test-module
-./gradlew :engine:cli-register:quarkusBuild :modules:test-module:quarkusBuild
+# Build everything in one command - CLI (as uber-jar) and test-module
+./gradlew :engine:cli-register:quarkusBuild -Dquarkus.package.jar.type=uber-jar :modules:test-module:quarkusBuild
 
 cd modules/test-module
 

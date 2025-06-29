@@ -1,6 +1,5 @@
 package com.rokkon.pipeline.consul.test;
 
-import com.rokkon.test.containers.ModuleContainerResource;
 import io.quarkus.test.common.QuarkusTestResourceLifecycleManager;
 import org.jboss.logging.Logger;
 

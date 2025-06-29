@@ -8,10 +8,6 @@ repositories {
     mavenLocal()
 }
 
-val quarkusPlatformGroupId: String by project
-val quarkusPlatformArtifactId: String by project
-val quarkusPlatformVersion: String by project
-
 dependencies {
     // Use our BOM
     implementation(platform(project(":rokkon-bom")))
@@ -28,7 +24,7 @@ dependencies {
 
     // Test dependencies
     testImplementation("io.quarkus:quarkus-junit5")
-    testImplementation(project(":test-utilities"))
+    testImplementation(project(":testing:util"))
     testImplementation("org.assertj:assertj-core")
     testImplementation("org.testcontainers:testcontainers")
     testImplementation("org.testcontainers:consul")
@@ -43,9 +39,6 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-tasks.withType<Test> {
-    systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
-}
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")

@@ -28,12 +28,22 @@ dependencies {
     
     // Additional module constraints
     constraints {
+        // Force Guava JRE version to fix conflicts with docker-java
+        api("com.google.guava:guava:33.3.1-jre")
+        
         // Other Rokkon modules
-        api("com.rokkon.pipeline:engine-models:${project.version}")
         api("com.rokkon.pipeline:test-utilities:${project.version}")
         
         // Dependencies NOT managed by Quarkus BOM:
         
+        // Swagger/OpenAPI dependencies
+        api("io.swagger.core.v3:swagger-annotations:2.2.21")
+
+        // TOML parsing libraries
+        api("com.moandjiezana.toml:toml4j:0.7.2")
+        api("com.fasterxml.jackson.dataformat:jackson-dataformat-toml:2.17.2")
+        api("com.electronwill.night-config:toml:3.7.3")
+
         // Testing dependencies not in Quarkus
         api("org.assertj:assertj-core:3.26.3")
         api("com.github.marschall:memoryfilesystem:2.8.1")

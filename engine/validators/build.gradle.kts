@@ -18,9 +18,7 @@ dependencies {
     implementation("io.quarkus:quarkus-hibernate-validator")
     
     // Depend on rokkon-commons which includes protobuf definitions
-    implementation(project(":rokkon-commons"))
-    // Depend on engine-models for the data structures
-    implementation(project(":engine:models"))
+    implementation(project(":commons:interface"))
     
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("org.assertj:assertj-core") // Version managed by BOM
@@ -34,31 +32,14 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-// Configure test tasks
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
-    useJUnitPlatform()
 }
-
-// Exclude integration tests from regular test task (Quarkus handles this)
-tasks.test {
-    exclude("**/*IT.class")
-}
-
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
-    options.compilerArgs.addAll(listOf("-parameters", "--enable-preview"))
+    options.compilerArgs.add("-parameters")
 }
 
-tasks.withType<JavaExec> {
-    jvmArgs("--enable-preview")
-}
-
-quarkus {
-    buildForkOptions {
-        jvmArgs("--enable-preview")
-    }
-}
 
 publishing {
     publications {
@@ -68,7 +49,3 @@ publishing {
     }
 }
 
-// Suppress the enforced platform validation
-tasks.withType<GenerateModuleMetadata> {
-    suppressedValidationErrors.add("enforced-platform")
-}

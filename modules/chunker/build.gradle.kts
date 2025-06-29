@@ -14,7 +14,7 @@ dependencies {
     implementation(platform(project(":rokkon-bom")))
 
     // Core dependencies (arc, grpc, protobuf, commons) come from BOM
-    
+
     // Additional Quarkus extensions needed by this module
     implementation("io.quarkus:quarkus-jackson")
     implementation("io.quarkus:quarkus-rest")
@@ -41,7 +41,7 @@ dependencies {
     testImplementation("io.grpc:grpc-services") // Version from BOM
     testImplementation("org.testcontainers:testcontainers") // Version from BOM
     testImplementation("org.testcontainers:junit-jupiter") // Version from BOM
-    testImplementation(project(":test-utilities"))
+    testImplementation(project(":testing:util"))
 }
 
 group = "com.rokkon.pipeline"
@@ -74,10 +74,22 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
+// Configuration to consume the CLI jar from cli-register-module
+val cliJar by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "cli-jar"))
+    }
+}
+
+dependencies {
+    cliJar(project(":cli:register-module", "cliJar"))
+}
+
 // Copy CLI jar for Docker build
 tasks.register<Copy>("copyDockerAssets") {
-    dependsOn(":engine:cli-register:quarkusBuild")
-    from(project(":engine:cli-register").file("build/quarkus-app/quarkus-run.jar")) {
+    from(cliJar) {
         rename { "rokkon-cli.jar" }
     }
     into(layout.buildDirectory.dir("docker"))
@@ -85,15 +97,6 @@ tasks.register<Copy>("copyDockerAssets") {
 
 // Hook the copy task before Docker build
 tasks.named("quarkusBuild") {
-    dependsOn("copyDockerAssets")
-}
-
-// Fix task dependencies
-tasks.named("quarkusGenerateCode") {
-    dependsOn("copyDockerAssets")
-}
-
-tasks.named("processResources") {
     dependsOn("copyDockerAssets")
 }
 

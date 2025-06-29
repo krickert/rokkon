@@ -1,10 +1,14 @@
 // /home/krickert/IdeaProjects/rokkon/rokkon-engine/rokkon-engine-fix-structure-branch/settings.gradle.kts
 
 pluginManagement {
+    val quarkusPluginVersion: String by settings
     repositories {
         mavenLocal()
         mavenCentral()
         gradlePluginPortal()
+    }
+    plugins {
+        id("io.quarkus") version quarkusPluginVersion
     }
 }
 
@@ -13,18 +17,17 @@ rootProject.name = "rokkon-pristine"
 
 // Include only the modules we've migrated
 include("rokkon-bom")
-include("rokkon-commons")
-include("rokkon-commons-util")
-include("rokkon-protobuf")
-include("test-utilities")
+include("cli:register-module")
+include("commons:protobuf")
+include("commons:interface")
+include("commons:util")
+include("testing:util")
 include("rokkon-engine")
 
 // Engine submodules
 include("engine:consul")
-include("engine:models")
 include("engine:validators")
 include("engine:seed-config")
-include("engine:cli-register")
 // include("engine:registration") - Merged into engine:consul
 
 // Module subprojects
@@ -37,7 +40,7 @@ include("modules:embedder")
 include("modules:connectors:filesystem-crawler")
 
 // New Architecture - Mock Engine
-include("rokkon-engine-new:pipestream-mock")
+//include("rokkon-engine-new:pipestream-mock")
 
 
 // Ensure dependencyResolutionManagement is present, especially if you plan to use version catalogs later.
@@ -47,10 +50,10 @@ dependencyResolutionManagement {
         mavenCentral()
         mavenLocal()
     }
-    // If you plan to use libs.versions.toml here, this is where you'd define it
-    // versionCatalogs {
-    //     create("libs") {
-    //         from(files("gradle/libs.versions.toml"))
-    //     }
-    // }
+////     If you plan to use libs.versions.toml here, this is where you'd define it
+//     versionCatalogs {
+//         create("libs") {
+//             from(files("gradle/libs.versions.toml"))
+//         }
+//     }
 }

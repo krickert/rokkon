@@ -8,8 +8,8 @@ import com.rokkon.pipeline.config.service.PipelineDefinitionService;
 import com.rokkon.pipeline.config.service.PipelineInstanceService;
 import com.rokkon.pipeline.config.model.PipelineDefinitionSummary;
 import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
-import com.rokkon.pipeline.validation.Composite;
-import com.rokkon.pipeline.validation.PipelineConfigValidator;
+import com.rokkon.pipeline.validation.CompositeValidator;
+import com.rokkon.pipeline.validation.ConfigValidator;
 import com.rokkon.pipeline.validation.ValidationResult;
 import com.rokkon.pipeline.validation.ValidationResultFactory;
 import io.smallrye.mutiny.Uni;
@@ -46,8 +46,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     ObjectMapper objectMapper;
     
     @Inject
-    @Composite
-    PipelineConfigValidator validator;
+    CompositeValidator<PipelineConfig> validator;
     
     @Inject
     PipelineInstanceService pipelineInstanceService;

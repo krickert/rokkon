@@ -1,0 +1,29 @@
+quarkus:
+  application:
+    name: rokkon-cli
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
+  log:
+    level: INFO
+    category:
+      "com.rokkon.pipeline":
+        level: DEBUG
+  # Disable HTTP server for CLI
+  http:
+    port: 0  # Use port 0 to let the OS assign a random port
+    non-application-root-path: /q  # Minimize exposed endpoints
+
+# CLI configuration
+rokkon:
+  cli:
+    module:
+      host: ${MODULE_HOST:localhost}
+      port: ${MODULE_PORT:9090}
+    engine:
+      host: ${ENGINE_HOST:localhost}
+      port: ${ENGINE_PORT:9082}  # gRPC port for engine registration service
+    registration:
+      retry-attempts: ${REGISTRATION_RETRY_ATTEMPTS:3}
+      retry-delay: ${REGISTRATION_RETRY_DELAY:5s}
+      health-check-timeout: ${HEALTH_CHECK_TIMEOUT:10s}

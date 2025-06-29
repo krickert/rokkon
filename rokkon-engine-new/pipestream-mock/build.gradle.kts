@@ -21,7 +21,7 @@ dependencies {
     // io.quarkus:quarkus-arc is included
     
     // Protobuf definitions
-    implementation(project(":rokkon-protobuf"))
+    implementation(project(":commons:protobuf"))
     
     // Additional Quarkus extensions
     implementation("io.quarkus:quarkus-rest-jackson")

@@ -39,7 +39,7 @@ dependencies {
     testImplementation("io.grpc:grpc-services") // Version from BOM
     testImplementation("org.testcontainers:testcontainers") // Version from BOM
     testImplementation("org.testcontainers:junit-jupiter") // Version from BOM
-    testImplementation(project(":test-utilities"))
+    testImplementation(project(":testing:util"))
 
     // Mockito for mocking in tests
     testImplementation("org.mockito:mockito-core:5.3.1")

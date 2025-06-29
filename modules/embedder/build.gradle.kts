@@ -14,7 +14,7 @@ dependencies {
     implementation(platform(project(":rokkon-bom")))
 
     // Core dependencies (arc, grpc, protobuf, commons) come from BOM
-    
+
     // Additional Quarkus extensions needed by this module
     implementation("io.quarkus:quarkus-container-image-docker")
     implementation("io.quarkus:quarkus-config-yaml")
@@ -38,14 +38,20 @@ dependencies {
     // Apache Commons for utilities
     implementation("org.apache.commons:commons-lang3:3.12.0")
 
+    // Rokkon commons util for ProcessingBuffer and other utilities
+    implementation(project(":commons:util"))
+
+    // Protobuf definitions for model classes
+    implementation(project(":commons:protobuf"))
+
     // Testing dependencies
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("org.assertj:assertj-core") // Version from BOM
+    testImplementation("com.rokkon.pipeline:testing-util:1.0.0-SNAPSHOT")
     testImplementation("io.grpc:grpc-services") // Version from BOM
     testImplementation("org.testcontainers:testcontainers") // Version from BOM
     testImplementation("org.testcontainers:junit-jupiter") // Version from BOM
-    testImplementation(project(":test-utilities"))
 }
 
 group = "com.rokkon.pipeline"
@@ -78,10 +84,22 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
+// Configuration to consume the CLI jar from cli-register-module
+val cliJar by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "cli-jar"))
+    }
+}
+
+dependencies {
+    cliJar(project(":cli:register-module", "cliJar"))
+}
+
 // Copy CLI jar for Docker build
 tasks.register<Copy>("copyDockerAssets") {
-    dependsOn(":engine:cli-register:quarkusBuild")
-    from(project(":engine:cli-register").file("build/quarkus-app/quarkus-run.jar")) {
+    from(cliJar) {
         rename { "rokkon-cli.jar" }
     }
     into(layout.buildDirectory.dir("docker"))
@@ -89,15 +107,6 @@ tasks.register<Copy>("copyDockerAssets") {
 
 // Hook the copy task before Docker build
 tasks.named("quarkusBuild") {
-    dependsOn("copyDockerAssets")
-}
-
-// Fix task dependencies
-tasks.named("quarkusGenerateCode") {
-    dependsOn("copyDockerAssets")
-}
-
-tasks.named("processResources") {
     dependsOn("copyDockerAssets")
 }
 
