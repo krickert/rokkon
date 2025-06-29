@@ -17,8 +17,8 @@ import java.util.Map;
  */
 public class ModuleContainerResource implements QuarkusTestResourceLifecycleManager {
     
-    protected static final int DEFAULT_GRPC_PORT = 9090;
-    protected static final int DEFAULT_HTTP_PORT = 8080;
+    protected static final int DEFAULT_GRPC_PORT = 49095;
+    protected static final int DEFAULT_HTTP_PORT = 39095;
     
     private final String imageName;
     private final int internalGrpcPort;

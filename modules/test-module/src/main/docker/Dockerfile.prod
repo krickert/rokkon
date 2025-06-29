@@ -105,8 +105,8 @@ ENV PATH="/deployments:${PATH}"
 COPY --chown=185 module-entrypoint.sh /deployments/module-entrypoint.sh
 RUN chmod +x /deployments/module-entrypoint.sh
 
-EXPOSE 8080
-EXPOSE 9090
+EXPOSE 39095
+EXPOSE 49095
 USER 185
 ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"

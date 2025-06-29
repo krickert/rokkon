@@ -4,8 +4,9 @@ set -e
 # Configuration with defaults
 MODULE_HOST=${MODULE_HOST:-0.0.0.0}
 MODULE_PORT=${MODULE_PORT:-49095}
-ENGINE_HOST=${ENGINE_HOST:-localhost}
+ENGINE_HOST=${ROKKON_ENGINE_ADDRESS:-${ENGINE_HOST:-localhost}} # Allow override by ROKKON_ENGINE_ADDRESS
 ENGINE_PORT=${ENGINE_PORT:-8081}
+CONSUL_HOST=${ROKKON_CONSUL_ADDRESS:-localhost} # Add CONSUL_HOST and allow override by ROKKON_CONSUL_ADDRESS
 HEALTH_CHECK=${HEALTH_CHECK:-true}
 MAX_RETRIES=${MAX_RETRIES:-3}
 STARTUP_TIMEOUT=${STARTUP_TIMEOUT:-60}
@@ -13,7 +14,7 @@ CHECK_INTERVAL=${CHECK_INTERVAL:-5}
 
 # The address that should be registered with Consul for health checks
 # This might be different from MODULE_HOST if running in Docker
-EXTERNAL_MODULE_HOST=${EXTERNAL_MODULE_HOST:-${MODULE_HOST}}
+EXTERNAL_MODULE_HOST=${EXTERNAL_MODULE_HOST:-host.docker.internal}
 EXTERNAL_MODULE_PORT=${EXTERNAL_MODULE_PORT:-${MODULE_PORT}}
 
 # Function to register module with retries
@@ -26,7 +27,7 @@ register_module() {
     
     # Build CLI command with all options
     # CLI connects to module locally at localhost
-    local cli_cmd="rokkon register --module-host=localhost --module-port=${MODULE_PORT} --engine-host=${ENGINE_HOST} --engine-port=${ENGINE_PORT}"
+    local cli_cmd="rokkon register --module-host=localhost --module-port=${MODULE_PORT} --engine-host=${ENGINE_HOST} --engine-port=${ENGINE_PORT} --consul-host=${CONSUL_HOST}"
     
     # Add the external address that the engine should use to reach this module
     # This is what gets registered in Consul for health checks
