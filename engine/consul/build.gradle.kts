@@ -8,7 +8,8 @@ plugins {
 
 
 dependencies {
-    implementation(platform(project(":rokkon-bom")))
+    // Library BOM provides all standard library dependencies
+    implementation(platform(project(":bom:library")))
 
     // Quarkus extensions for Consul functionality
     implementation("io.quarkiverse.config:quarkus-config-consul") // For configuration properties
@@ -23,19 +24,19 @@ dependencies {
     implementation("io.quarkus:quarkus-smallrye-context-propagation") // Required for Mutiny context propagation
 
     // Stork for Consul service discovery
-    implementation("io.smallrye.stork:stork-service-discovery-consul:2.6.3")
+    implementation("io.smallrye.stork:stork-service-discovery-consul")
 
     // Vertx Consul client for service registration
     implementation("io.smallrye.reactive:smallrye-mutiny-vertx-consul-client")
 
     // YAML processing for config persistence
-    implementation("org.yaml:snakeyaml:2.2")
+    implementation("org.yaml:snakeyaml")
 
     // Our modules - rokkon-commons and rokkon-protobuf come from BOM
     implementation(project(":commons:interface"))
     implementation(project(":commons:util"))
     implementation(project(":engine:validators"))
-    implementation("com.networknt:json-schema-validator:1.5.7")
+    implementation("com.networknt:json-schema-validator")
 
     // Test dependencies (versions from BOM where available)
     testImplementation("io.quarkus:quarkus-junit5")

@@ -38,6 +38,10 @@ dependencies {
         // Only add version constraints for things NOT in Quarkus BOM
         api("com.orbitz.consul:consul-client:1.5.3")
         api("io.swagger.core.v3:swagger-annotations:2.2.21")
+        api("io.smallrye.stork:stork-service-discovery-consul:2.6.3")
+        api("org.yaml:snakeyaml:2.2")
+        api("com.networknt:json-schema-validator:1.5.7")
+        // Note: awaitility is a test dependency - keep version in project build.gradle.kts
     }
 }
 
