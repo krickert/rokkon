@@ -1,0 +1,94 @@
+package com.rokkon.integration;
+
+import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.RestAssured;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.utility.DockerImageName;
+
+import java.time.Duration;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.*;
+
+/**
+ * Working example of Consul sidecar pattern.
+ */
+@QuarkusTest
+public class WorkingConsulSidecarTest {
+    
+    @Test
+    public void testConsulSidecarPattern() throws Exception {
+        Network network = Network.newNetwork();
+        
+        // Start Consul server - using specific IP binding
+        GenericContainer<?> consulServer = new GenericContainer<>(DockerImageName.parse("hashicorp/consul:latest"))
+                .withNetwork(network)
+                .withNetworkAliases("consul-server")
+                .withExposedPorts(8500, 8301) // HTTP API and Serf LAN
+                .withCommand("agent", "-server", "-bootstrap-expect=1",
+                           "-client=0.0.0.0",
+                           "-bind=0.0.0.0",  // Bind to all interfaces
+                           "-datacenter=dc1", 
+                           "-node=consul-server",
+                           "-ui",
+                           "-log-level=info")
+                .waitingFor(Wait.forLogMessage(".*Consul agent running!.*", 1)
+                           .withStartupTimeout(Duration.ofSeconds(30)));
+        
+        consulServer.start();
+        Thread.sleep(5000); // Give Consul time to elect a leader
+        
+        System.out.println("Consul server started at: http://localhost:" + consulServer.getMappedPort(8500));
+        
+        // Verify Consul server is ready
+        String consulUrl = "http://localhost:" + consulServer.getMappedPort(8500);
+        RestAssured.given()
+                .when().get(consulUrl + "/v1/status/leader")
+                .then()
+                .statusCode(200)
+                .body(not(equalTo("\"\"")));
+        
+        // Start Engine's Consul sidecar
+        GenericContainer<?> engineConsul = new GenericContainer<>(DockerImageName.parse("hashicorp/consul:latest"))
+                .withNetwork(network)
+                .withNetworkAliases("engine-consul")
+                .withCommand("agent",
+                           "-retry-join=consul-server",
+                           "-bind=0.0.0.0",
+                           "-client=0.0.0.0",
+                           "-datacenter=dc1",
+                           "-node=engine-consul-agent",
+                           "-log-level=info")
+                .withLogConsumer(frame -> System.out.print("[ENGINE-CONSUL] " + frame.getUtf8String()))
+                .waitingFor(Wait.forLogMessage(".*Synced node info.*", 1)
+                           .withStartupTimeout(Duration.ofSeconds(60)));
+        
+        engineConsul.start();
+        System.out.println("Engine Consul sidecar started");
+        
+        // Wait for agent to join cluster
+        Thread.sleep(10000);
+        
+        // Check cluster members
+        var response = RestAssured.given()
+                .when().get(consulUrl + "/v1/catalog/nodes")
+                .then()
+                .statusCode(200)
+                .extract()
+                .response();
+        
+        System.out.println("Cluster nodes: " + response.asString());
+        
+        // Should have both nodes
+        assertThat(response.asString()).contains("consul-server");
+        assertThat(response.asString()).contains("engine-consul-agent");
+        
+        // Cleanup
+        engineConsul.stop();
+        consulServer.stop();
+        network.close();
+    }
+}

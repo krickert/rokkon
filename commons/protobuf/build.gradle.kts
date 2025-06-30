@@ -16,26 +16,13 @@ java {
 }
 
 dependencies {
-    // Import the BOM for version management
-    implementation(platform("com.rokkon.pipeline:rokkon-bom:${project.version}"))
-
-    // Google common protos for Status and other types - exposed as transitive dependency
-    api("com.google.api.grpc:proto-google-common-protos")
-
-    // Explicitly include protobuf dependencies
-    implementation("com.google.protobuf:protobuf-java")
-    implementation("io.grpc:grpc-protobuf")
-
-    // Test dependencies
-    testImplementation("org.junit.jupiter:junit-jupiter")
-    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
-    testImplementation("org.assertj:assertj-core")
+    // Use core BOM for minimal dependencies
+    implementation(platform(project(":bom:core")))
+    
+    // No runtime dependencies needed - this is just a proto files jar
 }
 
-tasks.withType<Test> {
-    useJUnitPlatform()
-    dependsOn(tasks.jar)
-}
+// No tests needed for proto resource jar
 
 // Create a source jar that includes proto files
 tasks.register<Jar>("sourcesJar") {
@@ -52,6 +39,7 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
+            artifactId = "rokkon-protobuf"
 
             artifact(tasks["sourcesJar"])
 

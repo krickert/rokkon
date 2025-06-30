@@ -1,0 +1,16 @@
+plugins {
+    id("rokkon.cli-conventions")
+}
+
+// All common dependencies come from:
+// 1. CLI BOM (via convention plugin)
+// 2. rokkon.cli-conventions plugin
+
+// Only project-specific configuration needed
+publishing {
+    publications {
+        named<MavenPublication>("maven") {
+            artifactId = "cli-register-module"
+        }
+    }
+}

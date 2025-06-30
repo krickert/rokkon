@@ -1,0 +1,65 @@
+package com.rokkon.integration;
+
+import com.rokkon.test.containers.EngineContainerResource;
+import io.quarkus.test.common.QuarkusTestResource;
+import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.RestAssured;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.Timeout;
+
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
+
+/**
+ * Basic test to verify we can start the engine container and access its dashboard.
+ */
+@QuarkusTest
+@QuarkusTestResource(LocalEngineContainerResource.class)
+public class BasicEngineContainerTest {
+    
+    @Inject
+    @ConfigProperty(name = "rokkon.engine.dashboard.url")
+    String engineUrl;
+    
+    @Inject
+    @ConfigProperty(name = "rokkon.engine.http.port")
+    String engineHttpPort;
+    
+    @Inject
+    @ConfigProperty(name = "quarkus.application.version", defaultValue = "1.0.0-SNAPSHOT")
+    String version;
+    
+    @Test
+    @Timeout(value = 60, unit = TimeUnit.SECONDS)
+    public void testEngineContainerStartsAndDashboardIsAccessible() {
+        System.out.println("✅ Testing engine container...");
+        System.out.println("Engine URL: " + engineUrl);
+        System.out.println("Engine HTTP Port: " + engineHttpPort);
+        System.out.println("Project Version: " + version);
+        
+        // Verify we have the configuration
+        assertThat(engineUrl).isNotNull();
+        assertThat(engineHttpPort).isNotNull();
+        
+        // Test if the engine health endpoint is accessible
+        RestAssured.given()
+                .when().get(engineUrl + "/q/health")
+                .then()
+                .statusCode(200);
+        
+        System.out.println("✅ Engine health endpoint is accessible!");
+        
+        // Test if the engine dashboard is accessible
+        RestAssured.given()
+                .when().get(engineUrl)
+                .then()
+                .statusCode(200)
+                .body(containsString("Rokkon"));
+        
+        System.out.println("✅ Engine dashboard is accessible at " + engineUrl);
+    }
+}

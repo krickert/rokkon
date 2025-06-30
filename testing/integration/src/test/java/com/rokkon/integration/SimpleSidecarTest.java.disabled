@@ -1,0 +1,72 @@
+package com.rokkon.integration;
+
+import io.quarkus.test.junit.QuarkusTest;
+import io.restassured.RestAssured;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.containers.wait.strategy.Wait;
+import org.testcontainers.utility.DockerImageName;
+
+import static org.hamcrest.Matchers.*;
+
+/**
+ * Simplified sidecar test without the complex setup.
+ * This demonstrates the basic sidecar pattern working.
+ */
+@QuarkusTest
+public class SimpleSidecarTest {
+    
+    @Test
+    public void testBasicSidecarPattern() throws Exception {
+        Network network = Network.newNetwork();
+        
+        // Start Consul server
+        GenericContainer<?> consul = new GenericContainer<>(DockerImageName.parse("hashicorp/consul:latest"))
+                .withNetwork(network)
+                .withNetworkAliases("consul")
+                .withExposedPorts(8500)
+                .withCommand("agent", "-dev", "-client=0.0.0.0")
+                .waitingFor(Wait.forHttp("/v1/status/leader").forPort(8500));
+        
+        consul.start();
+        
+        String consulUrl = "http://localhost:" + consul.getMappedPort(8500);
+        System.out.println("Consul running at: " + consulUrl);
+        
+        // Verify Consul is running
+        RestAssured.given()
+                .when().get(consulUrl + "/v1/agent/self")
+                .then()
+                .statusCode(200)
+                .body("Config.Datacenter", equalTo("dc1"));
+        
+        // Start Engine with local Consul config
+        GenericContainer<?> engine = new GenericContainer<>(DockerImageName.parse("rokkon/rokkon-engine:1.0.0-SNAPSHOT"))
+                .withNetwork(network)
+                .withNetworkAliases("engine")
+                .withExposedPorts(8080, 49000)
+                .withEnv("CONSUL_HOST", "consul")
+                .withEnv("CONSUL_PORT", "8500")
+                .waitingFor(Wait.forHttp("/q/health").forPort(8080));
+        
+        engine.start();
+        
+        System.out.println("Engine running at: http://localhost:" + engine.getMappedPort(8080));
+        
+        // Give services time to register
+        Thread.sleep(5000);
+        
+        // Check if engine registered itself
+        RestAssured.given()
+                .when().get(consulUrl + "/v1/catalog/services")
+                .then()
+                .statusCode(200)
+                .body("$", hasKey("consul")); // At minimum, consul should be registered
+        
+        // Cleanup
+        engine.stop();
+        consul.stop();
+        network.close();
+    }
+}

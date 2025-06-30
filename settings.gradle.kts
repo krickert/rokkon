@@ -16,9 +16,19 @@ pluginManagement {
 rootProject.name = "rokkon-pristine"
 
 // Include only the modules we've migrated
-include("rokkon-bom")
+include("rokkon-bom") // Original BOM - keeping as backup
+
+// New BOMs
+include("bom:core")
+include("bom:cli")
+include("bom:module")
+include("bom:library")
+include("bom:server")
+
 include("cli:register-module")
+include("cli:seed-engine-consul-config")
 include("commons:protobuf")
+include("commons:protobuf-stubs")
 include("commons:interface")
 include("commons:util")
 include("testing:util")

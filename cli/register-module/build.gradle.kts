@@ -8,28 +8,19 @@ plugins {
 
 
 dependencies {
-    // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
-
-    // Core dependencies
-    implementation("io.quarkus:quarkus-arc")
-    implementation("io.quarkus:quarkus-picocli")
-    implementation("io.quarkus:quarkus-grpc")
-    implementation("io.quarkus:quarkus-config-yaml")
-
-    // Google common protos for Status and other types
-    implementation("com.google.api.grpc:proto-google-common-protos")
-
-    // Additional Quarkus extensions needed by this module
-    implementation("io.quarkus:quarkus-smallrye-health")
-
-    // gRPC health checking
-    implementation("io.grpc:grpc-services") // Version from BOM
-
-    // Testing dependencies
+    // Use the CLI BOM - includes all common CLI dependencies:
+    // - protobuf-stubs (pre-generated)
+    // - quarkus-picocli
+    // - quarkus-arc
+    // - quarkus-config-yaml
+    // - grpc-netty-shaded
+    implementation(platform(project(":bom:cli")))
+    
+    // Test dependencies from BOM
+    testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("io.quarkus:quarkus-junit5")
-    testImplementation("io.quarkus:quarkus-junit5-mockito")
     testImplementation("org.assertj:assertj-core")
+    testRuntimeOnly("org.junit.platform:junit-platform-launcher")
 }
 
 group = "com.rokkon.pipeline"
@@ -40,36 +31,21 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-quarkus {
-    buildForkOptions {
-        systemProperty("quarkus.grpc.codegen.type", "mutiny")
-    }
-}
-
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
+    useJUnitPlatform()
 }
+
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
 }
 
-// Create a configuration for the CLI jar that other projects can depend on
-val cliJar by configurations.creating {
-    isCanBeConsumed = true
-    isCanBeResolved = false
-    attributes {
-        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "cli-jar"))
-    }
-}
-
-// Add the quarkus runner jar to the configuration
-artifacts {
-    add("cliJar", tasks.named("quarkusBuild").map {
-        file("build/quarkus-app/quarkus-run.jar")
-    }) {
-        builtBy(tasks.named("quarkusBuild"))
-    }
+// Create sourcesJar task
+tasks.register<Jar>("sourcesJar") {
+    archiveClassifier.set("sources")
+    from(sourceSets.main.get().allSource)
+    dependsOn("compileQuarkusGeneratedSourcesJava")
 }
 
 publishing {

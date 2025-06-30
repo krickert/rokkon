@@ -1,0 +1,34 @@
+{
+  "rokkon": {
+    "engine": {
+      "grpc-port": 49000,
+      "rest-port": 8080,
+      "debug": false
+    },
+    "consul": {
+      "cleanup": {
+        "enabled": true,
+        "interval": "5m",
+        "zombie-threshold": "2m",
+        "cleanup-stale-whitelist": true
+      },
+      "health": {
+        "check-interval": "10s",
+        "deregister-after": "1m",
+        "timeout": "5s"
+      }
+    },
+    "modules": {
+      "auto-discover": false,
+      "service-prefix": "module-",
+      "require-whitelist": true,
+      "connection-timeout": "30s",
+      "max-instances-per-module": 10
+    },
+    "default-cluster": {
+      "name": "default",
+      "auto-create": true,
+      "description": "Default cluster for Rokkon pipelines"
+    }
+  }
+}

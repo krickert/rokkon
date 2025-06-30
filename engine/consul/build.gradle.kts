@@ -67,6 +67,11 @@ tasks.withType<Jar> {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
 }
 
+// Fix sourcesJar dependency on generated sources
+tasks.named<Jar>("sourcesJar") {
+    dependsOn("compileQuarkusGeneratedSourcesJava")
+}
+
 // Configure Quarkus to use Mutiny for gRPC code generation
 quarkus {
     buildForkOptions {
