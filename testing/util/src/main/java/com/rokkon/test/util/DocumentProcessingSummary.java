@@ -1,7 +1,7 @@
 package com.rokkon.test.util;
 
 import com.rokkon.search.model.PipeDoc;
-import com.rokkon.pipeline.utils.ProcessingBuffer;
+import com.rokkon.pipeline.util.ProcessingBuffer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 

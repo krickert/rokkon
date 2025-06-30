@@ -1,5 +1,5 @@
 plugins {
-    java
+    `java-library`
     id("io.quarkus")
     `maven-publish`
     idea
@@ -8,11 +8,10 @@ plugins {
 
 
 dependencies {
-    // Import the rokkon BOM
-    implementation(platform(project(":rokkon-bom")))
+    // Use library BOM for common library dependencies
+    implementation(platform(project(":bom:library")))
     
-    // Use pre-generated protobuf classes from rokkon-protobuf
-    implementation(project(":commons:protobuf")) // For SampleDataCreator/Loader
+    // No protobuf generation needed in util anymore
 
     // Core dependencies from BOM
     implementation("io.quarkus:quarkus-arc")
@@ -50,13 +49,6 @@ tasks.named<Jar>("sourcesJar") {
     dependsOn("compileQuarkusGeneratedSourcesJava")
 }
 
-// Configure Quarkus to use Mutiny for gRPC code generation
-quarkus {
-    buildForkOptions {
-        systemProperty("quarkus.grpc.codegen.type", "mutiny")
-    }
-}
-
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
     useJUnitPlatform()
@@ -64,15 +56,14 @@ tasks.withType<Test> {
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
-    options.compilerArgs.addAll(listOf("-parameters", "--enable-preview"))
-    options.release = 21
+    options.compilerArgs.add("-parameters")
 }
 
 publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
-            artifactId = "rokkon-commons-util"
+            artifactId = "commons-util"
         }
     }
 }

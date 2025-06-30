@@ -7,19 +7,21 @@ plugins {
 
 
 dependencies {
-    // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
+    // Library BOM provides all standard library dependencies
+    implementation(platform(project(":bom:library")))
     
-    // Quarkus dependencies come from BOM
+    // Library-specific dependencies only
     implementation("io.quarkus:quarkus-jackson")
     implementation("io.quarkus:quarkus-hibernate-validator")
+    implementation("jakarta.annotation:jakarta.annotation-api")
     
-    // Depend on rokkon-commons which includes protobuf definitions
+    // Project dependencies - interface is already provided by library BOM
+    // but we need to explicitly declare it since we use it directly
     implementation(project(":commons:interface"))
     
+    // Test dependencies
     testImplementation("io.quarkus:quarkus-junit5")
-    testImplementation("org.assertj:assertj-core") // Version managed by BOM
-    implementation("jakarta.annotation:jakarta.annotation-api")
+    testImplementation("org.assertj:assertj-core")
 }
 
 group = "com.rokkon.pipeline"

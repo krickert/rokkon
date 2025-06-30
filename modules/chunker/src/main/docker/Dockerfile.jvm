@@ -91,13 +91,13 @@ COPY --chown=185 build/quarkus-app/app/ /deployments/app/
 COPY --chown=185 build/quarkus-app/quarkus/ /deployments/quarkus/
 
 # Copy the CLI tool and entrypoint from build directory
-COPY --chown=185 build/docker/rokkon-cli.jar /deployments/rokkon-cli.jar
+COPY --chown=185 build/docker/register-module-cli.jar /deployments/register-module-cli.jar
 COPY --chown=185 src/main/bash/module-entrypoint.sh /deployments/module-entrypoint.sh
 
 # Create CLI wrapper and make scripts executable
-RUN echo '#!/bin/bash' > /deployments/rokkon && \
-    echo 'java -jar /deployments/rokkon-cli.jar "$@"' >> /deployments/rokkon && \
-    chmod +x /deployments/rokkon /deployments/module-entrypoint.sh
+RUN echo '#!/bin/bash' > /deployments/register-module && \
+    echo 'java -jar /deployments/register-module-cli.jar "$@"' >> /deployments/register-module && \
+    chmod +x /deployments/register-module /deployments/module-entrypoint.sh
 
 # Set PATH to include the deployments directory
 ENV PATH="/deployments:${PATH}"

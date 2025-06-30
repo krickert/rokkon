@@ -7,29 +7,21 @@ plugins {
 
 
 dependencies {
-    // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
+    // Module BOM provides all standard module dependencies
+    implementation(platform(project(":bom:module")))
 
-    // Core dependencies (arc, grpc, protobuf, commons) come from BOM
-
-    // Additional Quarkus extensions needed by this module
-    implementation("io.quarkus:quarkus-container-image-docker")
-    implementation("io.quarkus:quarkus-config-yaml")
-    implementation("io.quarkus:quarkus-arc")
-    implementation("io.quarkus:quarkus-smallrye-health")
-    implementation("io.quarkus:quarkus-micrometer")
-    implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
-    implementation("io.quarkus:quarkus-opentelemetry")
+    // Module-specific dependencies only
+    implementation("io.quarkus:quarkus-opentelemetry") // Not in module BOM by default
 
     // Apache Tika dependencies - use standard package which includes most parsers
-    implementation("org.apache.tika:tika-core:3.2.0")
-    implementation("org.apache.tika:tika-parsers-standard-package:3.2.0")
+    implementation("org.apache.tika:tika-core")
+    implementation("org.apache.tika:tika-parsers-standard-package")
 
     // Rokkon commons util for ProcessingBuffer and other utilities
     implementation(project(":commons:util"))
 
     // JSON Schema validation
-    implementation("com.networknt:json-schema-validator:1.5.2")
+    implementation("com.networknt:json-schema-validator")
 
     // Testing dependencies
     testImplementation("io.quarkus:quarkus-junit5")
@@ -38,13 +30,14 @@ dependencies {
     testImplementation("io.grpc:grpc-services") // Version from BOM
     testImplementation("org.testcontainers:testcontainers") // Version from BOM
     testImplementation("org.testcontainers:junit-jupiter") // Version from BOM
-    testImplementation("com.rokkon.pipeline:testing-util:1.0.0-SNAPSHOT")
+    testImplementation(project(":testing:util"))
+    testImplementation(project(":testing:server-util"))
 
     // Apache Commons IO for file operations
-    testImplementation("commons-io:commons-io:2.19.0")
+    testImplementation("commons-io:commons-io")
     // Apache Commons Compress for reading from JARs/ZIPs
     // https://mvnrepository.com/artifact/org.apache.commons/commons-compress
-    testImplementation("org.apache.commons:commons-compress:1.27.1")
+    testImplementation("org.apache.commons:commons-compress")
 }
 
 group = "com.rokkon.pipeline"
@@ -93,7 +86,7 @@ dependencies {
 // Copy CLI jar for Docker build
 tasks.register<Copy>("copyDockerAssets") {
     from(cliJar) {
-        rename { "rokkon-cli.jar" }
+        rename { "register-module-cli.jar" }
     }
     into(layout.buildDirectory.dir("docker"))
 }

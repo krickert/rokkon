@@ -8,6 +8,10 @@ dependencies {
     // Use the CLI BOM - includes all common CLI dependencies
     implementation(platform(project(":bom:cli")))
     
+    // Add compile-only dependency for gRPC code generation
+    // This won't be included in runtime, avoiding server components
+    compileOnly("io.quarkus:quarkus-grpc")
+    
     // Project-specific dependencies only
     implementation("io.vertx:vertx-consul-client")
     implementation("com.fasterxml.jackson.core:jackson-databind") 

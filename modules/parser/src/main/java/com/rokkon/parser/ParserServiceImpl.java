@@ -3,7 +3,7 @@ package com.rokkon.parser;
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
 import com.rokkon.search.model.*;
-import com.rokkon.pipeline.utils.ProcessingBuffer;
+import com.rokkon.pipeline.util.ProcessingBuffer;
 import com.rokkon.search.sdk.*;
 import com.rokkon.parser.util.DocumentParser;
 import io.quarkus.grpc.GrpcService;

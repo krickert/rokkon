@@ -7,46 +7,28 @@ javaPlatform {
     allowDependencies()
 }
 
-val slf4jVersion = "2.0.13"
-
 dependencies {
-    // Import core BOM
-    api(platform(project(":bom:core")))
-    
-    // Don't include protobuf-stubs directly in BOM - let projects add it with exclusions
+    // Import base BOM which includes Quarkus BOM
+    api(platform(project(":bom:base")))
     
     // Direct dependencies that all CLI projects will have
-    api(project(":commons:protobuf-stubs"))
+    api(project(":commons:protobuf"))  // Proto files for code generation
     api("io.quarkus:quarkus-picocli")
     api("io.quarkus:quarkus-arc")
     api("io.quarkus:quarkus-config-yaml")
-    api("io.grpc:grpc-netty-shaded") // For gRPC client connections
+    // NOT including quarkus-grpc here - it brings in server dependencies!
+    // CLI projects need to generate protobuf code without server components
+    api("io.grpc:grpc-netty-shaded")  // For gRPC client connections
+    api("io.grpc:grpc-stub")          // For gRPC stubs
+    api("io.grpc:grpc-protobuf")      // For protobuf support
+    api("com.google.protobuf:protobuf-java")
+    api("com.google.protobuf:protobuf-java-util")
     
     constraints {
-        // Additional optional dependencies that CLI projects might use
-        api("info.picocli:picocli")
-        api("info.picocli:picocli-codegen")
-        api("org.yaml:snakeyaml")
+        // Only add versions for things NOT in Quarkus BOM
+        // Quarkus manages: picocli, jackson, vertx, junit, mockito, testcontainers, etc.
         
-        // Logging
-        api("org.slf4j:slf4j-simple:${slf4jVersion}")
-        
-        // Common utilities that CLI apps might need
-        api("com.fasterxml.jackson.core:jackson-databind")
-        api("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
-        api("io.vertx:vertx-consul-client")
-        
-        // Testing dependencies for CLI projects
-        api("io.quarkus:quarkus-junit5")
-        api("io.quarkus:quarkus-junit5-mockito")
-        api("io.quarkus:quarkus-test-common")
-        api("org.junit.platform:junit-platform-launcher")
-        api("org.mockito:mockito-junit-jupiter")
-        api("org.testcontainers:testcontainers")
-        api("org.awaitility:awaitility")
-        
-        // Minimal Quarkus runtime for CLI
-        api("io.quarkus:quarkus-core")
+        // Nothing additional needed - Quarkus BOM covers everything
     }
 }
 

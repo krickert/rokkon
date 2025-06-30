@@ -19,7 +19,7 @@ rootProject.name = "rokkon-pristine"
 include("rokkon-bom") // Original BOM - keeping as backup
 
 // New BOMs
-include("bom:core")
+include("bom:base")
 include("bom:cli")
 include("bom:module")
 include("bom:library")
@@ -28,16 +28,17 @@ include("bom:server")
 include("cli:register-module")
 include("cli:seed-engine-consul-config")
 include("commons:protobuf")
-include("commons:protobuf-stubs")
 include("commons:interface")
 include("commons:util")
+include("commons:data-util")
 include("testing:util")
+include("testing:server-util")
 include("rokkon-engine")
 
 // Engine submodules
 include("engine:consul")
 include("engine:validators")
-include("engine:seed-config")
+// include("engine:seed-config") - Moved to cli:seed-engine-consul-config
 // include("engine:registration") - Merged into engine:consul
 
 // Module subprojects

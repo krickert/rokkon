@@ -2,8 +2,8 @@ package com.rokkon.parser;
 
 import com.rokkon.search.model.PipeDoc;
 import com.rokkon.search.model.PipeStream;
-import com.rokkon.pipeline.utils.ProcessingBuffer;
-import com.rokkon.pipeline.utils.ProcessingBufferFactory;
+import com.rokkon.pipeline.util.ProcessingBuffer;
+import com.rokkon.pipeline.util.ProcessingBufferFactory;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;

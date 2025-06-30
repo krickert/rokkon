@@ -1,11 +1,12 @@
 quarkus:
   application:
-    name: chunker-module
+    name: chunker
   http:
     port: 39092
   generate-code:
     grpc:
-      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
+      scan-for-proto: com.rokkon.pipeline:protobuf
+      scan-for-imports: com.google.protobuf:protobuf-java,com.google.api.grpc:proto-google-common-protos
   grpc:
     server:
       port: 49092
@@ -26,7 +27,7 @@ quarkus:
     build: false  # Set to true when you want to build the image
     push: false   # Set to true when you want to push to registry
     registry: "registry.rokkon.com:8443"
-    image: "rokkon/chunker-module:${quarkus.application.version}"
+    image: "pipeline/chunker:${quarkus.application.version}"
     dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
     group: rokkon
     # Credentials should be provided via environment variables:

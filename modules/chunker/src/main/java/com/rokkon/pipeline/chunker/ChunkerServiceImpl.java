@@ -5,7 +5,7 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.Struct;
 import com.google.protobuf.util.JsonFormat;
 import com.rokkon.search.model.*;
-import com.rokkon.pipeline.utils.ProcessingBuffer;
+import com.rokkon.pipeline.util.ProcessingBuffer;
 import com.rokkon.search.sdk.*;
 import com.rokkon.search.sdk.RegistrationRequest;
 import com.rokkon.search.sdk.ServiceRegistrationResponse;

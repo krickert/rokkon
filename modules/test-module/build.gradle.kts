@@ -7,19 +7,11 @@ plugins {
 
 
 dependencies {
-    // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
+    // Module BOM provides all standard module dependencies
+    implementation(platform(project(":bom:module")))
 
-    // Core dependencies (arc, grpc, protobuf, commons) come from BOM
-
-    // Additional Quarkus extensions needed by this module
-    implementation("io.quarkus:quarkus-rest-jackson")
-    implementation("io.quarkus:quarkus-container-image-docker")
-    implementation("io.quarkus:quarkus-smallrye-health")
-    implementation("io.quarkus:quarkus-smallrye-openapi")
-    implementation("io.quarkus:quarkus-micrometer")
-    implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
-    implementation("io.quarkus:quarkus-opentelemetry")
+    // Module-specific dependencies only
+    implementation("io.quarkus:quarkus-opentelemetry") // Not in module BOM by default
 
     // Testing dependencies
     testImplementation("io.quarkus:quarkus-junit5")
@@ -29,6 +21,7 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers") // Version from BOM
     testImplementation("org.testcontainers:junit-jupiter") // Version from BOM
     testImplementation(project(":testing:util"))
+    testImplementation(project(":testing:server-util"))
 }
 
 group = "com.rokkon.pipeline"
@@ -73,7 +66,7 @@ dependencies {
 // Copy CLI jar for Docker build
 tasks.register<Copy>("copyDockerAssets") {
     from(cliJar) {
-        rename { "rokkon-cli.jar" }
+        rename { "register-module-cli.jar" }
     }
     into(layout.buildDirectory.dir("docker"))
 }

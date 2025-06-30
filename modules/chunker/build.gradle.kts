@@ -4,41 +4,18 @@ plugins {
     `maven-publish`
 }
 
-
-
 dependencies {
-    // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
+    // Module BOM provides all standard module dependencies
+    implementation(platform(project(":bom:module")))
 
-    // Core dependencies (arc, grpc, protobuf, commons) come from BOM
-
-    // Additional Quarkus extensions needed by this module
-    implementation("io.quarkus:quarkus-jackson")
-    implementation("io.quarkus:quarkus-rest")
-    implementation("io.quarkus:quarkus-rest-jackson")
-    implementation("io.quarkus:quarkus-smallrye-openapi")
-    implementation("io.quarkus:quarkus-container-image-docker")
-    implementation("io.quarkus:quarkus-config-yaml")
-    implementation("io.quarkus:quarkus-arc")
-    implementation("io.quarkus:quarkus-smallrye-health")
-    implementation("io.quarkus:quarkus-micrometer")
-    implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
-    implementation("io.quarkus:quarkus-opentelemetry")
-
-    // OpenNLP dependencies for chunking and NLP analysis
+    // Module-specific dependencies only
     implementation("org.apache.opennlp:opennlp-tools:2.3.0")
-
-    // Apache Commons for string utilities
-    implementation("org.apache.commons:commons-lang3:3.12.0")
-
-    // Testing dependencies
-    testImplementation("io.quarkus:quarkus-junit5")
-    testImplementation("io.rest-assured:rest-assured")
-    testImplementation("org.assertj:assertj-core") // Version from BOM
-    testImplementation("io.grpc:grpc-services") // Version from BOM
-    testImplementation("org.testcontainers:testcontainers") // Version from BOM
-    testImplementation("org.testcontainers:junit-jupiter") // Version from BOM
+    
+    // Module-specific test dependencies
     testImplementation(project(":testing:util"))
+    testImplementation(project(":testing:server-util")) // For ProtobufTestDataHelper
+    testImplementation("io.quarkus:quarkus-junit5")
+    testImplementation("org.assertj:assertj-core")
 }
 
 group = "com.rokkon.pipeline"
@@ -49,16 +26,9 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-// Configure Quarkus to use Mutiny for gRPC code generation
-quarkus {
-    buildForkOptions {
-        systemProperty("quarkus.grpc.codegen.type", "mutiny")
-    }
-}
+// No gRPC code generation needed - using pre-generated stubs
 
-// Exclude integration tests from regular test task
 tasks.test {
-    exclude("**/*IT.class")
     maxHeapSize = "2g"
 }
 
@@ -71,7 +41,7 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-// Configuration to consume the CLI jar from cli-register-module
+// Configuration to consume the CLI jar from register-module
 val cliJar by configurations.creating {
     isCanBeConsumed = false
     isCanBeResolved = true
@@ -87,7 +57,7 @@ dependencies {
 // Copy CLI jar for Docker build
 tasks.register<Copy>("copyDockerAssets") {
     from(cliJar) {
-        rename { "rokkon-cli.jar" }
+        rename { "register-module-cli.jar" }
     }
     into(layout.buildDirectory.dir("docker"))
 }
@@ -101,7 +71,7 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
-            artifactId = "chunker-module"
+            artifactId = "chunker"
         }
     }
 }

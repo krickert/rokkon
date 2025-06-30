@@ -17,7 +17,7 @@ java {
 
 dependencies {
     // Use core BOM for minimal dependencies
-    implementation(platform(project(":bom:core")))
+    implementation(platform(project(":bom:base")))
     
     // No runtime dependencies needed - this is just a proto files jar
 }

@@ -9,7 +9,8 @@ quarkus:
     host: 0.0.0.0
   generate-code:
     grpc:
-      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
+      scan-for-proto: com.rokkon.pipeline:protobuf
+      scan-for-imports: com.google.protobuf:protobuf-java,com.google.api.grpc:proto-google-common-protos
   log:
     level: INFO
     category:

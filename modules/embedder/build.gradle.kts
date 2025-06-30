@@ -7,20 +7,11 @@ plugins {
 
 
 dependencies {
-    // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
+    // Module BOM provides all standard module dependencies
+    implementation(platform(project(":bom:module")))
 
-    // Core dependencies (arc, grpc, protobuf, commons) come from BOM
-
-    // Additional Quarkus extensions needed by this module
-    implementation("io.quarkus:quarkus-container-image-docker")
-    implementation("io.quarkus:quarkus-config-yaml")
-    implementation("io.quarkus:quarkus-arc")
-    implementation("io.quarkus:quarkus-jackson")
-    implementation("io.quarkus:quarkus-smallrye-health")
-    implementation("io.quarkus:quarkus-micrometer")
-    implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
-    implementation("io.quarkus:quarkus-opentelemetry")
+    // Module-specific dependencies only
+    implementation("io.quarkus:quarkus-opentelemetry") // Not in module BOM by default
 
     // DJL (Deep Java Library) for ML inference
     implementation("ai.djl.huggingface:tokenizers:0.33.0")
@@ -33,19 +24,17 @@ dependencies {
     }
 
     // Apache Commons for utilities
-    implementation("org.apache.commons:commons-lang3:3.12.0")
+    implementation("org.apache.commons:commons-lang3")
 
     // Rokkon commons util for ProcessingBuffer and other utilities
     implementation(project(":commons:util"))
-
-    // Protobuf definitions for model classes
-    implementation(project(":commons:protobuf"))
 
     // Testing dependencies
     testImplementation("io.quarkus:quarkus-junit5")
     testImplementation("io.rest-assured:rest-assured")
     testImplementation("org.assertj:assertj-core") // Version from BOM
-    testImplementation("com.rokkon.pipeline:testing-util:1.0.0-SNAPSHOT")
+    testImplementation(project(":testing:util"))
+    testImplementation(project(":testing:server-util"))
     testImplementation("io.grpc:grpc-services") // Version from BOM
     testImplementation("org.testcontainers:testcontainers") // Version from BOM
     testImplementation("org.testcontainers:junit-jupiter") // Version from BOM
@@ -97,7 +86,7 @@ dependencies {
 // Copy CLI jar for Docker build
 tasks.register<Copy>("copyDockerAssets") {
     from(cliJar) {
-        rename { "rokkon-cli.jar" }
+        rename { "register-module-cli.jar" }
     }
     into(layout.buildDirectory.dir("docker"))
 }

@@ -1,0 +1,22 @@
+filename,title,description,author,creation_date,last_modified_date,content_type,language,keywords,category
+acm_3627673.3679549.pdf,Academic Research Paper,Research paper from ACM Digital Library about software engineering,ACM Authors,2023-01-01,2023-01-01,application/pdf,en,"pdf,academic,research,large",documents
+sample_1mb.txt,Large Text Document,A large plain text document for testing text processing,Test Author,2023-01-01,2023-01-01,text/plain,en,"txt,large,performance",documents
+1mb.json,Large JSON Dataset,A comprehensive JSON dataset for testing JSON parsing,Test Author,2023-01-01,2023-01-01,application/json,en,"json,large,dataset",documents
+file_example_1MB_PPTX.pptx,Large PowerPoint Presentation,A comprehensive PowerPoint presentation with multiple slides,Test Author,2023-01-01,2023-01-01,application/vnd.openxmlformats-officedocument.presentationml.presentation,en,"pptx,presentation,large",documents
+file-sample_500kB.odt,OpenDocument Text Sample,A substantial OpenDocument text file for testing,Test Author,2023-01-01,2023-01-01,application/vnd.oasis.opendocument.text,en,"odt,medium,opendocument",documents
+file_example_PPT_500kB.ppt,Legacy PowerPoint Presentation,A PowerPoint presentation in legacy PPT format,Test Author,2023-01-01,2023-01-01,application/vnd.ms-powerpoint,en,"ppt,presentation,medium",documents
+file-sample_500kB.doc,Legacy Word Document,A substantial Word document in legacy DOC format,Test Author,2023-01-01,2023-01-01,application/msword,en,"doc,word,medium",documents
+412KB.pdf,Medium PDF Document,A standard PDF document for testing PDF parsing,Test Author,2023-01-01,2023-01-01,application/pdf,en,"pdf,medium,standard",documents
+file_example_ODP_200kB.odp,OpenDocument Presentation,An OpenDocument presentation for testing ODP parsing,Test Author,2023-01-01,2023-01-01,application/vnd.oasis.opendocument.presentation,en,"odp,presentation,medium",documents
+har.json,HTTP Archive File,A web performance HTTP Archive file with request/response data,Test Author,2023-01-01,2023-01-01,application/json,en,"json,har,web,performance",documents
+SampleCSVFile_119kb.csv,Large CSV Dataset,A substantial CSV file with tabular data for testing,Test Author,2023-01-01,2023-01-01,text/csv,en,"csv,data,medium",documents
+file-sample_100kB.docx,Word Document Sample,A Word document in modern DOCX format,Test Author,2023-01-01,2023-01-01,application/vnd.openxmlformats-officedocument.wordprocessingml.document,en,"docx,word,small",documents
+file_example_XLS_100KB.xls,Excel Spreadsheet Sample,A legacy Excel spreadsheet for testing XLS parsing,Test Author,2023-01-01,2023-01-01,application/vnd.ms-excel,en,"xls,excel,small",documents
+file-sample_100kB_RTF.rtf,Rich Text Format Sample,A Rich Text Format document for testing RTF parsing,Test Author,2023-01-01,2023-01-01,application/rtf,en,"rtf,rich-text,small",documents
+file_example_ODS_1000.ods,OpenDocument Spreadsheet,An OpenDocument spreadsheet with substantial data,Test Author,2023-01-01,2023-01-01,application/vnd.oasis.opendocument.spreadsheet,en,"ods,spreadsheet,medium",documents
+PDF.pdf,Standard PDF Sample,A basic PDF document for testing,Test Author,2023-01-01,2023-01-01,application/pdf,en,"pdf,basic,small",documents
+source-code/DocumentPipelineIntegrationTests.java,Integration Test Source,Comprehensive integration test source code,Rokkon Developer,2023-01-01,2023-01-01,text/x-java-source,en,"java,test,integration,large",source-code
+source-code/SecurityIntegrationTests.java,Security Test Source,Security integration test source code,Rokkon Developer,2023-01-01,2023-01-01,text/x-java-source,en,"java,test,security,large",source-code
+source-code/PipelineConfigService.java,Service Implementation,Pipeline configuration service implementation,Rokkon Developer,2023-01-01,2023-01-01,text/x-java-source,en,"java,service,implementation,medium",source-code
+source-code/TikaResponseGenerator.java,Test Data Generator,Source code for generating Tika test response data,Rokkon Developer,2023-01-01,2023-01-01,text/x-java-source,en,"java,generator,test-data,medium",source-code
+source-code/build.gradle.kts,Build Configuration,Gradle build configuration in Kotlin DSL,Rokkon Developer,2023-01-01,2023-01-01,text/x-kotlin,en,"gradle,kotlin,build,configuration",source-code

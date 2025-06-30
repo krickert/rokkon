@@ -46,7 +46,7 @@ configurations {
 
 // Add specific dependencies for integrationTest
 dependencies {
-    "integrationTestImplementation"("com.rokkon.pipeline:rokkon-protobuf")
+    "integrationTestImplementation"(project(":commons:protobuf"))
 }
 
 
@@ -57,35 +57,17 @@ val quarkusPlatformVersion: String by project
 val swaggerUiVersion: String = project.findProperty("swagger.ui.version") as String
 
 dependencies {
-    // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
-
-    // Don't need to declare Quarkus BOM again - it comes from rokkon-bom
-
-    // Core dependencies (arc, grpc, protobuf, commons) come from BOM automatically
-
-    // Quarkus dependencies
-    implementation("io.quarkus:quarkus-grpc")
-    implementation("io.quarkus:quarkus-arc")
-    implementation("io.quarkus:quarkus-rest-jackson")
-    implementation("io.quarkus:quarkus-smallrye-health")
-    implementation("io.quarkus:quarkus-config-yaml")
-    implementation("io.quarkus:quarkus-smallrye-openapi")
-    implementation("io.swagger.core.v3:swagger-annotations:${swaggerUiVersion}")
-
-    // Rokkon dependencies
-    implementation("com.rokkon.pipeline:rokkon-protobuf")
-    implementation(project(":commons:interface"))
-
-    // For file operations
-    implementation("commons-io:commons-io:2.15.0")
-
-    // Testing
-    testImplementation("io.quarkus:quarkus-junit5")
-    testImplementation("io.rest-assured:rest-assured")
-    testImplementation("org.assertj:assertj-core") // Version managed by BOM
+    // Module BOM provides all standard module dependencies
+    implementation(platform(project(":bom:module")))
+    
+    // Module-specific dependencies only
+    implementation("commons-io:commons-io")
+    
+    // Module-specific test dependencies
     testImplementation("io.quarkus:quarkus-junit5-mockito")
     testImplementation("org.mockito:mockito-core")
+    testImplementation("io.rest-assured:rest-assured")
+    testImplementation("io.quarkus:quarkus-junit5") // For @QuarkusTest
 }
 
 group = "com.rokkon.pipeline"
@@ -100,21 +82,40 @@ tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
 }
 
-// Temporarily disable all tests until the mock engine is completed
-// This is as per the issue request: "let's leave it where we turn off the integration tests"
-// "We will turn them back on when I complete the mock engine"
+// Temporarily disable tests until the mock engine is completed
 tasks.test {
-    // Disable all tests by setting the test task to do nothing
     enabled = false
-    // The following exclusions are kept for reference when tests are re-enabled
-    // exclude("**/*IT.class")
-    // exclude("**/FilesystemCrawlerIntegrationTest.class")
-    // exclude("**/mock/**")
 }
 
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
     options.compilerArgs.add("-parameters")
+}
+
+// Configuration to consume the CLI jar from register-module
+val cliJar by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "cli-jar"))
+    }
+}
+
+dependencies {
+    cliJar(project(":cli:register-module", "cliJar"))
+}
+
+// Copy CLI jar for Docker build
+tasks.register<Copy>("copyDockerAssets") {
+    from(cliJar) {
+        rename { "register-module-cli.jar" }
+    }
+    into(layout.buildDirectory.dir("docker"))
+}
+
+// Hook the copy task before Docker build
+tasks.named("quarkusBuild") {
+    dependsOn("copyDockerAssets")
 }
 
 publishing {

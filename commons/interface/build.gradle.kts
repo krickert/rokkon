@@ -1,7 +1,7 @@
 // rokkon-commons/build.gradle.kts
 plugins {
-    java
-    id("io.quarkus")
+    `java-library`
+    id("io.quarkus") version "3.24.1"
     `maven-publish`
     idea
 }
@@ -11,24 +11,20 @@ plugins {
 
 // gRPC version for grpc-services dependency
 dependencies {
-    // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
+    // Use library BOM for common library dependencies
+    implementation(platform(project(":bom:library")))
 
-    //implementation(project(":commons:protobuf"))
-
-
-    // Additional dependencies needed by this module
-    implementation("io.quarkus:quarkus-jackson")
+    // Additional dependencies needed by this module (not in library BOM)
+    implementation("io.quarkus:quarkus-jackson") // For ObjectMapperCustomizer
     implementation("io.quarkus:quarkus-config-yaml")
     implementation("io.quarkus:quarkus-hibernate-validator")
     implementation("io.quarkus:quarkus-smallrye-openapi")
-    implementation("io.swagger.core.v3:swagger-annotations") // Version managed by BOM
-
+    implementation("io.swagger.core.v3:swagger-annotations") // version from BOM constraints
 
     // Testing
     testImplementation("io.quarkus:quarkus-junit5")
-    testImplementation("org.assertj:assertj-core") // Version managed by BOM
-    testImplementation("com.github.marschall:memoryfilesystem") // Version managed by BOM
+    testImplementation("org.assertj:assertj-core")
+    testImplementation("com.github.marschall:memoryfilesystem")
 }
 
 group = "com.rokkon.pipeline"
@@ -49,9 +45,11 @@ tasks.withType<JavaCompile> {
     options.release = 21
 }
 
-// Fix duplicate entries in sources jar
+// Fix duplicate entries in sources jar and exclude application.yml
 tasks.withType<Jar> {
     duplicatesStrategy = DuplicatesStrategy.EXCLUDE
+    // Exclude application.yml from JAR - it's only needed for proto generation
+    exclude("application.yml", "application.properties")
 }
 
 tasks.withType<GenerateModuleMetadata> {
@@ -62,11 +60,11 @@ publishing {
     publications {
         create<MavenPublication>("maven") {
             from(components["java"])
-            artifactId = "rokkon-commons"
+            artifactId = "interface"
             
             pom {
-                name.set("Rokkon Commons")
-                description.set("Common utilities and protobuf helpers for Rokkon Engine")
+                name.set("Rokkon Commons Interface")
+                description.set("Common interfaces and models for Rokkon Engine")
             }
         }
     }

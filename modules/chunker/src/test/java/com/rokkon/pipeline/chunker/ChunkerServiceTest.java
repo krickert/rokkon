@@ -8,10 +8,10 @@ import io.quarkus.test.junit.QuarkusTest;
 class ChunkerServiceTest extends ChunkerServiceTestBase {
 
     @GrpcClient
-    PipeStepProcessor pipeStepProcessor;
+    PipeStepProcessor chunkerService;
 
     @Override
     protected PipeStepProcessor getChunkerService() {
-        return pipeStepProcessor;
+        return chunkerService;
     }
 }

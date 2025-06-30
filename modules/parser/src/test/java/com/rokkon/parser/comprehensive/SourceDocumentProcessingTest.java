@@ -2,7 +2,7 @@ package com.rokkon.parser.comprehensive;
 
 import com.rokkon.search.model.PipeDoc;
 import com.rokkon.search.model.PipeStream;
-import com.rokkon.pipeline.utils.ProcessingBuffer;
+import com.rokkon.pipeline.util.ProcessingBuffer;
 import com.rokkon.search.sdk.PipeStepProcessor;
 import com.rokkon.search.sdk.ProcessConfiguration;
 import com.rokkon.search.sdk.ProcessRequest;

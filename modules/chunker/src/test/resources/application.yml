@@ -1,6 +1,8 @@
 quarkus:
   application:
     name: chunker-module-test
+  http:
+    test-port: 0  # Use random port for tests to avoid conflicts
   grpc:
     server:
       port: 0  # Use random port for tests

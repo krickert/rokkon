@@ -22,7 +22,7 @@ register_module() {
     echo "Registering module with engine (attempt $((retry_count+1))/${MAX_RETRIES})..."
     
     # Build CLI command with all options
-    local cli_cmd="rokkon register --module-host=${MODULE_HOST} --module-port=${MODULE_PORT} --engine-host=${ENGINE_HOST} --engine-port=${ENGINE_PORT}"
+    local cli_cmd="register-module register --module-host=${MODULE_HOST} --module-port=${MODULE_PORT} --engine-host=${ENGINE_HOST} --engine-port=${ENGINE_PORT}"
     
     # Add optional parameters if provided
     if [ -n "$CONSUL_HOST" ]; then
