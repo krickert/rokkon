@@ -127,6 +127,18 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
                 }
                 
                 // Check if there are existing modules with the same name
+                // Check for duplicate host/port combination
+                boolean duplicateEndpoint = existingModules.stream()
+                    .anyMatch(m -> m.host().equals(host) && m.port() == port);
+                
+                if (duplicateEndpoint) {
+                    LOG.warnf("Module already registered at %s:%d", host, port);
+                    return Uni.createFrom().failure(new WebApplicationException(
+                        String.format("A module is already registered at %s:%d", host, port),
+                        Response.Status.CONFLICT
+                    ));
+                }
+                
                 List<ModuleRegistration> sameNameModules = existingModules.stream()
                     .filter(m -> m.moduleName().equals(moduleName))
                     .toList();

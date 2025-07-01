@@ -4,6 +4,7 @@ import com.rokkon.pipeline.config.model.PipelineStepConfig;
 import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
 import com.rokkon.pipeline.engine.grpc.DynamicGrpcClientFactory;
 import com.rokkon.search.engine.MutinyPipeStreamEngineGrpc;
+import com.rokkon.search.model.ActionType;
 import com.rokkon.search.model.PipeStream;
 import com.rokkon.search.sdk.ProcessRequest;
 import com.rokkon.search.sdk.ProcessResponse;
@@ -19,8 +20,12 @@ import java.util.Map;
 /**
  * Enhanced transport handler that supports both module (PipeStepProcessor) and 
  * engine (PipeStreamEngine) routing based on service metadata in Consul.
+ * 
+ * This replaces the standard GrpcTransportHandler.
  */
 @ApplicationScoped
+@jakarta.enterprise.inject.Alternative
+@jakarta.annotation.Priority(jakarta.interceptor.Interceptor.Priority.APPLICATION + 10)
 public class EngineRoutingGrpcTransportHandler extends GrpcTransportHandler {
     
     private static final Logger LOG = LoggerFactory.getLogger(EngineRoutingGrpcTransportHandler.class);
@@ -85,27 +90,33 @@ public class EngineRoutingGrpcTransportHandler extends GrpcTransportHandler {
     private Uni<ProcessResponse> routeToEngine(ProcessRequest request, String engineServiceName) {
         return grpcClientFactory.getMutinyEngineClientForService(engineServiceName)
             .flatMap(engineClient -> {
-                // Convert ProcessRequest to PipeStreamRequest
-                PipeStreamRequest streamRequest = PipeStreamRequest.newBuilder()
-                    .setPipeStream(PipeStream.newBuilder()
-                        .setStreamId(request.getMetadata().getStreamId())
-                        .setPipeDoc(request.getDocument())
-                        .setCurrentHopNumber(request.getMetadata().getCurrentHopNumber())
-                        .build())
+                // Convert ProcessRequest to PipeStream
+                PipeStream pipeStream = PipeStream.newBuilder()
+                    .setStreamId(request.getMetadata().getStreamId())
+                    .setDocument(request.getDocument())
+                    .setCurrentPipelineName(request.getMetadata().getPipelineName())
+                    .setTargetStepName("engine-routing") // Target step for the downstream engine
+                    .setCurrentHopNumber(request.getMetadata().getCurrentHopNumber())
+                    .setActionType(ActionType.CREATE) // Default action
                     .build();
                 
-                // Call the engine
-                return engineClient.processPipeStream(streamRequest)
-                    .map(streamResponse -> {
-                        // Convert PipeStreamResponse back to ProcessResponse
+                // Call the engine using testPipeStream (synchronous RPC that returns PipeStream)
+                return engineClient.testPipeStream(pipeStream)
+                    .map(resultStream -> {
+                        // Convert PipeStream result back to ProcessResponse
                         return ProcessResponse.newBuilder()
-                            .setSuccess(!streamResponse.hasError())
-                            .setOutputDoc(streamResponse.getPipeStream().getPipeDoc())
-                            .addAllProcessorLogs(streamResponse.getLogsList())
+                            .setSuccess(true)
+                            .setOutputDoc(resultStream.getDocument())
+                            .addProcessorLogs("Processed by downstream engine: " + engineServiceName)
                             .build();
                     });
             })
-            .onFailure().invoke(error -> 
-                LOG.error("Failed to route to engine {}", engineServiceName, error));
+            .onFailure().recoverWithItem(error -> {
+                LOG.error("Failed to route to engine {}", engineServiceName, error);
+                return ProcessResponse.newBuilder()
+                    .setSuccess(false)
+                    .addProcessorLogs("Failed to route to engine: " + error.getMessage())
+                    .build();
+            });
     }
 }

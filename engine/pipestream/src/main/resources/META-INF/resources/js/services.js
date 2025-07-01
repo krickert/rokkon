@@ -69,7 +69,7 @@ const Services = {
                 <i class="bi bi-exclamation-triangle-fill me-2"></i>
                 <div>
                     <strong>Zombie Instances Detected</strong><br>
-                    <small>Found ${zombieCount} instance(s) in Consul that are not registered in Rokkon.</small>
+                    <small>Found ${zombieCount} instance(s) in Consul that are not registered in the engine.</small>
                 </div>
             </div>
         `;
@@ -134,9 +134,10 @@ const Services = {
         `;
         
         moduleServices.forEach(module => {
-            const healthyCount = module.instances.filter(i => i.healthy && i.registered).length;
+            const allHealthyCount = module.instances.filter(i => i.healthy).length;
             const totalCount = module.instances.length;
             const registeredCount = module.instances.filter(i => i.registered).length;
+            const registeredHealthyCount = module.instances.filter(i => i.healthy && i.registered).length;
             
             // Module group header
             html += `
@@ -146,9 +147,10 @@ const Services = {
                             <div>
                                 <strong>${module.service_name}</strong>
                                 <span class="badge bg-info ms-2">Module Group</span>
-                                <span class="badge ${healthyCount === registeredCount ? 'bg-success' : healthyCount > 0 ? 'bg-warning' : 'bg-danger'} ms-2">
-                                    ${healthyCount}/${registeredCount} Healthy
+                                <span class="badge ${allHealthyCount === totalCount ? 'bg-success' : allHealthyCount > 0 ? 'bg-warning' : 'bg-danger'} ms-2">
+                                    ${allHealthyCount}/${totalCount} Healthy
                                 </span>
+                                ${registeredCount > 0 ? `<span class="badge bg-primary ms-2">${registeredHealthyCount}/${registeredCount} Registered</span>` : ''}
                                 ${registeredCount < totalCount ? `<span class="badge bg-warning ms-2">${totalCount - registeredCount} Unregistered</span>` : ''}
                             </div>
                             <button class="btn btn-sm btn-outline-secondary" onclick="Services.toggleModuleInstances('${module.module_name}')">
@@ -196,12 +198,21 @@ const Services = {
                     `;
                 }
             } else {
-                actionButtons = `
-                    <button class="btn btn-sm btn-outline-primary" 
-                            onclick="Modules.registerModuleFromConsul('${module.module_name}', '${instance.address}', ${instance.port})">
-                        <i class="bi bi-plus-circle"></i> Register
-                    </button>
-                `;
+                // Only show register button for healthy unregistered instances
+                if (instance.healthy) {
+                    actionButtons = `
+                        <button class="btn btn-sm btn-outline-primary" 
+                                onclick="Modules.registerModuleFromConsul('${module.module_name}', '${instance.address}', ${instance.port})">
+                            <i class="bi bi-plus-circle"></i> Register
+                        </button>
+                    `;
+                } else {
+                    actionButtons = `
+                        <span class="text-muted">
+                            <i class="bi bi-exclamation-triangle"></i> Unhealthy
+                        </span>
+                    `;
+                }
             }
             
             const rowClass = instance.enabled === false ? 'table-secondary opacity-75' : '';

@@ -36,8 +36,8 @@ The latest test run shows **15 failing tests** and **17 skipped tests** out of *
 
 1. **BasicConsulConnectionIT** - Initialization error (FIXED)
 2. **ParallelConsulKvIT** - Initialization error (Fixed)
-3. **ClusterResourceIT** - Test execution failed (broken because LLM is drunk)
-4. **PipelineConfigResourceIT** - Test execution failed
+3. **ClusterResourceIT** - Test execution failed (fixed)
+4. **PipelineConfigResourceIT** - Test execution failed (fixed)
 5. **ClusterServiceIT** - Initialization error (Fixed)
 6. **ModuleWhitelistServiceSimpleIT** - Initialization error (Fixed)
 7. **PipelineConfigServiceIT** - Test execution failed

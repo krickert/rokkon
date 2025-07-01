@@ -11,7 +11,10 @@ const Dashboard = {
     
     // Initialize dashboard
     async init() {
-        console.log('Initializing Rokkon Dashboard...');
+        console.log('Initializing Pipeline Engine Dashboard...');
+        
+        // Load engine info first
+        await this.loadEngineInfo();
         
         // Set up event listeners
         this.setupEventListeners();
@@ -27,6 +30,35 @@ const Dashboard = {
         
         // Ensure default cluster exists
         await Clusters.ensureDefaultCluster();
+    },
+    
+    // Load engine information
+    async loadEngineInfo() {
+        try {
+            const response = await fetch('/api/v1/engine/info');
+            if (response.ok) {
+                const info = await response.json();
+                
+                // Update application name in header
+                const nameElement = document.getElementById('applicationName');
+                if (nameElement) {
+                    nameElement.textContent = info.applicationName;
+                }
+                
+                // Update page title
+                document.title = `${info.applicationName} Dashboard`;
+                
+                // Store for later use
+                this.engineInfo = info;
+            }
+        } catch (error) {
+            console.error('Failed to load engine info:', error);
+            // Fallback to default
+            const nameElement = document.getElementById('applicationName');
+            if (nameElement) {
+                nameElement.textContent = 'Pipeline Engine';
+            }
+        }
     },
 
     // Set up event listeners

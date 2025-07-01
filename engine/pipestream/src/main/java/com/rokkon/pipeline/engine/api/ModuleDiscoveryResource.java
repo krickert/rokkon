@@ -177,12 +177,13 @@ public class ModuleDiscoveryResource {
                                             healthy, 
                                             svc.getAddress(), 
                                             svc.getPort(), 
-                                            svc.getTags()
+                                            svc.getTags(),
+                                            svc.getMeta() != null ? svc.getMeta() : Map.of()
                                         );
                                     })
                                     .toList();
                             })
-                            .onFailure().recoverWithItem(List.of(new ServiceInfo(serviceName, false, "", 0, tags)));
+                            .onFailure().recoverWithItem(List.of(new ServiceInfo(serviceName, false, "", 0, tags, Map.of())));
                     })
                     .toList();
 
@@ -217,7 +218,8 @@ public class ModuleDiscoveryResource {
         boolean healthy,
         String address,
         int port,
-        List<String> tags
+        List<String> tags,
+        Map<String, String> metadata
     ) {}
 
     public record ServiceInstance(
@@ -255,9 +257,29 @@ public class ModuleDiscoveryResource {
                     .collect(Collectors.groupingBy(ServiceInfo::name));
 
                 servicesByName.forEach((serviceName, instances) -> {
-                    if (serviceName.startsWith("module-")) {
+                    // Check if this is a module by looking at metadata
+                    boolean isModule = false;
+                    String moduleName = serviceName;
+                    
+                    // Check service-type metadata first (most reliable)
+                    if (!instances.isEmpty() && instances.get(0).metadata() != null) {
+                        String serviceType = instances.get(0).metadata().get("service-type");
+                        isModule = "MODULE".equals(serviceType);
+                    }
+                    
+                    // Fall back to tags if metadata not present
+                    if (!isModule && !instances.isEmpty() && instances.get(0).tags() != null) {
+                        isModule = instances.get(0).tags().contains("pipeline-module");
+                    }
+                    
+                    // For backward compatibility, also check name prefix
+                    if (!isModule && serviceName.startsWith("module-")) {
+                        isModule = true;
+                        moduleName = serviceName.substring(7);
+                    }
+                    
+                    if (isModule) {
                         // This is a module service
-                        String moduleName = serviceName.substring(7);
                         List<GlobalModuleRegistryService.ModuleRegistration> registered = 
                             registeredByName.getOrDefault(moduleName, List.of());
 
@@ -363,7 +385,8 @@ public class ModuleDiscoveryResource {
                                             check.getStatus() == io.vertx.ext.consul.CheckStatus.PASSING);
 
                                     return new ServiceInfo(serviceName, healthy, svc.getAddress(), 
-                                        svc.getPort(), svc.getTags());
+                                        svc.getPort(), svc.getTags(), 
+                                        svc.getMeta() != null ? svc.getMeta() : Map.of());
                                 })
                                 .toList()
                             )
