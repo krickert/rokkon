@@ -34,6 +34,10 @@ dependencies {
     api("org.apache.commons:commons-lang3")
     api("commons-io:commons-io")
     
+    // OpenTelemetry and logging support - standard for all modules
+    api("io.quarkus:quarkus-opentelemetry")
+    api("io.quarkus:quarkus-smallrye-context-propagation")  // Required for MDC provider
+    
     // Container image support - all modules need this
     api("io.quarkus:quarkus-container-image-docker")
     

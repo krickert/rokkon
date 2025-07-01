@@ -36,7 +36,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     private static final Logger LOG = LoggerFactory.getLogger(PipelineDefinitionServiceImpl.class);
     private static final String PIPELINE_METADATA_SUFFIX = "/metadata";
     
-    @ConfigProperty(name = "rokkon.consul.kv-prefix", defaultValue = "rokkon")
+    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "rokkon")
     String kvPrefix;
     
     @Inject

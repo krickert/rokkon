@@ -32,15 +32,15 @@ quarkus:
       "com.rokkon":
         level: DEBUG
   container-image:
-    build: false  # Set to true when you want to build the image
-    push: false   # Set to true when you want to push to registry
-    registry: "registry.rokkon.com:8443"
-    image: "rokkon/echo-module:${quarkus.application.version}"
-    dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
-    group: rokkon
-    # Credentials should be provided via environment variables:
-    # QUARKUS_CONTAINER_IMAGE_USERNAME
-    # QUARKUS_CONTAINER_IMAGE_PASSWORD
+    build: false  # Override with -Dquarkus.container-image.build=true
+    push: false   # Override with -Dquarkus.container-image.push=true
+    group: pipeline
+    name: echo-module
+    tag: latest
+    # Additional labels for service mesh integration
+    labels:
+      "consul.service": "module-echo"
+      "consul.connect": "true"
 
 # Test profile configuration
 "%test":

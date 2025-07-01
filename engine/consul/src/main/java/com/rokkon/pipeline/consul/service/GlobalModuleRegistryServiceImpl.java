@@ -47,7 +47,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
     
     private static final Logger LOG = Logger.getLogger(GlobalModuleRegistryServiceImpl.class);
     
-    @ConfigProperty(name = "rokkon.consul.kv-prefix", defaultValue = "rokkon")
+    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "rokkon")
     String kvPrefix;
     
     @Inject

@@ -36,7 +36,7 @@ public class ModuleWhitelistServiceImpl implements ModuleWhitelistService {
 
     private static final Logger LOG = LoggerFactory.getLogger(ModuleWhitelistServiceImpl.class);
     
-    @ConfigProperty(name = "rokkon.consul.kv-prefix", defaultValue = "rokkon")
+    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "rokkon")
     String kvPrefix;
 
     @Inject

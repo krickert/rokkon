@@ -1,0 +1,87 @@
+version: '3.8'
+
+services:
+  # Consul server for service discovery and configuration
+  consul-server:
+    image: hashicorp/consul:latest
+    container_name: pipeline-consul-server
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    command: agent -dev -ui -client=0.0.0.0 -bind=0.0.0.0
+    networks:
+      - pipeline-network
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Pipeline Engine with Consul sidecar
+  pipeline-engine:
+    image: pipeline-engine:latest
+    container_name: pipeline-engine
+    environment:
+      - CONSUL_HOST=localhost  # Connect to sidecar via shared network namespace
+      - CONSUL_PORT=8500
+      - QUARKUS_HTTP_PORT=38082
+      - QUARKUS_GRPC_SERVER_PORT=48082
+      - ENGINE_HOST=localhost  # Register as localhost since sidecar handles routing
+    ports:
+      - "38082:38082"  # HTTP port
+      - "48082:48082"  # gRPC port
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    networks:
+      - pipeline-network
+
+  # Consul Connect sidecar for pipeline-engine
+  pipeline-engine-sidecar:
+    image: hashicorp/consul:latest
+    container_name: pipeline-engine-sidecar
+    command: >
+      consul agent
+        -retry-join=consul-server
+        -bind=0.0.0.0
+        -client=0.0.0.0
+        -node=pipeline-engine-agent
+        -datacenter=dc1
+    network_mode: "service:pipeline-engine"  # Share network namespace
+    depends_on:
+      - pipeline-engine
+      - consul-server
+    volumes:
+      - ./consul-config/engine-sidecar.json:/consul/config/service.json:ro
+
+  # Example module with sidecar (uncomment when needed)
+  # echo-module:
+  #   image: pipeline/echo-module:latest
+  #   container_name: echo-module
+  #   environment:
+  #     - CONSUL_HOST=localhost
+  #     - CONSUL_PORT=8500
+  #     - QUARKUS_HTTP_PORT=39092
+  #     - QUARKUS_GRPC_SERVER_PORT=49092
+  #   networks:
+  #     - pipeline-network
+  # 
+  # echo-module-sidecar:
+  #   image: hashicorp/consul:latest
+  #   container_name: echo-module-sidecar
+  #   command: >
+  #     consul agent
+  #       -retry-join=consul-server
+  #       -bind=0.0.0.0
+  #       -client=0.0.0.0
+  #       -node=echo-module-agent
+  #       -datacenter=dc1
+  #   network_mode: "service:echo-module"
+  #   depends_on:
+  #     - echo-module
+  #     - consul-server
+
+networks:
+  pipeline-network:
+    name: pipeline-network
+    driver: bridge

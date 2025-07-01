@@ -16,7 +16,7 @@ pluginManagement {
 rootProject.name = "rokkon-pristine"
 
 // Include only the modules we've migrated
-include("rokkon-bom") // Original BOM - keeping as backup
+// include("rokkon-bom") // Original BOM - removed as all projects migrated
 
 // New BOMs
 include("bom:base")
@@ -33,7 +33,7 @@ include("commons:util")
 include("commons:data-util")
 include("testing:util")
 include("testing:server-util")
-include("rokkon-engine")
+include("engine:pipestream")
 
 // Engine submodules
 include("engine:consul")

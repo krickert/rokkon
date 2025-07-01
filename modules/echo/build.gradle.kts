@@ -12,7 +12,7 @@ dependencies {
 
     // Module-specific dependencies only
     implementation(project(":commons:util")) // For SampleDataLoader
-    implementation("io.quarkus:quarkus-opentelemetry") // Not in module BOM by default
+    // OpenTelemetry is now in the module BOM
     
     // Module-specific test dependencies
     testImplementation("io.quarkus:quarkus-junit5")

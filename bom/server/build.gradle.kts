@@ -32,6 +32,7 @@ dependencies {
     api("io.quarkus:quarkus-grpc") // gRPC server
     api("io.quarkus:quarkus-rest") // REST server
     api("io.quarkus:quarkus-rest-jackson") // REST with Jackson
+    api("io.quarkus:quarkus-hibernate-validator") // Validation support
     api("io.quarkus:quarkus-smallrye-openapi")
     api("io.quarkus:quarkus-smallrye-health")
     api("io.quarkus:quarkus-micrometer")

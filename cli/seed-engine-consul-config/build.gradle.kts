@@ -13,6 +13,7 @@ dependencies {
     compileOnly("io.quarkus:quarkus-grpc")
     
     // Project-specific dependencies only
+    implementation("io.quarkus:quarkus-vertx")  // Provides Vertx for dependency injection
     implementation("io.vertx:vertx-consul-client")
     implementation("com.fasterxml.jackson.core:jackson-databind") 
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")

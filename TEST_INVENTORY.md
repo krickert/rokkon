@@ -1,173 +1,143 @@
 # Rokkon Test Inventory
 
-This document tracks all tests in the Rokkon project and their migration status to the base/unit/integration pattern.
+This document tracks all tests in the Rokkon project and their current status.
 
 ## Summary Statistics
-- Total Test Files: 172
-- Unit Tests: 108
-- Integration Tests: 64
-- Tests Already Migrated: 4 (EngineLifecycle, CustomClusterLifecycle, MethodicalBuildUp - partial)
+- **Total Components Tested**: 8 major components
+- **Passing Components**: 7/8 (87.5%)
+- **Failing Components**: 1/8 (engine/pipestream)
+- **Last Updated**: June 30, 2025
 
 ## Legend
-- ✅ Migrated to base/unit/integration pattern
-- 🔧 In progress
-- ❌ Not yet migrated
-- 🚫 Disabled/needs fixing
-- ⚠️ May need new test profile
+- ✅ All tests passing
+- ❌ Tests failing
+- 🚫 Tests won't compile
+- ⚠️ Tests pass but with warnings/issues
+- 📝 Analysis provided
 
-## Test Inventory by Module
+## Test Status by Component
 
-### engine/consul (22 unit tests, 9 integration tests)
-#### Unit Tests (src/test/java)
-- ✅ BasicConsulConnectionTest.java → BasicConsulConnectionUnitTest + IT (PASSING)
-- ✅ ConsulConfigFailOnMissingTest.java (PASSING)
-- ✅ ConsulConfigLoadingTest.java → moved to IT (requires real Consul)
-- ✅ ConsulConfigSuccessFailTest.java → ConsulConfigSuccessFailUnitTest + IT (PASSING)
-- ✅ IsolatedConsulKvTest.java → IsolatedConsulKvUnitTest + IT (PASSING)
-- ✅ MethodicalBuildUpTest.java → base + unit + IT (PASSING)
-- ✅ ParallelConsulKvTest.java → ParallelConsulKvUnitTest (PASSING - converted to non-Quarkus test)
-- ⚠️ service/ClusterServiceTest.java → ClusterServiceUnitTest + IT (SKIPPED when run with all tests, passes individually)
-- ⚠️ service/ModuleWhitelistServiceSimpleTest.java → ModuleWhitelistServiceSimpleUnitTest + IT (SKIPPED when run with all tests, passes individually)
-- ⚠️ service/ModuleWhitelistServiceTest.java → base + unit + IT (SKIPPED when run with all tests, passes individually)
-- ⚠️ service/PipelineConfigServiceTest.java → already has base/unit/IT pattern (SKIPPED when run with all tests, passes individually)
-- 🚫 config/ConsulConfigSourceSimpleTest.java (FAILING - shutdown error when run with other tests, passes individually)
+### ✅ engine/consul 
+**Status**: All tests passing
+- Unit tests: ✅ BUILD SUCCESSFUL
+- Integration tests: Not run in this analysis
+- **Notes**: Clean execution, no issues
 
-#### Integration Tests (src/integrationTest/java)
-- ❌ api/ClusterResourceIT.java
-- ❌ api/PipelineConfigResourceIT.java
-- ❌ ConsulConfigIsolatedIT.java
-- ✅ MethodicalBuildUpIT.java (already proper IT)
-- ❌ service/ModuleWhitelistServiceContainerIT.java
-- ❌ service/ModuleWhitelistServiceIT.java
-- ❌ service/PipelineConfigServiceIT.java
+### ✅ engine/validators
+**Status**: All tests passing
+- Unit tests: ✅ BUILD SUCCESSFUL (13 tests)
+- Integration tests: Not run in this analysis
+- **Notes**: Clean execution, validator logic working correctly
 
-### rokkon-engine (8 unit tests, 46 integration tests)
-#### Unit Tests (src/test/java)
-- ❌ api/GlobalModuleResourceTest.java
-- ❌ api/PipelineDefinitionResourceTest.java
-- ❌ api/PipelineInstanceResourceTest.java
-- ❌ api/SimpleClusterResourceTest.java
-- ❌ grpc/ModuleRegistrationServiceImplTest.java
-- ❌ validation/ValidatorComponentTest.java (4 tests pass - uses RealValidatorsTestProfile)
-- ✅ engine/CustomClusterLifecycleUnitTest.java
-- ✅ engine/EngineLifecycleUnitTest.java
+### ❌ engine/pipestream
+**Status**: Unit tests failing, integration tests won't compile
+- Unit tests: ❌ 2 failures out of 8 tests
+  - `GlobalModuleResourceTest` - RuntimeException during initialization
+  - `PipelineInstanceResourceTest` - RuntimeException during initialization
+  - 6 tests passing
+- Integration tests: 🚫 Won't compile
+- **Issues**:
+  1. Missing dependencies in build configuration
+  2. Class naming mismatches (files named `*IT.java` contain classes named `*Test`)
+  3. Missing `com.orbitz.consul` and `testcontainers-consul` dependencies
+  4. Duplicate class definitions
 
-#### Integration Tests (src/integrationTest/java)
-- Multiple IT files for various components (46 total)
-- ✅ engine/EngineLifecycleIT.java
-- ✅ engine/CustomClusterLifecycleIT.java
-- Others need review after unit tests are fixed
+📝 **Analysis**: The pipestream module has structural issues that need addressing:
+- The BOM migration may have removed necessary test dependencies
+- Integration test structure doesn't follow naming conventions
+- Unit test failures appear to be configuration/initialization related
 
-### engine/validators (13 unit tests, 11 integration tests)
-#### Unit Tests (src/test/java)
-- ❌ validators/InterPipelineLoopValidatorTest.java
-- ❌ validators/IntraPipelineLoopValidatorTest.java
-- ❌ validators/KafkaTopicNamingValidatorTest.java
-- ❌ validators/NamingConventionValidatorTest.java
-- ❌ validators/OutputRoutingValidatorTest.java
-- ❌ validators/ProcessorInfoValidatorTest.java
-- ❌ validators/RequiredFieldsValidatorTest.java
-- ❌ validators/RetryConfigValidatorTest.java
-- ❌ validators/StepReferenceValidatorTest.java
-- ❌ validators/StepTypeValidatorTest.java
-- ❌ validators/TransportConfigValidatorTest.java
-- ❌ validators/TransportConfigValidatorExtendedTest.java
+📝 **Fix Strategy**:
+1. Add missing test dependencies to build.gradle.kts
+2. Rename integration test classes to match filenames (*IT)
+3. Fix initialization issues in failing unit tests
+4. Add proper test profiles for Consul-dependent tests
 
-#### Integration Tests (src/integrationTest/java)
-- 11 corresponding IT files for validators
+### ✅ cli/register-module
+**Status**: All tests passing
+- Unit tests: ✅ BUILD SUCCESSFUL (2 tests)
+- **Warnings**: Configuration warnings for unrecognized keys (non-critical)
+- **Notes**: CLI functionality working correctly
 
-### engine/models (13 unit tests, 10 integration tests) - NOTE: This module was merged into commons/interface
-#### Unit Tests (src/test/java)
-- ❌ AbstractJsonSerdeTest.java (base class)
-- ❌ GrpcTransportConfigTest.java
-- ❌ KafkaInputDefinitionTest.java
-- ❌ KafkaTransportConfigTest.java
-- ❌ PipelineClusterConfigTest.java
-- ❌ PipelineConfigAdvancedTest.java
-- ❌ PipelineConfigTest.java
-- ❌ PipelineGraphConfigTest.java
-- ❌ PipelineModuleConfigurationTest.java
-- ❌ PipelineModuleMapTest.java
-- ❌ PipelineStepConfigTest.java
-- ❌ SchemaReferenceTest.java
-- ❌ StepTypeTest.java
-- ❌ TransportTypeTest.java
+### ✅ cli/seed-engine-consul-config  
+**Status**: All tests passing
+- Unit tests: ✅ BUILD SUCCESSFUL (3 tests)
+- **Warnings**: Configuration warnings for unrecognized keys (non-critical)
+- **Notes**: Consul seeding logic working correctly
 
-### modules/* (31 unit tests across all module subdirectories)
-#### modules/chunker (3 tests)
-- ❌ ChunkerServiceTest.java
-- ❌ comprehensive/DoubleChunkProcessingTest.java
-- ❌ comprehensive/SimpleChunkGenerationTest.java
+### ✅ modules/chunker
+**Status**: All tests passing
+- Unit tests: ✅ BUILD SUCCESSFUL (3 tests)
+- **Notes**: Module registration and chunking logic working
 
-#### modules/connectors/filesystem-crawler (5 unit, 11 integration)
-- ❌ FilesystemCrawlerConnectorTest.java
-- ❌ FilesystemCrawlerHealthCheckTest.java
-- ❌ FilesystemCrawlerIntegrationTest.java
-- ❌ FilesystemCrawlerResourceTest.java
-- ❌ SwaggerUIIntegrationTest.java
-- ❌ mock/MockConnectorEngineTest.java
-- ❌ mock/MockConnectorEngineUnitTest.java
+### ✅ modules/echo
+**Status**: All tests passing  
+- Unit tests: ✅ BUILD SUCCESSFUL (1 test)
+- **Notes**: Simple echo module functioning correctly
 
-#### modules/echo (1 test)
-- ❌ EchoServiceTest.java
+### ✅ modules/parser
+**Status**: All tests passing
+- Unit tests: ✅ BUILD SUCCESSFUL (5 tests)
+- **Warnings**: Expected Tika font substitution warnings for PDF processing
+- **Notes**: Document parsing working correctly
 
-#### modules/embedder (2 tests)
-- ❌ EmbedderServiceTest.java
-- ❌ comprehensive/EmbedderComprehensiveTest.java
+### ✅ modules/embedder
+**Status**: All tests passing
+- Unit tests: ✅ BUILD SUCCESSFUL (2 tests)  
+- **Warnings**: Network timeout connecting to DJL servers (non-critical)
+- **Notes**: Embedding logic working, external dependency timeouts expected
 
-#### modules/parser (5 tests)
-- ❌ ParserServiceTest.java
-- ❌ TikaTestDataGenerationTest.java
-- ❌ comprehensive/ParserServiceComprehensiveTest.java
-- ❌ comprehensive/ParserServiceRegistrationTest.java
-- ❌ comprehensive/SourceDocumentProcessingTest.java
+## Common Issues Across Tests
 
-#### modules/proxy-module (1 test)
-- ❌ PipeStepProcessorProxyTest.java
+### 1. OpenTelemetry Export Failures
+- **Seen in**: Multiple components
+- **Error**: `Failed to export spans. The request could not be executed. Full error message: Failed to connect to localhost/127.0.0.1:4317`
+- **Impact**: None - this is expected when no telemetry collector is running
+- **Fix**: Can be ignored or telemetry can be disabled in test profiles
 
-#### modules/test-module (10 unit, 5 integration)
-- ❌ health/GrpcHealthCheckTest.java
-- ❌ health/MixedHealthCheckTest.java
-- ❌ health/QuarkusContainerHealthCheckTest.java
-- ❌ health/SimpleHealthCheckTest.java
-- ❌ health/StandaloneGrpcHealthCheckDockerTest.java
-- ❌ TestHarnessServiceTest.java
-- ❌ TestProcessorHelperTest.java
-- ❌ TestProcessorUnitTest.java
+### 2. Configuration Warnings
+- **Seen in**: CLI modules
+- **Warning**: `Unrecognized configuration key "quarkus.X" was provided`
+- **Impact**: None - these are build-time properties not needed at runtime
+- **Fix**: Can be cleaned up in application.yml files
 
-### commons/* (12 tests) - NOTE: Split into commons/interface, commons/util, commons/protobuf
-- ❌ events/ConsulConnectionEventTest.java
-- ❌ events/ModuleRegistrationRequestEventTest.java
-- ❌ events/ModuleRegistrationResponseEventTest.java
-- ❌ jackson/JsonOrderingCustomizerTest.java
-- ❌ utils/NoOpProcessingBufferTest.java
-- ❌ utils/ObjectMapperFactoryTest.java
-- ❌ utils/ProcessingBufferFactoryTest.java
-- ❌ utils/ProcessingBufferImplTest.java
-- ❌ utils/ProcessingBufferTest.java
-- ❌ utils/ProtoFieldMapperTest.java
+### 3. External Network Dependencies
+- **Seen in**: embedder module
+- **Issue**: Attempts to connect to external services during tests
+- **Impact**: Tests still pass but with timeouts
+- **Fix**: Mock external services or disable in test profiles
 
-### testing/util (4 unit, 4 integration)
-- ❌ containers/ModuleContainerResourceTest.java
-- ❌ data/DebugTest.java
-- ❌ data/ProtobufTestDataHelperTest.java
-- ❌ data/ResourceLoadingTest.java
+## Recommendations
 
-### cli/register-module (2 tests)
-- ❌ RegisterCommandTest.java
-- ❌ service/ModuleRegistrationServiceTest.java
+1. **Immediate Priority**: Fix engine/pipestream tests
+   - Add missing dependencies to server BOM or test configuration
+   - Fix class naming in integration tests
+   - Debug initialization failures in unit tests
 
-### engine/seed-config (3 tests)
-- ❌ ConsulSeederCommandIT.java (probably should be unit test with IT variant)
-- ❌ model/ConfigurationModelTest.java
-- ❌ util/ConfigFileHandlerTest.java
+2. **Medium Priority**: Clean up warnings
+   - Configure test profiles to disable telemetry
+   - Remove unnecessary configuration properties
+   - Mock external service dependencies
 
-### commons/protobuf (1 test)
-- ❌ ProtoJarPackagingTest.java
+3. **Long Term**: Establish consistent test patterns
+   - Implement base/unit/integration pattern where beneficial
+   - Create proper test profiles for different scenarios
+   - Document testing best practices
 
-## Next Steps
+## Test Execution Commands Used
 
-1. Start with engine/consul module as it has the most tests and is critical infrastructure
-2. Apply base/unit/integration pattern systematically
-3. Create test profiles as needed for each test's requirements
-4. Track progress by updating this inventory
+```bash
+# Unit tests
+./gradlew :engine:consul:test
+./gradlew :engine:validators:test  
+./gradlew :engine:pipestream:test
+./gradlew :cli:register-module:test
+./gradlew :cli:seed-engine-consul-config:test
+./gradlew :modules:chunker:test
+./gradlew :modules:echo:test
+./gradlew :modules:parser:test
+./gradlew :modules:embedder:test
+
+# Integration tests (where applicable)
+./gradlew :engine:pipestream:integrationTest
+```

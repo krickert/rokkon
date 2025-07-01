@@ -31,7 +31,7 @@ import java.util.Set;
 public class ClusterServiceImpl implements ClusterService {
     private static final Logger LOG = Logger.getLogger(ClusterServiceImpl.class);
     
-    @ConfigProperty(name = "rokkon.consul.kv-prefix", defaultValue = "rokkon")
+    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "pipeline")
     String kvPrefix;
 
     @Inject
@@ -129,8 +129,16 @@ public class ClusterServiceImpl implements ClusterService {
     }
 
     public Uni<List<Cluster>> listClusters() {
-        return UniHelper.toUni(getConsulClient().getKeys(kvPrefix + "/clusters"))
+        String prefix = kvPrefix + "/clusters";
+        LOG.debugf("Listing clusters with prefix: %s", prefix);
+        
+        return UniHelper.toUni(getConsulClient().getKeys(prefix))
             .onItem().transformToUni(keys -> {
+                LOG.debugf("Found %d keys under prefix %s", keys != null ? keys.size() : 0, prefix);
+                if (keys != null && !keys.isEmpty()) {
+                    LOG.debugf("Keys: %s", keys);
+                }
+                
                 if (keys == null || keys.isEmpty()) {
                     return Uni.createFrom().item(new ArrayList<Cluster>());
                 }
@@ -138,11 +146,17 @@ public class ClusterServiceImpl implements ClusterService {
                 // Extract unique cluster names
                 Set<String> clusterNames = new java.util.HashSet<>();
                 for (String key : keys) {
-                    String[] parts = key.split("/");
-                    if (parts.length >= 2) {
-                        clusterNames.add(parts[1]);
+                    // Remove the prefix to get the relative path
+                    if (key.startsWith(prefix + "/")) {
+                        String relativePath = key.substring(prefix.length() + 1);
+                        String[] parts = relativePath.split("/");
+                        // First part after prefix should be the cluster name
+                        if (parts.length > 0 && !parts[0].isEmpty()) {
+                            clusterNames.add(parts[0]);
+                        }
                     }
                 }
+                LOG.debugf("Extracted cluster names: %s", clusterNames);
 
                 // Get metadata for each cluster
                 List<Uni<Optional<Cluster>>> clusterUnis = new ArrayList<>();
