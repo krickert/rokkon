@@ -88,7 +88,7 @@ public class PipelineDefinitionResource {
                     .onItem().transform(moduleRegistration -> {
                         StepType stepType = convertServiceTypeToStepType(moduleRegistration.serviceType(), dtoStep.module());
 
-                        ProcessorInfo processorInfo = new ProcessorInfo(dtoStep.module(), null); // Assuming module ID is grpcServiceName
+                        ProcessorInfo processorInfo = new ProcessorInfo(moduleRegistration.moduleName(), null); // Use module name for distributed load balancing
 
                         Map<String, String> configParams = new HashMap<>();
                         configParams.put("module_version", moduleRegistration.version() != null ? moduleRegistration.version() : "1.0.0");

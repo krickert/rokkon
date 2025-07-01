@@ -1,50 +1,56 @@
 package com.rokkon.pipeline.consul.api;
 
 import com.rokkon.pipeline.config.model.*;
+import com.rokkon.pipeline.consul.ConsulTestResource;
+import io.quarkus.test.common.QuarkusTestResource;
 import io.quarkus.test.junit.QuarkusIntegrationTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
 import io.restassured.http.ContentType;
 import org.junit.jupiter.api.*;
 
 import java.util.Map;
+import java.util.UUID;
 
 import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.*;
 
 /**
  * Integration test for the Pipeline Config REST API.
- * Note: Requires a running Consul instance on localhost:8500
+ * Uses ConsulTestResource to provide a Consul instance.
  */
 @QuarkusIntegrationTest
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
-@Disabled("Requires running Consul instance")
+@QuarkusTestResource(ConsulTestResource.class)
+@TestProfile(PipelineConfigResourceIT.PipelineConfigResourceITProfile.class)
 class PipelineConfigResourceIT {
-    
+
     private static final String CLUSTER_NAME = "test-cluster-it";
     private static final String PIPELINE_ID = "test-pipeline-it";
-    
+
     private PipelineConfig createTestPipeline() {
         // Create INITIAL_PIPELINE step
         PipelineStepConfig.ProcessorInfo sourceProcessor = new PipelineStepConfig.ProcessorInfo(
             "source-service", null
         );
-        
+
         PipelineStepConfig sourceStep = new PipelineStepConfig(
             "source-step",
             StepType.INITIAL_PIPELINE,
             sourceProcessor
         );
-        
+
         // Create SINK step
         PipelineStepConfig.ProcessorInfo sinkProcessor = new PipelineStepConfig.ProcessorInfo(
             "sink-service", null
         );
-        
+
         PipelineStepConfig sinkStep = new PipelineStepConfig(
             "sink-step",
             StepType.SINK,
             sinkProcessor
         );
-        
+
         return new PipelineConfig(
             PIPELINE_ID,
             Map.of(
@@ -53,12 +59,12 @@ class PipelineConfigResourceIT {
             )
         );
     }
-    
+
     @Test
     @Order(1)
     void testCreatePipeline() {
         PipelineConfig config = createTestPipeline();
-        
+
         given()
             .contentType(ContentType.JSON)
             .body(config)
@@ -69,7 +75,7 @@ class PipelineConfigResourceIT {
             .body("success", equalTo(true))
             .body("message", equalTo("Pipeline created successfully"));
     }
-    
+
     @Test
     @Order(2)
     void testGetCreatedPipeline() {
@@ -84,23 +90,23 @@ class PipelineConfigResourceIT {
             .body("pipelineSteps.source-step.stepType", equalTo("INITIAL_PIPELINE"))
             .body("pipelineSteps.sink-step.stepType", equalTo("SINK"));
     }
-    
+
     @Test
     @Order(3)
     void testUpdatePipeline() {
         PipelineConfig config = createTestPipeline();
-        
+
         // Add a middle step
         PipelineStepConfig.ProcessorInfo middleProcessor = new PipelineStepConfig.ProcessorInfo(
             "middle-service", null
         );
-        
+
         PipelineStepConfig middleStep = new PipelineStepConfig(
             "middle-step",
             StepType.PIPELINE,
             middleProcessor
         );
-        
+
         config = new PipelineConfig(
             PIPELINE_ID,
             Map.of(
@@ -109,7 +115,7 @@ class PipelineConfigResourceIT {
                 "sink-step", config.pipelineSteps().get("sink-step")
             )
         );
-        
+
         given()
             .contentType(ContentType.JSON)
             .body(config)
@@ -119,7 +125,7 @@ class PipelineConfigResourceIT {
             .statusCode(200)
             .body("success", equalTo(true))
             .body("message", equalTo("Pipeline updated successfully"));
-        
+
         // Verify the update
         given()
             .when()
@@ -128,7 +134,7 @@ class PipelineConfigResourceIT {
             .statusCode(200)
             .body("pipelineSteps", hasKey("middle-step"));
     }
-    
+
     @Test
     @Order(4)
     void testListPipelines() {
@@ -140,12 +146,12 @@ class PipelineConfigResourceIT {
             .body("$", hasKey(PIPELINE_ID))
             .body(PIPELINE_ID + ".name", equalTo(PIPELINE_ID));
     }
-    
+
     @Test
     @Order(5)
     void testCreateDuplicatePipeline() {
         PipelineConfig config = createTestPipeline();
-        
+
         given()
             .contentType(ContentType.JSON)
             .body(config)
@@ -156,7 +162,7 @@ class PipelineConfigResourceIT {
             .body("success", equalTo(false))
             .body("errors", hasItem(containsString("already exists")));
     }
-    
+
     @Test
     @Order(6)
     void testValidationFailure() {
@@ -164,18 +170,18 @@ class PipelineConfigResourceIT {
         PipelineStepConfig.ProcessorInfo processor = new PipelineStepConfig.ProcessorInfo(
             "service", null
         );
-        
+
         PipelineStepConfig step = new PipelineStepConfig(
             "only-step",
             StepType.PIPELINE, // Not INITIAL_PIPELINE or SINK
             processor
         );
-        
+
         PipelineConfig invalidConfig = new PipelineConfig(
             "invalid-pipeline",
             Map.of("only-step", step)
         );
-        
+
         given()
             .contentType(ContentType.JSON)
             .body(invalidConfig)
@@ -186,7 +192,7 @@ class PipelineConfigResourceIT {
             .body("success", equalTo(false))
             .body("errors", hasSize(greaterThan(0)));
     }
-    
+
     @Test
     @Order(7)
     void testDeletePipeline() {
@@ -195,7 +201,7 @@ class PipelineConfigResourceIT {
             .delete("/api/v1/clusters/{cluster}/pipelines/{pipeline}", CLUSTER_NAME, PIPELINE_ID)
             .then()
             .statusCode(204);
-        
+
         // Verify deletion
         given()
             .when()
@@ -205,7 +211,7 @@ class PipelineConfigResourceIT {
             .body("success", equalTo(false))
             .body("message", equalTo("Pipeline not found"));
     }
-    
+
     @Test
     @Order(8)
     void testDeleteNonExistentPipeline() {
@@ -217,7 +223,7 @@ class PipelineConfigResourceIT {
             .body("success", equalTo(false))
             .body("errors", hasItem(containsString("not found")));
     }
-    
+
     @Test
     void testOpenApiDocumentation() {
         given()
@@ -228,7 +234,7 @@ class PipelineConfigResourceIT {
             .body("info.title", equalTo("Rokkon Pipeline Configuration API"))
             .body("paths", hasKey("/api/v1/clusters/{clusterName}/pipelines/{pipelineId}"));
     }
-    
+
     @Test
     void testSwaggerUI() {
         given()
@@ -236,5 +242,21 @@ class PipelineConfigResourceIT {
             .get("/swagger-ui/")
             .then()
             .statusCode(200);
+    }
+
+    /**
+     * Profile that configures test isolation
+     */
+    public static class PipelineConfigResourceITProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            // Generate unique namespace for this test run
+            String testId = UUID.randomUUID().toString().substring(0, 8);
+            return Map.of(
+                "quarkus.consul-config.fail-on-missing-key", "false",
+                "quarkus.consul-config.watch", "false",
+                "smallrye.config.mapping.validate-unknown", "false"
+            );
+        }
     }
 }

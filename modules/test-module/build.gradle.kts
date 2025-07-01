@@ -11,7 +11,7 @@ dependencies {
     implementation(platform(project(":bom:module")))
 
     // Module-specific dependencies only
-    implementation("io.quarkus:quarkus-opentelemetry") // Not in module BOM by default
+    // OpenTelemetry is now in the module BOM
 
     // Testing dependencies
     testImplementation("io.quarkus:quarkus-junit5")

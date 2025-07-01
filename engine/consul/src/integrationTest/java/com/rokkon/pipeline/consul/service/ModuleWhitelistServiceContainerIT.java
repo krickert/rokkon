@@ -2,7 +2,9 @@ package com.rokkon.pipeline.consul.service;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rokkon.pipeline.config.model.PipelineConfig;
+import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.config.service.ModuleWhitelistService;
+import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.validation.CompositeValidator;
 import com.rokkon.test.containers.ModuleContainerResource;
 import com.rokkon.test.containers.SharedNetworkManager;
@@ -251,5 +253,15 @@ class ModuleWhitelistServiceContainerIT extends ModuleWhitelistServiceTestBase {
         } catch (Exception e) {
             throw new RuntimeException("Failed to set field " + fieldName, e);
         }
+    }
+    
+    @Override
+    protected PipelineConfigService getPipelineConfigService() {
+        return pipelineConfigService;
+    }
+    
+    @Override
+    protected ClusterService getClusterService() {
+        return clusterService;
     }
 }

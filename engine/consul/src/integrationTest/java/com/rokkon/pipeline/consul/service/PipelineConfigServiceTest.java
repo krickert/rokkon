@@ -4,14 +4,14 @@ import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
 import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusIntegrationTest;
 import jakarta.inject.Inject;
 
 /**
  * Unit test for PipelineConfigService with real Consul backend.
  * Extends PipelineConfigServiceTestBase to reuse common test logic.
  */
-@QuarkusTest
+@QuarkusIntegrationTest
 @QuarkusTestResource(ConsulTestResource.class)
 class PipelineConfigServiceTest extends PipelineConfigServiceTestBase {
 

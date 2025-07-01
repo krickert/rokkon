@@ -41,7 +41,7 @@ quarkus:
 # Module specific configuration
 test:
   processor:
-    name: test-processor
+    name: test
     delay:
       ms: 0
 

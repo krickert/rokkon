@@ -1,6 +1,7 @@
 package com.rokkon.pipeline.engine.service;
 
 import com.rokkon.pipeline.config.model.PipelineStepConfig;
+import com.rokkon.pipeline.engine.grpc.ServiceDiscovery;
 import com.rokkon.search.sdk.PipeStepProcessor;
 import com.rokkon.search.sdk.ProcessRequest;
 import com.rokkon.search.sdk.ProcessResponse;

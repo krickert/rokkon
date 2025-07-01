@@ -48,6 +48,13 @@ quarkus:
   # Jackson configuration for consistent JSON formatting
   jackson:
     property-naming-strategy: SNAKE_CASE
+  
+  # Cache configuration for gRPC channels
+  cache:
+    caffeine:
+      "grpc-channels":
+        expire-after-write: 10m
+        maximum-size: 100
     
   # Index external dependencies for CDI discovery
   index-dependency:
@@ -60,6 +67,9 @@ quarkus:
     engine-validators:
       group-id: com.rokkon.pipeline
       artifact-id: engine-validators
+    engine-dynamic-grpc:
+      group-id: com.rokkon.pipeline
+      artifact-id: dynamic-grpc
     # Add missing classes for reflection
     rokkon-commons:
       group-id: com.rokkon.pipeline
@@ -105,6 +115,11 @@ consul:
 # Engine configuration
 engine:
   host: ${ENGINE_HOST:localhost}
+
+# Rokkon configuration
+rokkon:
+  service-discovery:
+    type: consul-direct  # Use dynamic Consul discovery without pre-configuration
 
 # Stork configuration for service discovery
 stork:

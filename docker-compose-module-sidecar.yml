@@ -1,7 +1,11 @@
-version: '3.8'
-
 # Docker Compose for deploying modules with Consul sidecars
-# Usage: docker-compose -f docker-compose-module-sidecar.yml up -d echo
+# Usage: docker-compose -f docker-compose-module-sidecar.yml up -d <module-name>
+#
+# Environment variables:
+# - ENGINE_HOST: Host where engine is running (default: host.docker.internal)
+# - ENGINE_GRPC_PORT: Engine gRPC port (default: 48082)
+# - CONSUL_HOST: Consul host (default: host.docker.internal)
+# - CONSUL_PORT: Consul port (default: 8500)
 
 services:
   # Echo Module with Sidecar
@@ -127,6 +131,93 @@ services:
       - parser
     profiles:
       - parser
+
+  # Test Module with Sidecar - comprehensive testing harness
+  test-module:
+    image: pipeline/test-module:latest
+    container_name: pipeline-test-module
+    environment:
+      - MODULE_HOST=localhost
+      - MODULE_PORT=49095
+      - QUARKUS_GRPC_SERVER_PORT=49095
+      - QUARKUS_HTTP_PORT=39095
+      - ENGINE_HOST=${ENGINE_HOST:-host.docker.internal}
+      - ENGINE_GRPC_PORT=${ENGINE_GRPC_PORT:-48082}
+      - CONSUL_HOST=localhost
+      - CONSUL_PORT=8500
+      # Test module specific configuration
+      - PROCESSING_MODE=${PROCESSING_MODE:-echo}
+      - ERROR_RATE=${ERROR_RATE:-0.0}
+      - PROCESSING_DELAY_MS=${PROCESSING_DELAY_MS:-0}
+      - VALIDATION_STRICT=${VALIDATION_STRICT:-false}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:39095/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - test-module
+
+  test-module-sidecar:
+    image: hashicorp/consul:latest
+    container_name: pipeline-test-module-sidecar
+    network_mode: "service:test-module"
+    command: >
+      sh -c "
+        sleep 5
+        consul services register -address=localhost -port=49095 -name=module-test-module \
+          -tag=rokkon-module -tag=cluster:default -tag=grpc -tag=test-harness \
+          -check='grpc localhost:49095/grpc.health.v1.Health/Check' \
+          -interval=10s
+        tail -f /dev/null
+      "
+    environment:
+      - CONSUL_HTTP_ADDR=${CONSUL_HOST:-host.docker.internal}:${CONSUL_PORT:-8500}
+    depends_on:
+      - test-module
+    profiles:
+      - test-module
+
+  # Embedder Module with Sidecar
+  embedder:
+    image: pipeline/embedder-module:latest
+    container_name: pipeline-embedder-module
+    environment:
+      - MODULE_HOST=localhost
+      - MODULE_PORT=49094
+      - QUARKUS_GRPC_SERVER_PORT=49094
+      - QUARKUS_HTTP_PORT=39094
+      - ENGINE_HOST=${ENGINE_HOST:-host.docker.internal}
+      - ENGINE_GRPC_PORT=48082
+      - CONSUL_HOST=localhost
+      - CONSUL_PORT=8500
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:39094/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    profiles:
+      - embedder
+
+  embedder-sidecar:
+    image: hashicorp/consul:latest
+    container_name: pipeline-embedder-sidecar
+    network_mode: "service:embedder"
+    command: >
+      sh -c "
+        sleep 5
+        consul services register -address=localhost -port=49094 -name=module-embedder \
+          -tag=rokkon-module -tag=cluster:default -tag=grpc \
+          -check='grpc localhost:49094/grpc.health.v1.Health/Check' \
+          -interval=10s
+        tail -f /dev/null
+      "
+    environment:
+      - CONSUL_HTTP_ADDR=${CONSUL_HOST:-host.docker.internal}:${CONSUL_PORT:-8500}
+    depends_on:
+      - embedder
+    profiles:
+      - embedder
 
 # For development, use host networking to connect to host Consul
 # For production, create a dedicated network

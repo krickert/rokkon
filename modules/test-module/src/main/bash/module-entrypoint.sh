@@ -11,6 +11,7 @@ HEALTH_CHECK=${HEALTH_CHECK:-true}
 MAX_RETRIES=${MAX_RETRIES:-3}
 STARTUP_TIMEOUT=${STARTUP_TIMEOUT:-60}
 CHECK_INTERVAL=${CHECK_INTERVAL:-5}
+SHUTDOWN_ON_REGISTRATION_FAILURE=${SHUTDOWN_ON_REGISTRATION_FAILURE:-true}
 
 # The address that should be registered with Consul for health checks
 # This might be different from MODULE_HOST if running in Docker
@@ -78,10 +79,18 @@ sleep 5
 
 # Register the module (CLI will handle health checks)
 if register_module; then
-  echo "Registration successful!"
+  echo "Module registered successfully!"
+  # Keep the module running in foreground
+  wait $MODULE_PID
 else
-  echo "Registration failed, but keeping module running for debugging..."
+  if [ "$SHUTDOWN_ON_REGISTRATION_FAILURE" = "true" ]; then
+    echo "Registration failed. Shutting down module as SHUTDOWN_ON_REGISTRATION_FAILURE=true"
+    kill $MODULE_PID
+    exit 1
+  else
+    echo "Registration failed, but keeping module running as SHUTDOWN_ON_REGISTRATION_FAILURE=false"
+    echo "Module is available for manual registration or debugging"
+    # Keep the module running in foreground
+    wait $MODULE_PID
+  fi
 fi
-
-# Keep the module running in foreground regardless of registration status
-wait $MODULE_PID

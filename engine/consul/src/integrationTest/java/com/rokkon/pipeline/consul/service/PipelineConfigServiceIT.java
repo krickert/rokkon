@@ -5,8 +5,10 @@ import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
-import com.rokkon.pipeline.validation.CompositeValidator;
-import com.rokkon.pipeline.validation.Validator;
+import com.rokkon.pipeline.validation.CompositePipelineConfigValidator;
+import com.rokkon.pipeline.validation.PipelineConfigValidator;
+import com.rokkon.pipeline.validation.ConfigValidator;
+import com.rokkon.pipeline.validation.PipelineConfigValidatable;
 import com.rokkon.pipeline.validation.validators.RequiredFieldsValidator;
 import com.rokkon.pipeline.validation.validators.StepTypeValidator;
 import io.quarkus.test.common.QuarkusTestResource;
@@ -55,11 +57,11 @@ class PipelineConfigServiceIT extends PipelineConfigServiceTestBase {
         setField(pipelineConfigServiceImpl, "clusterService", clusterServiceClient);
         
         // Create validators for pipeline config service
-        List<Validator<PipelineConfig>> validators = List.of(
+        List<ConfigValidator<PipelineConfigValidatable>> validators = List.of(
             new RequiredFieldsValidator(),
             new StepTypeValidator()
         );
-        CompositeValidator<PipelineConfig> validator = new CompositeValidator<>("pipeline-validator", validators);
+        CompositePipelineConfigValidator validator = new CompositePipelineConfigValidator(validators);
         setField(pipelineConfigServiceImpl, "validator", validator);
         
         this.pipelineConfigServiceClient = pipelineConfigServiceImpl;

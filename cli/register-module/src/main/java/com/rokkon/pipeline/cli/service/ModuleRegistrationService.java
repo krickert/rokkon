@@ -70,9 +70,11 @@ public class ModuleRegistrationService {
                     .withDeadlineAfter(TIMEOUT_SECONDS, TimeUnit.SECONDS);
             
             // Build registration request
+            // Service name is simple (e.g., "echo"), instance ID is unique
+            String instanceId = registrationResponse.getModuleName() + "-" + UUID.randomUUID().toString().substring(0, 8);
             RegisterModuleRequest.Builder requestBuilder = RegisterModuleRequest.newBuilder()
                 .setImplementationId(registrationResponse.getModuleName())
-                .setInstanceServiceName(registrationResponse.getModuleName() + "-" + UUID.randomUUID().toString().substring(0, 8))
+                .setInstanceServiceName(registrationResponse.getModuleName())  // Simple service name for Consul load balancing
                 .setHost(registrationHost)
                 .setPort(registrationPort)
                 .setHealthCheckType(HealthCheckType.GRPC);  // Use standard gRPC health check
@@ -87,6 +89,9 @@ public class ModuleRegistrationService {
             
             // Add metadata
             additionalTags.putAll(registrationResponse.getMetadataMap());
+            
+            // Add instance ID for tracking specific instances
+            additionalTags.put("instance_id", instanceId);
             
             // Add version info
             additionalTags.put("module_version", registrationResponse.getVersion());

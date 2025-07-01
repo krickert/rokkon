@@ -51,6 +51,9 @@ dependencies {
 
     // Integration tests are handled by Quarkus automatically
     // It automatically gets testImplementation dependencies, so no need to add them twice
+
+    // Integration test specific dependencies
+    integrationTestImplementation(project(":testing:util"))
 }
 
 group = "com.rokkon.pipeline"
@@ -105,4 +108,9 @@ idea {
         isDownloadJavadoc = true
         isDownloadSources = true
     }
+}
+
+// Disable testNative task to prevent tests from running twice for now
+tasks.named("testNative") {
+    enabled = false
 }

@@ -34,9 +34,16 @@ dependencies {
     api("org.apache.commons:commons-lang3")
     api("commons-io:commons-io")
     
+    // JSON processing - required for health checks and REST
+    api("jakarta.json:jakarta.json-api")
+    api("io.quarkus:quarkus-jsonp")  // JSON-P implementation
+    api("io.quarkus:quarkus-jsonb")  // JSON-B implementation
+    
     // OpenTelemetry and logging support - standard for all modules
     api("io.quarkus:quarkus-opentelemetry")
-    api("io.quarkus:quarkus-smallrye-context-propagation")  // Required for MDC provider
+    api("io.quarkus:quarkus-smallrye-context-propagation")  // Required for context propagation
+    api("io.quarkus:quarkus-vertx")  // Provides MDC provider for OpenTelemetry
+    api("io.quarkus:quarkus-logging-json")  // JSON logging support
     
     // Container image support - all modules need this
     api("io.quarkus:quarkus-container-image-docker")

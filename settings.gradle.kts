@@ -38,6 +38,7 @@ include("engine:pipestream")
 // Engine submodules
 include("engine:consul")
 include("engine:validators")
+include("engine:dynamic-grpc")
 // include("engine:seed-config") - Moved to cli:seed-engine-consul-config
 // include("engine:registration") - Merged into engine:consul
 

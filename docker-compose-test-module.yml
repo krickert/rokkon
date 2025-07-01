@@ -1,54 +1,159 @@
-version: '3.8'
+# Generic Module Deployment Template with Consul Sidecar
+# 
+# This template provides a standard way to deploy Rokkon modules with:
+# - Consul sidecar for service mesh integration
+# - Automatic registration with both Consul and Engine
+# - Health checking and monitoring
+# - Configurable environment variables
+#
+# Usage:
+# 1. Copy this template to docker-compose-<module-name>.yml
+# 2. Replace test-module placeholder with your module name
+# 3. Update ports and environment variables as needed
+# 4. Run: docker compose -f docker-compose-<module-name>.yml up -d
 
 services:
-  # Consul service for service discovery and configuration
-  consul:
-    image: hashicorp/consul:1.19.2
-    container_name: rokkon-consul
-    ports:
-      - "8500:8500"       # Consul UI and HTTP API
-      - "8600:8600/udp"   # Consul DNS
-    command: agent -dev -ui -client=0.0.0.0
+  # Module Container
+  test-module:
+    image: pipeline/test-module-module:latest
+    container_name: pipeline-test-module-module
     environment:
-      - CONSUL_BIND_INTERFACE=eth0
-    networks:
-      - rokkon-network
-    healthcheck:
-      test: ["CMD", "consul", "members"]
-      interval: 10s
-      timeout: 5s
-      retries: 3
-
-  # Rokkon Engine - must be running for module registration
-  rokkon-engine:
-    image: rokkon/engine:latest
-    container_name: rokkon-engine
-    ports:
-      - "8081:8081"   # Engine HTTP port
-      - "9081:9081"   # Engine gRPC port
-    environment:
-      - CONSUL_HOST=consul
+      # Module configuration
+      - MODULE_HOST=localhost
+      - MODULE_PORT=${MODULE_GRPC_PORT:-49095}  # Update with module's gRPC port
+      - QUARKUS_GRPC_SERVER_PORT=${MODULE_GRPC_PORT:-49095}
+      - QUARKUS_HTTP_PORT=${MODULE_HTTP_PORT:-39095}  # Update with module's HTTP port
+      
+      # Engine connection (for registration attempts)
+      - ENGINE_HOST=${ENGINE_HOST:-host.docker.internal}
+      - ENGINE_GRPC_PORT=${ENGINE_GRPC_PORT:-48082}
+      
+      # Consul connection (handled by sidecar)
+      - CONSUL_HOST=localhost
       - CONSUL_PORT=8500
-      - QUARKUS_HTTP_PORT=8081
-      - QUARKUS_GRPC_SERVER_PORT=9081
-      - QUARKUS_CONSUL_CONFIG_AGENT_HOST=consul
-      - QUARKUS_CONSUL_CONFIG_AGENT_PORT=8500
-      - QUARKUS_CONSUL_AGENT_HOST=rokkon-engine # Force engine to register with its service name
-      - ENGINE_HOST=rokkon-engine # Explicitly set engine's advertised host
-    depends_on:
-      consul:
-        condition: service_healthy
-    networks:
-      - rokkon-network
+      
+      # Module-specific configuration
+      # Add module-specific environment variables here
+      # Example:
+      # - PROCESSING_MODE=${PROCESSING_MODE:-default}
+      # - ERROR_RATE=${ERROR_RATE:-0.0}
+      
+      # Disable auto-registration if using sidecar registration
+      - AUTO_REGISTER=${AUTO_REGISTER:-false}
+      
+      # Test module specific configuration
+      - PROCESSING_MODE=${PROCESSING_MODE:-echo}
+      - ERROR_RATE=${ERROR_RATE:-0.0}
+      - PROCESSING_DELAY_MS=${PROCESSING_DELAY_MS:-0}
+      - VALIDATION_STRICT=${VALIDATION_STRICT:-false}
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:8081/q/health"]
+      test: ["CMD", "curl", "-f", "http://localhost:${MODULE_HTTP_PORT:-39095}/q/health"]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 30s
+    
+    # Resource limits (adjust as needed)
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+    
+    # Logging configuration
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
 
-  
+  # Consul Sidecar Container
+  test-module-sidecar:
+    image: hashicorp/consul:latest
+    container_name: pipeline-test-module-sidecar
+    # Share network namespace with module
+    network_mode: "service:test-module"
+    
+    command: >
+      sh -c "
+        # Wait for module to be ready
+        echo 'Waiting for module to be ready...'
+        sleep 10
+        
+        # Register service with Consul
+        echo 'Registering service with Consul...'
+        consul services register \
+          -address=localhost \
+          -port=${MODULE_GRPC_PORT:-49095} \
+          -name=module-test-module \
+          -tag=rokkon-module \
+          -tag=cluster:${CLUSTER_NAME:-default} \
+          -tag=grpc \
+          -tag=version:${MODULE_VERSION:-1.0.0} \
+          -check='grpc localhost:${MODULE_GRPC_PORT:-49095}/grpc.health.v1.Health/Check' \
+          -check-interval=10s \
+          -check-timeout=5s
+        
+        # Optional: Register with Engine via CLI
+        # Uncomment if you have the registration CLI in the sidecar
+        # echo 'Registering module with Engine...'
+        # java -jar /usr/local/bin/register-module.jar register \
+        #   --module-host localhost \
+        #   --module-port ${MODULE_GRPC_PORT:-49095} \
+        #   --engine-host ${ENGINE_HOST:-host.docker.internal} \
+        #   --engine-port ${ENGINE_GRPC_PORT:-48082}
+        
+        # Keep sidecar running and monitor health
+        echo 'Sidecar running, monitoring module health...'
+        while true; do
+          if ! grpcurl -plaintext -connect-timeout 2 \
+              localhost:${MODULE_GRPC_PORT:-49095} \
+              grpc.health.v1.Health/Check >/dev/null 2>&1; then
+            echo \"Warning: Module health check failed at \$(date)\"
+          fi
+          sleep 30
+        done
+      "
+    
+    environment:
+      # Consul connection
+      - CONSUL_HTTP_ADDR=${CONSUL_HOST:-host.docker.internal}:${CONSUL_PORT:-8500}
+      - CONSUL_DATACENTER=${CONSUL_DATACENTER:-dc1}
+      
+      # Module information for registration
+      - test-module=test-module
+      - MODULE_GRPC_PORT=${MODULE_GRPC_PORT:-49095}
+      - MODULE_HTTP_PORT=${MODULE_HTTP_PORT:-39095}
+      - MODULE_VERSION=${MODULE_VERSION:-1.0.0}
+      - CLUSTER_NAME=${CLUSTER_NAME:-default}
+      
+      # Engine connection for registration
+      - ENGINE_HOST=${ENGINE_HOST:-host.docker.internal}
+      - ENGINE_GRPC_PORT=${ENGINE_GRPC_PORT:-48082}
+    
+    depends_on:
+      test-module:
+        condition: service_started
+    
+    # Sidecar resource limits (minimal)
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 256M
+        reservations:
+          cpus: '0.1'
+          memory: 128M
 
+# Network configuration
 networks:
-  rokkon-network:
-    name: rokkon-network
+  default:
     driver: bridge
+    
+# Volume configuration (if needed)
+# volumes:
+#   module-data:
+#     driver: local

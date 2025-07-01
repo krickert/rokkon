@@ -1,4 +1,10 @@
 quarkus:
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:protobuf
+      scan-for-imports: com.google.protobuf:protobuf-java,com.google.api.grpc:proto-google-common-protos
+      codegen:
+        type: mutiny
   http:
     test-port: 0  # Use random port for tests
   grpc:
@@ -15,6 +21,14 @@ quarkus:
       enabled: false
       period: 10s
     format: properties
+  # Index dependencies for CDI discovery in tests
+  index-dependency:
+    protobuf:
+      group-id: com.rokkon.pipeline
+      artifact-id: protobuf
+    dynamic-grpc:
+      group-id: com.rokkon.pipeline
+      artifact-id: dynamic-grpc
 
 # Consul configuration for tests
 consul:

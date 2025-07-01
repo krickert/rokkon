@@ -1,7 +1,9 @@
 package com.rokkon.pipeline.engine.service;
 
 import com.rokkon.pipeline.config.model.PipelineStepConfig;
+import com.rokkon.pipeline.engine.grpc.DynamicGrpcClientFactory;
 import com.rokkon.search.model.PipeStream;
+import com.rokkon.search.sdk.MutinyPipeStepProcessorGrpc;
 import com.rokkon.search.sdk.PipeStepProcessor;
 import com.rokkon.search.sdk.ProcessRequest;
 import com.rokkon.search.sdk.ProcessResponse;
@@ -21,10 +23,7 @@ public class GrpcTransportHandler implements TransportHandler {
     private static final Logger LOG = LoggerFactory.getLogger(GrpcTransportHandler.class);
     
     @Inject
-    ServiceDiscovery serviceDiscovery;
-    
-    @Inject
-    GrpcClientFactory grpcClientFactory;
+    DynamicGrpcClientFactory grpcClientFactory;
     
     @Override
     public Uni<ProcessResponse> routeRequest(ProcessRequest request, PipelineStepConfig stepConfig) {
@@ -36,15 +35,10 @@ public class GrpcTransportHandler implements TransportHandler {
         
         String serviceName = stepConfig.processorInfo().grpcServiceName();
         
-        return serviceDiscovery.discoverService(serviceName)
-            .flatMap(serviceInstance -> {
-                LOG.debug("Routing to gRPC service {} at {}:{}", 
-                    serviceName, serviceInstance.getHost(), serviceInstance.getPort());
-                
-                PipeStepProcessor client = grpcClientFactory.getClient(
-                    serviceInstance.getHost(), 
-                    serviceInstance.getPort()
-                );
+        // Use Mutiny client for better reactive integration
+        return grpcClientFactory.getMutinyClientForService(serviceName)
+            .flatMap(client -> {
+                LOG.debug("Routing request to gRPC service: {} using Mutiny client", serviceName);
                 
                 return client.processData(request)
                     .onFailure().invoke(error -> 

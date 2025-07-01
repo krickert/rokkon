@@ -1306,6 +1306,163 @@ This structure enforces clean architecture principles and makes the codebase mor
 
 ---
 
+## 🎯 NEW: Abstract Getter Pattern for Module Independence
+
+### Problem
+Modules with cross-module CDI dependencies (like dynamic-grpc depending on engine:consul) cannot be built or tested standalone. This violates module independence and makes testing difficult.
+
+### Solution: Abstract Getter Pattern
+A testing pattern that enables the same test logic to work with both mocked dependencies (unit tests) and real instances (integration tests), without requiring CDI.
+
+### Implementation
+
+#### 1. Abstract Base Test Class
+```java
+public abstract class AbstractModuleTestBase {
+    protected SomeService service;
+    protected SomeDependency dependency;
+    
+    // Abstract getters - concrete tests provide implementation
+    protected abstract SomeDependency getDependency();
+    
+    @BeforeEach
+    void setupBase() {
+        // Allow concrete classes to setup first
+        additionalSetup();
+        
+        // Get dependencies from concrete implementations
+        dependency = getDependency();
+        
+        // Create service with dependency
+        service = new SomeService();
+        service.setDependency(dependency);
+    }
+    
+    // Hook for concrete classes
+    protected void additionalSetup() {}
+    
+    // Common test methods work for both unit and integration
+    @Test
+    void testCommonFunctionality() {
+        // Test logic using service and dependency
+    }
+}
+```
+
+#### 2. Unit Test Implementation (No CDI)
+```java
+class ModuleUnitTest extends AbstractModuleTestBase {
+    private MockDependency mockDependency = new MockDependency();
+    
+    @Override
+    protected SomeDependency getDependency() {
+        return mockDependency;
+    }
+    
+    @Override
+    protected void additionalSetup() {
+        // Setup mock data
+        mockDependency.addTestData("test", "value");
+    }
+}
+```
+
+#### 3. Integration Test Implementation
+```java
+@Testcontainers
+class ModuleIntegrationIT extends AbstractModuleTestBase {
+    @Container
+    static GenericContainer<?> externalService = new GenericContainer<>("service:latest");
+    
+    private RealDependency realDependency;
+    
+    @Override
+    protected SomeDependency getDependency() {
+        return realDependency;
+    }
+    
+    @Override
+    protected void additionalSetup() {
+        // Create real instance with container connection
+        realDependency = new RealDependency(
+            externalService.getHost(),
+            externalService.getFirstMappedPort()
+        );
+    }
+}
+```
+
+### Production Code Pattern: Optional Injection
+
+For production code to work both standalone and integrated:
+
+```java
+@ApplicationScoped
+public class ServiceRequiringDependency {
+    
+    @Inject
+    Instance<OptionalDependency> dependencyInstance; // Optional!
+    
+    @ConfigProperty(name = "service.host", defaultValue = "localhost")
+    String serviceHost;
+    
+    @ConfigProperty(name = "service.port", defaultValue = "8080")
+    int servicePort;
+    
+    private ActualClient client;
+    
+    @PostConstruct
+    void init() {
+        if (dependencyInstance.isResolvable()) {
+            // Use injected dependency when available
+            OptionalDependency dep = dependencyInstance.get();
+            this.client = dep.getClient();
+        } else {
+            // Create own client for standalone operation
+            this.client = createStandaloneClient();
+        }
+    }
+    
+    private ActualClient createStandaloneClient() {
+        return new ActualClient(serviceHost, servicePort);
+    }
+}
+```
+
+### Key Benefits
+
+1. **Module Independence**: Modules can be built and tested standalone
+2. **No CDI in Unit Tests**: Fast execution without Quarkus context
+3. **Code Reuse**: Same test logic for unit and integration tests
+4. **Flexible Integration**: Works standalone or integrated
+5. **Clear Contracts**: Abstract methods define required dependencies
+
+### When to Use This Pattern
+
+- Module has dependencies on other modules' beans
+- Module needs to be testable in isolation
+- You want to share test logic between unit and integration tests
+- Module should work both standalone and integrated
+
+### Critical Rules
+
+1. **NEVER use default ports** - Always use random ports from containers
+2. **NO @QuarkusTest in unit tests** - Use manual dependency injection
+3. **Use Instance<T> for optional dependencies** - Not direct @Inject
+4. **Create @DefaultBean producers** - For standalone operation
+
+### Proven Success
+
+✅ Successfully implemented in `engine:dynamic-grpc` module:
+- All unit tests pass without CDI (< 1 second)
+- All integration tests pass with real services
+- Module builds standalone JAR
+- Works integrated with engine
+
+This pattern is now a **CORE ARCHITECTURAL PATTERN** for the Rokkon project.
+
+---
+
 ## Phase 2: End-to-End Implementation Roadmap
 
 ### 🎉 Milestone Achieved: Working Module Registration with Sidecar Pattern

@@ -1,0 +1,28 @@
+quarkus:
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:protobuf
+      scan-for-imports: com.google.protobuf:protobuf-java,com.google.api.grpc:proto-google-common-protos
+  
+  # Test configuration
+  test:
+    native-image-profile: test
+  
+  # Ensure beans are discovered
+  arc:
+    unremovable-types:
+      - com.rokkon.pipeline.engine.grpc.**
+  
+  # Disable Consul config source
+  consul-config:
+    enabled: false
+
+# Disable real Consul for tests
+consul:
+  enabled: false
+
+# Test logging
+logging:
+  level:
+    com.rokkon.pipeline: DEBUG
+    io.quarkus.arc: DEBUG

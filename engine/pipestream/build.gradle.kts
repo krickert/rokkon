@@ -26,10 +26,14 @@ dependencies {
 
     // --- Observability & Resilience ---
     implementation("io.quarkus:quarkus-smallrye-fault-tolerance")
+    
+    // --- Caching for gRPC channels ---
+    implementation("io.quarkus:quarkus-cache")
 
     // --- Engine Modules ---
     implementation(project(":engine:consul")) // Now includes gRPC registration service
     implementation(project(":engine:validators"))
+    implementation(project(":engine:dynamic-grpc")) // Dynamic gRPC client discovery
 
     // --- Shared Libraries ---
     implementation("com.networknt:json-schema-validator:1.5.7")
@@ -40,6 +44,18 @@ dependencies {
     testImplementation("org.awaitility:awaitility:4.3.0")
     testImplementation("org.testcontainers:consul:1.19.3")
     testImplementation(project(":testing:util"))
+    testImplementation(project(":testing:server-util"))
+    
+    // --- Integration Testing ---
+    integrationTestImplementation("com.orbitz.consul:consul-client:1.5.3")
+    integrationTestImplementation("io.quarkus:quarkus-junit5-mockito")
+    integrationTestImplementation("org.assertj:assertj-core:3.26.3")
+    integrationTestImplementation("org.awaitility:awaitility:4.3.0")
+    integrationTestImplementation("org.testcontainers:consul:1.19.3")
+    integrationTestImplementation(project(":testing:util"))
+    integrationTestImplementation(project(":engine:dynamic-grpc"))
+    integrationTestImplementation("io.vertx:vertx-consul-client")
+    integrationTestImplementation("io.smallrye.reactive:smallrye-mutiny-vertx-consul-client")
 }
 
 java {
