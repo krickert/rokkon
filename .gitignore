@@ -95,3 +95,4 @@ backup-hosed-modules
 
 old_*
 old_rokkon-to-migrate/**
+/consul-data/node-id

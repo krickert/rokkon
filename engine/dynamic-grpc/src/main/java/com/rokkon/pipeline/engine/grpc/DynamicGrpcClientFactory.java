@@ -3,6 +3,8 @@ package com.rokkon.pipeline.engine.grpc;
 import com.rokkon.search.sdk.MutinyPipeStepProcessorGrpc;
 import com.rokkon.search.sdk.PipeStepProcessor;
 import com.rokkon.search.sdk.PipeStepProcessorClient;
+import com.rokkon.search.engine.MutinyPipeStreamEngineGrpc;
+import com.rokkon.search.engine.PipeStreamEngine;
 import io.grpc.ManagedChannel;
 import io.grpc.ManagedChannelBuilder;
 import io.quarkus.cache.CacheResult;
@@ -152,6 +154,53 @@ public class DynamicGrpcClientFactory {
                     serviceName, instance.getHost(), instance.getPort());
                 return getMutinyClient(instance.getHost(), instance.getPort());
             });
+    }
+    
+    /**
+     * Get a Mutiny-based PipeStreamEngine client for engine-to-engine communication.
+     * 
+     * @param serviceName The engine service name to look up in service discovery
+     * @return A Uni that resolves to a MutinyPipeStreamEngineStub
+     */
+    @CacheResult(cacheName = CHANNEL_CACHE_NAME + "-engine")
+    public Uni<MutinyPipeStreamEngineGrpc.MutinyPipeStreamEngineStub> getMutinyEngineClientForService(String serviceName) {
+        return serviceDiscovery.discoverService(serviceName)
+            .map(instance -> {
+                LOG.debug("Discovered engine service {} at {}:{} for Mutiny PipeStreamEngine client", 
+                    serviceName, instance.getHost(), instance.getPort());
+                
+                String key = instance.getHost() + ":" + instance.getPort();
+                ManagedChannel channel = channels.computeIfAbsent(key, k -> {
+                    LOG.info("Creating new gRPC channel for engine {}", key);
+                    return ManagedChannelBuilder
+                        .forAddress(instance.getHost(), instance.getPort())
+                        .usePlaintext()
+                        .build();
+                });
+                
+                return MutinyPipeStreamEngineGrpc.newMutinyStub(channel);
+            });
+    }
+    
+    /**
+     * Get a direct PipeStreamEngine client for a specific host and port.
+     * 
+     * @param host The target host
+     * @param port The target port
+     * @return A MutinyPipeStreamEngineStub
+     */
+    public MutinyPipeStreamEngineGrpc.MutinyPipeStreamEngineStub getMutinyEngineClient(String host, int port) {
+        String key = host + ":" + port;
+        
+        ManagedChannel channel = channels.computeIfAbsent(key, k -> {
+            LOG.info("Creating new gRPC channel for engine {}", key);
+            return ManagedChannelBuilder
+                .forAddress(host, port)
+                .usePlaintext()
+                .build();
+        });
+        
+        return MutinyPipeStreamEngineGrpc.newMutinyStub(channel);
     }
     
     /**
