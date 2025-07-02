@@ -1,4 +1,3 @@
-c
 # Rokkon Engine: Multi-Layered Testing Strategy
 
 Based on the comprehensive architecture documents and our detailed discussion, here is a full summary of the multi-layered testing strategy for the Rokkon Engine. This framework is designed to address the challenges of a complex, distributed system by providing fast feedback during development while ensuring robust, comprehensive validation for releases.
@@ -18,7 +17,7 @@ The core of this strategy is to separate tests into distinct layers, each with a
 
 * **Goal:** To verify the correctness of a single class or method (a "unit") in complete isolation from the framework and external systems.
 * **Scope:** Focus on business logic, algorithms, data transformations, and state changes within a class.
-* **What to Test:** Utility classes, validator logic (`engine-validators`), specific data model transformations, and individual service methods with their dependencies mocked.
+* **What to Test:** Utility classes, validator logic (`engine/validators`), specific data model transformations, and individual service methods with their dependencies mocked.
 * **Key Guidelines:**
     * **Strict Isolation:** These tests **must not** start the Quarkus application context. They must not access the network, filesystem, or any external processes.
     * **Mock Everything:** All external dependencies are replaced with "mocks" or "stubs." This includes `ConsulClient`, `KafkaProducer`, gRPC clients, and any other injected CDI beans.
@@ -28,17 +27,17 @@ The core of this strategy is to separate tests into distinct layers, each with a
 **Example: Testing a Simple Validator**
 
 ```java
-// In engine-validators/src/test/java/com/rokkon/validators/PipelineConfigValidatorTest.java
+// In engine/validators/src/test/java/com/rokkon/pipeline/validation/validators/PipelineConfigValidatorTest.java
 
 import org.junit.jupiter.api.Test;
 import static org.junit.jupiter.api.Assertions.*;
-import com.rokkon.models.PipelineConfig; // Assuming this model exists
+import com.rokkon.pipeline.config.model.PipelineConfig; // From commons/interface
 
 class PipelineConfigValidatorTest {
 
     private final PipelineConfigValidator validator = new PipelineConfigValidator();
 
-    @rokkon-engine/src/test/resources/application-test.properties
+    @Test
     void whenPipelineNameIsMissing_validationShouldFail() {
         // Arrange
         PipelineConfig config = new PipelineConfig();
@@ -49,7 +48,7 @@ class PipelineConfigValidatorTest {
         assertFalse(validator.isValid(config), "Validation should fail for null pipeline ID");
     }
 
-    @rokkon-engine/src/test/resources/application-test.properties
+    @Test
     void whenPipelineHasNoSteps_validationShouldFail() {
         // Arrange
         PipelineConfig config = new PipelineConfig();
@@ -94,7 +93,7 @@ public class PipelineControlResourceTest {
     @InjectMock
     PipelineManager pipelineManager; // Inject a mock of the underlying service
 
-    @rokkon-engine/src/test/resources/application-test.properties
+    @Test
     public void testDeployPipelineEndpoint() {
         // Arrange: Define the mock's behavior
         when(pipelineManager.deploy(anyString())).thenReturn(true);
@@ -107,7 +106,7 @@ public class PipelineControlResourceTest {
              .statusCode(200); // Verify the HTTP response
     }
 
-    @rokkon-engine/src/test/resources/application-test.properties
+    @Test
     public void testDeployNonExistentPipelineEndpoint() {
         // Arrange
         when(pipelineManager.deploy("unknown-pipeline")).thenReturn(false);
@@ -492,14 +491,14 @@ public class RealValidatorsTestProfile implements QuarkusTestProfile {
 A major breakthrough in our testing strategy was refactoring the validation framework to break circular dependencies between modules. This was "the center of why a lot of our tests were so hard to create and take so long."
 
 **The Problem**: 
-- Validation interfaces in `rokkon-commons` were importing model classes from `engine/models`
+- Validation interfaces in the former `rokkon-commons` (now split into commons/interface, commons/util, commons/protobuf) were importing model classes from `engine/models` (now merged into commons/interface)
 - This created circular dependencies that made mocking difficult
 - Tests couldn't easily inject or mock validators
 
 **The Solution - Tagged/Marker Interfaces**:
 
 ```java
-// In rokkon-commons - generic interfaces with no model dependencies
+// In commons/interface - generic interfaces with no model dependencies
 public interface ConfigValidatable {
     // Marker interface for validatable configurations
 }
@@ -512,7 +511,7 @@ public interface ConfigValidator<T extends ConfigValidatable> {
 ```
 
 ```java
-// In engine/models - specific implementations
+// In commons/interface - specific implementations
 public record PipelineConfig(
     String name,
     Map<String, PipelineStepConfig> pipelineSteps
@@ -1130,12 +1129,16 @@ The testing strategy has evolved from a monolithic approach where all tests requ
 3. **5% of tests** require full infrastructure (integration/E2E tests)
 
 This aligns with the testing pyramid principle and provides:
-- Fast developer feedback
+- Fast developer feedback (unit tests < 1 second)
 - Reliable CI/CD pipelines
 - Comprehensive coverage when needed
 - Clear separation of concerns
 
-The key insight was recognizing that circular dependencies and tight coupling were "the center of why a lot of our tests were so hard to create and take so long." By breaking these dependencies and creating proper abstractions, we've made the codebase significantly more testable and maintainable.
+**Major Breakthroughs**:
+1. **Circular Dependency Resolution**: Breaking validator dependencies was "the center of why a lot of our tests were so hard to create and take so long"
+2. **NoConsulTestProfile**: Tests run in milliseconds without external dependencies
+3. **Sidecar Registration Pattern**: Proven working implementation for module registration
+4. **Network-Aware Testing**: Understanding Docker vs host networking for proper integration testing
 
 **Performance Improvements from Migration**:
 - BasicConsulConnectionUnitTest: 0.208s (was 30+ seconds)
@@ -1151,9 +1154,9 @@ All unit tests now run without Consul, providing reliable and fast feedback duri
 
 To maintain clean architecture and prevent circular dependencies, we follow strict module organization rules:
 
-#### 1. **rokkon-commons** - Interfaces and Contracts Only
-- **Contains**: Service interfaces, marker interfaces, base abstractions
-- **No Dependencies**: Must not depend on any other Rokkon modules
+#### 1. **commons/interface** - Interfaces and Contracts Only
+- **Contains**: Service interfaces, marker interfaces, base abstractions, models, configuration classes
+- **No Dependencies**: Must not depend on any other Rokkon modules except commons/protobuf
 - **Examples**:
   ```java
   // Good - generic interface with no model dependencies
@@ -1165,9 +1168,13 @@ To maintain clean architecture and prevent circular dependencies, we follow stri
   import com.rokkon.pipeline.config.model.PipelineConfig; // DON'T DO THIS!
   ```
 
-#### 2. **engine/models** - Pure Data Models
-- **Contains**: Records, POJOs, DTOs with no business logic
-- **Allowed Dependencies**: Can depend on rokkon-commons for interfaces
+#### 2. **commons/protobuf** - Protocol Buffer Definitions
+- **Contains**: All .proto files and generated protobuf classes
+- **No Dependencies**: Standalone module with protobuf definitions
+
+#### 3. **commons/util** - Utility Classes
+- **Contains**: Helper classes, utilities, factories
+- **Allowed Dependencies**: Can depend on commons/interface and commons/protobuf
 - **Examples**:
   ```java
   // Good - data model implementing commons interface
@@ -1189,9 +1196,10 @@ To maintain clean architecture and prevent circular dependencies, we follow stri
   }
   ```
 
-#### 3. **test-utilities** - Shared Test Infrastructure
+#### 4. **testing/util** - Shared Test Infrastructure
 - **Contains**: Test containers, mock implementations, test data builders
 - **Purpose**: Reusable test components across modules
+- **Related Modules**: testing/e2e-test, testing/integration-test, testing/mocks
 - **Examples**:
   ```java
   // Good - reusable test container
@@ -1218,42 +1226,53 @@ To maintain clean architecture and prevent circular dependencies, we follow stri
   }
   ```
 
-#### 4. **engine/consul** - Consul-Specific Implementations
+#### 5. **engine/consul** - Consul-Specific Implementations
 - **Contains**: Service implementations that interact with Consul
-- **Dependencies**: Can depend on models, commons, and Consul client libraries
+- **Dependencies**: Can depend on commons/interface, commons/util, and Consul client libraries
 - **Not Allowed**: Other modules should not depend on consul internals
 
-#### 5. **engine/validators** - Validation Logic
+#### 6. **engine/validators** - Validation Logic
 - **Contains**: Concrete validator implementations, composite validators
-- **Dependencies**: Can depend on models and commons
+- **Dependencies**: Can depend on commons/interface and commons/util
 - **Produces**: CDI beans for validators that can be injected
+
+#### 7. **cli/register-module** - CLI Registration Tool
+- **Contains**: CLI tool for module registration
+- **Dependencies**: Can depend on commons modules and gRPC clients
+- **Purpose**: Standalone tool for registering modules with the engine
 
 ### Dependency Flow
 
 ```
-rokkon-commons (interfaces)
-    ↑
-engine/models (data)
+commons/interface (interfaces, models, config)
+commons/protobuf (protobuf definitions)
+commons/util (utilities)
     ↑
 engine/validators (validation logic)
 engine/consul (service implementations)
+engine/seed-config (configuration seeding)
     ↑
 rokkon-engine (main application)
     ↑
-test-utilities (test helpers)
+cli/register-module (CLI tools)
+    ↑
+testing/util (test helpers)
+testing/integration-test
+testing/e2e-test
+testing/mocks
 ```
 
 ### Anti-Patterns to Avoid
 
 1. **Circular Dependencies**:
    ```java
-   // BAD - commons depending on models
-   // In rokkon-commons
-   import com.rokkon.pipeline.config.model.PipelineConfig;
-   
-   // BAD - models depending on service implementations
-   // In engine/models
+   // BAD - cross-module dependencies
+   // In engine/validators
    import com.rokkon.pipeline.consul.service.ClusterServiceImpl;
+   
+   // BAD - util depending on implementations
+   // In commons/util
+   import com.rokkon.engine.service.PipelineManagerImpl;
    ```
 
 2. **Business Logic in Models**:
@@ -1287,47 +1306,201 @@ This structure enforces clean architecture principles and makes the codebase mor
 
 ---
 
+## 🎯 NEW: Abstract Getter Pattern for Module Independence
+
+### Problem
+Modules with cross-module CDI dependencies (like dynamic-grpc depending on engine:consul) cannot be built or tested standalone. This violates module independence and makes testing difficult.
+
+### Solution: Abstract Getter Pattern
+A testing pattern that enables the same test logic to work with both mocked dependencies (unit tests) and real instances (integration tests), without requiring CDI.
+
+### Implementation
+
+#### 1. Abstract Base Test Class
+```java
+public abstract class AbstractModuleTestBase {
+    protected SomeService service;
+    protected SomeDependency dependency;
+    
+    // Abstract getters - concrete tests provide implementation
+    protected abstract SomeDependency getDependency();
+    
+    @BeforeEach
+    void setupBase() {
+        // Allow concrete classes to setup first
+        additionalSetup();
+        
+        // Get dependencies from concrete implementations
+        dependency = getDependency();
+        
+        // Create service with dependency
+        service = new SomeService();
+        service.setDependency(dependency);
+    }
+    
+    // Hook for concrete classes
+    protected void additionalSetup() {}
+    
+    // Common test methods work for both unit and integration
+    @Test
+    void testCommonFunctionality() {
+        // Test logic using service and dependency
+    }
+}
+```
+
+#### 2. Unit Test Implementation (No CDI)
+```java
+class ModuleUnitTest extends AbstractModuleTestBase {
+    private MockDependency mockDependency = new MockDependency();
+    
+    @Override
+    protected SomeDependency getDependency() {
+        return mockDependency;
+    }
+    
+    @Override
+    protected void additionalSetup() {
+        // Setup mock data
+        mockDependency.addTestData("test", "value");
+    }
+}
+```
+
+#### 3. Integration Test Implementation
+```java
+@Testcontainers
+class ModuleIntegrationIT extends AbstractModuleTestBase {
+    @Container
+    static GenericContainer<?> externalService = new GenericContainer<>("service:latest");
+    
+    private RealDependency realDependency;
+    
+    @Override
+    protected SomeDependency getDependency() {
+        return realDependency;
+    }
+    
+    @Override
+    protected void additionalSetup() {
+        // Create real instance with container connection
+        realDependency = new RealDependency(
+            externalService.getHost(),
+            externalService.getFirstMappedPort()
+        );
+    }
+}
+```
+
+### Production Code Pattern: Optional Injection
+
+For production code to work both standalone and integrated:
+
+```java
+@ApplicationScoped
+public class ServiceRequiringDependency {
+    
+    @Inject
+    Instance<OptionalDependency> dependencyInstance; // Optional!
+    
+    @ConfigProperty(name = "service.host", defaultValue = "localhost")
+    String serviceHost;
+    
+    @ConfigProperty(name = "service.port", defaultValue = "8080")
+    int servicePort;
+    
+    private ActualClient client;
+    
+    @PostConstruct
+    void init() {
+        if (dependencyInstance.isResolvable()) {
+            // Use injected dependency when available
+            OptionalDependency dep = dependencyInstance.get();
+            this.client = dep.getClient();
+        } else {
+            // Create own client for standalone operation
+            this.client = createStandaloneClient();
+        }
+    }
+    
+    private ActualClient createStandaloneClient() {
+        return new ActualClient(serviceHost, servicePort);
+    }
+}
+```
+
+### Key Benefits
+
+1. **Module Independence**: Modules can be built and tested standalone
+2. **No CDI in Unit Tests**: Fast execution without Quarkus context
+3. **Code Reuse**: Same test logic for unit and integration tests
+4. **Flexible Integration**: Works standalone or integrated
+5. **Clear Contracts**: Abstract methods define required dependencies
+
+### When to Use This Pattern
+
+- Module has dependencies on other modules' beans
+- Module needs to be testable in isolation
+- You want to share test logic between unit and integration tests
+- Module should work both standalone and integrated
+
+### Critical Rules
+
+1. **NEVER use default ports** - Always use random ports from containers
+2. **NO @QuarkusTest in unit tests** - Use manual dependency injection
+3. **Use Instance<T> for optional dependencies** - Not direct @Inject
+4. **Create @DefaultBean producers** - For standalone operation
+
+### Proven Success
+
+✅ Successfully implemented in `engine:dynamic-grpc` module:
+- All unit tests pass without CDI (< 1 second)
+- All integration tests pass with real services
+- Module builds standalone JAR
+- Works integrated with engine
+
+This pattern is now a **CORE ARCHITECTURAL PATTERN** for the Rokkon project.
+
+---
+
 ## Phase 2: End-to-End Implementation Roadmap
 
-### 🎉 Milestone Achieved: Working Dev Environment with Consul
+### 🎉 Milestone Achieved: Working Module Registration with Sidecar Pattern
 
-We've successfully established a working development environment where:
-- ✅ Consul runs in Docker with proper networking
-- ✅ Engine runs locally with Quarkus Dev Mode
-- ✅ Bidirectional communication works (Engine → Consul and Consul → Engine)
-- ✅ Health checks are passing using `host.docker.internal`
-- ✅ Created diagnostic endpoints (`/api/consul/registration`) for debugging
+We've successfully implemented the sidecar registration pattern where:
+- ✅ Test module runs in Docker with embedded CLI sidecar
+- ✅ CLI performs health check on module before registration
+- ✅ CLI successfully registers module with engine via gRPC
+- ✅ Engine validates module connectivity before registering in Consul
+- ✅ Module appears in Consul service catalog
 
-This gives us a solid foundation to build upon, as we now understand:
-- How services register and discover each other through Consul
-- How to handle Docker-to-host networking challenges
-- How to diagnose and fix health check issues
+**Key Fixes Applied**:
+1. Fixed `ModuleRegistrationService.java` to use module host/port (not consul host/port) in registration request
+2. Fixed `GlobalModuleRegistryServiceImpl.java` validation to check module connectivity (not engine connectivity)
+3. Addressed Docker networking with proper host resolution
+
+**Current Challenge**: Consul health checks failing due to Docker networking
+- Module registers with `localhost` address, which Consul container cannot reach
+- Solution: Use host machine's actual IP address (`192.168.1.193`) for registration
+- Implementation in progress with `EXTERNAL_MODULE_HOST` environment variable
 
 ### Implementation Strategy: Build Working Examples First
 
 Before diving deep into unit and integration tests, we're taking a strategic approach to build working examples that will inform our testing strategy. This "implementation-first" approach ensures we understand the real-world patterns before codifying them in tests.
 
-#### Phase 2.1: Get Test Module Running (Week 1)
+#### Phase 2.1: Get Test Module Running ✅ COMPLETED
 
-**Goal**: Create a simple test module that registers with Consul and can be discovered by the engine.
+**What We Achieved**:
+- Created test-module with gRPC service and health checks
+- Implemented CLI sidecar pattern for registration
+- Module successfully registers with engine and appears in Consul
+- Identified and fixed critical bugs in registration flow
 
-**Tasks**:
-1. Create a minimal `test-module` with gRPC service
-   - Implement basic gRPC health check
-   - Register with Consul on startup
-   - Provide simple echo/transform capability
-2. Test module discovery from engine
-   - Engine should discover test module via Consul
-   - Verify gRPC communication works
-3. Document the module startup sequence
-   - How modules find Consul
-   - How they register themselves
-   - How they maintain health checks
-
-**Success Criteria**:
-- Test module appears in Consul UI as healthy
-- Engine can list test module in available modules
-- Basic gRPC call from engine to module succeeds
+**Key Learnings**:
+1. **Sidecar Pattern Works**: CLI runs alongside module in same container, handles registration
+2. **Network Addressing Critical**: Must use host-reachable addresses for Consul health checks
+3. **Validation Before Registration**: Engine validates module connectivity before Consul registration
+4. **Event-Based Registration**: Current implementation uses CDI events (marked deprecated)
 
 #### Phase 2.2: Implement Pipeline Creation (Week 1-2)
 
@@ -1408,11 +1581,11 @@ Before diving deep into unit and integration tests, we're taking a strategic app
 - ✅ 50 tests passing in consul module
 - ❌ 8 tests failing in rokkon-engine
 - ❌ 13 tests failing in engine/validators
-- ❌ 13 tests failing in engine/models
+- ❌ 13 tests failing in engine/models (NOTE: this module was merged into commons/interface)
 - ❌ 31 tests failing in modules/*
-- ❌ 12 tests failing in rokkon-commons
-- ❌ 4 tests failing in test-utilities
-- ❌ 2 tests failing in engine/cli-register
+- ❌ 12 tests failing in commons/* (interface/util/protobuf)
+- ❌ 4 tests failing in testing/util
+- ❌ 2 tests failing in cli/register-module
 - ❌ 3 tests failing in engine/seed-config
 
 **Approach**:

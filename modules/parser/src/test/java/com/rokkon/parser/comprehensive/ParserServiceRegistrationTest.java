@@ -43,7 +43,7 @@ public class ParserServiceRegistrationTest {
 
         // Basic registration validation
         assertThat(registration).isNotNull();
-        assertThat(registration.getModuleName()).isEqualTo("parser-module");
+        assertThat(registration.getModuleName()).isEqualTo("parser");
         assertThat(registration.getHealthCheckPassed()).isTrue();
         assertThat(registration.getHealthCheckMessage()).contains("No health check performed");
 
@@ -110,7 +110,7 @@ public class ParserServiceRegistrationTest {
 
         // Validate registration
         assertThat(registration).isNotNull();
-        assertThat(registration.getModuleName()).isEqualTo("parser-module");
+        assertThat(registration.getModuleName()).isEqualTo("parser");
         assertThat(registration.getHealthCheckPassed()).isTrue();
         assertThat(registration.getHealthCheckMessage()).contains("successfully processed test document");
         assertThat(registration.hasJsonConfigSchema()).isTrue();
@@ -127,7 +127,7 @@ public class ParserServiceRegistrationTest {
         var registration = parserService.getServiceRegistration(request)
                 .await().indefinitely();
 
-        assertThat(registration.getModuleName()).isEqualTo("parser-module");
+        assertThat(registration.getModuleName()).isEqualTo("parser");
 
         // Verify JSON schema is present and comprehensive
         String schema = registration.getJsonConfigSchema();

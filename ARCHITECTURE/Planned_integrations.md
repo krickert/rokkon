@@ -1,17 +1,17 @@
-# Rokkon Engine: Planned Integrations
+# Pipeline Engine: Planned Integrations
 
-The Rokkon Engine is designed as a flexible and extensible platform. Its true power will be realized through a rich ecosystem of connectors, pipeline steps, and sinks that allow it to interact with various data sources, perform diverse processing tasks, and deliver results to numerous destinations. This document outlines the planned integrations that will expand Rokkon's capabilities.
+The Pipeline Engine is designed as a flexible and extensible platform. Its true power will be realized through a rich ecosystem of connectors, pipeline steps, and sinks that allow it to interact with various data sources, perform diverse processing tasks, and deliver results to numerous destinations. This document outlines the planned integrations that will expand Pipeline's capabilities.
 
-The ability to rapidly develop and integrate these new modules stems from Rokkon's core architecture:
+The ability to rapidly develop and integrate these new modules stems from Pipeline's core architecture:
 *   **gRPC-based Microservices:** Any language supporting gRPC can be used to write a module.
-*   **Clear Contracts (`rokkon-protobuf`):** Standardized interfaces for module interaction.
+*   **Clear Contracts (`commons/protobuf`):** Standardized interfaces for module interaction.
 *   **Dynamic Configuration & Discovery (Consul):** Easy integration of new modules into pipelines.
 
 This means development teams can work in parallel, leveraging existing libraries and domain expertise to build new integrations quickly.
 
 ## Planned Connectors (Data Sources)
 
-Connectors are specialized modules responsible for ingesting data from external systems into Rokkon pipelines.
+Connectors are specialized modules responsible for ingesting data from external systems into Pipeline pipelines.
 
 ```mermaid
 graph TD
@@ -25,7 +25,7 @@ graph TD
         LiveFeeds["Live Feeds <br> (Weather, News)"]
     end
 
-    subgraph "Rokkon Connectors (Modules)"
+    subgraph "Pipeline Connectors (Modules)"
         direction LR
         JdbcConnector[JDBC Connector]
         S3Connector[S3/Cloud Storage Connector]
@@ -46,14 +46,14 @@ graph TD
     WebCorpora -- "Ingested by" --> GutenbergConnector
     LiveFeeds -- "Ingested by" --> WeatherFeedConnector
 
-    JdbcConnector -- PipeDocs --> RokkonPipeline[Rokkon Pipeline]
-    S3Connector -- PipeDocs --> RokkonPipeline
-    FtpConnector -- PipeDocs --> RokkonPipeline
-    NfsConnector -- PipeDocs --> RokkonPipeline
-    GitConnector -- PipeDocs --> RokkonPipeline
-    WikipediaConnector -- PipeDocs --> RokkonPipeline
-    GutenbergConnector -- PipeDocs --> RokkonPipeline
-    WeatherFeedConnector -- PipeDocs --> RokkonPipeline
+    JdbcConnector -- PipeDocs --> PipelinePipeline[Pipeline]
+    S3Connector -- PipeDocs --> PipelinePipeline
+    FtpConnector -- PipeDocs --> PipelinePipeline
+    NfsConnector -- PipeDocs --> PipelinePipeline
+    GitConnector -- PipeDocs --> PipelinePipeline
+    WikipediaConnector -- PipeDocs --> PipelinePipeline
+    GutenbergConnector -- PipeDocs --> PipelinePipeline
+    WeatherFeedConnector -- PipeDocs --> PipelinePipeline
 
     classDef source fill:#lightblue,stroke:#333,stroke-width:2px;
     classDef connector fill:#lightgreen,stroke:#333,stroke-width:2px;
@@ -61,7 +61,7 @@ graph TD
 
     class DBs,CloudStorage,FileServers,CodeRepos,WebCorpora,LiveFeeds source;
     class JdbcConnector,S3Connector,FtpConnector,NfsConnector,GitConnector,WikipediaConnector,GutenbergConnector,WeatherFeedConnector connector;
-    class RokkonPipeline pipeline;
+    class PipelinePipeline pipeline;
 ```
 
 1.  **JDBC Connector:**
@@ -106,7 +106,7 @@ graph TD
 
 ## Planned Pipeline Steps (Data Processors)
 
-Pipeline steps are modules that transform, enrich, or analyze data as it flows through a Rokkon pipeline.
+Pipeline steps are modules that transform, enrich, or analyze data as it flows through a Pipeline.
 
 ```mermaid
 graph TD
@@ -169,14 +169,14 @@ graph TD
 
 ## Planned Sinks (Data Destinations)
 
-Sinks are modules responsible for writing processed data from Rokkon pipelines to external systems or storage.
+Sinks are modules responsible for writing processed data from Pipeline to external systems or storage.
 
 ```mermaid
 graph TD
-    RokkonPipeline[Rokkon Pipeline] -- PipeDocs --> OpenSearchSink[OpenSearch Sink]
-    RokkonPipeline -- PipeDocs --> MongoSink["MongoDB/DocumentDB Sink"]
-    RokkonPipeline -- PipeDocs --> VectorStoreSink["Pinecone/Other Vector Stores Sink"]
-    RokkonPipeline -- PipeDocs --> PostgresSink["PostgreSQL Sink (Relational/JSONB)"]
+    PipelinePipeline[Pipeline] -- PipeDocs --> OpenSearchSink[OpenSearch Sink]
+    PipelinePipeline -- PipeDocs --> MongoSink["MongoDB/DocumentDB Sink"]
+    PipelinePipeline -- PipeDocs --> VectorStoreSink["Pinecone/Other Vector Stores Sink"]
+    PipelinePipeline -- PipeDocs --> PostgresSink["PostgreSQL Sink (Relational/JSONB)"]
 
     OpenSearchSink -- "Writes Data" --> OpenSearchCluster[OpenSearch Cluster]
     MongoSink -- "Writes Data" --> MongoCluster["MongoDB / DocumentDB"]
@@ -188,7 +188,7 @@ graph TD
     classDef datastore fill:#cce5ff,stroke:#333,stroke-width:2px;
 
     class OpenSearchSink,MongoSink,VectorStoreSink,PostgresSink sink;
-    class RokkonPipeline pipeline;
+    class PipelinePipeline pipeline;
     class OpenSearchCluster,MongoCluster,VectorDB,PostgresDB datastore;
 ```
 
@@ -214,14 +214,14 @@ graph TD
 
 ## Why This Can Happen Quickly
 
-The development and integration of these modules can be accelerated due to several factors inherent in Rokkon's design and the broader software ecosystem:
+The development and integration of these modules can be accelerated due to several factors inherent in Pipeline's design and the broader software ecosystem:
 
 *   **Microservice Architecture:** Each module is a small, focused service. Teams can develop them independently and in parallel.
 *   **gRPC & Protobuf:** Clear, language-agnostic contracts simplify integration. Code generation for client/server stubs saves significant time.
-*   **Leveraging Existing Libraries & SDKs:** For most planned integrations, mature open-source libraries, cloud provider SDKs, or commercial SDKs already exist. Module development often becomes a task of wrapping these existing tools within Rokkon's gRPC interface.
+*   **Leveraging Existing Libraries & SDKs:** For most planned integrations, mature open-source libraries, cloud provider SDKs, or commercial SDKs already exist. Module development often becomes a task of wrapping these existing tools within Pipeline's gRPC interface.
 *   **Language Flexibility:** Teams can use the language best suited for the task or where existing expertise lies (e.g., Python for AI/NLP, Java for robust enterprise connectors, Go for high-performance network utilities).
-*   **Modularity of Rokkon Engine:** The engine itself doesn't need to change significantly to support new modules, as long as they adhere to the defined gRPC contracts and registration process.
+*   **Modularity of Pipeline Engine:** The engine itself doesn't need to change significantly to support new modules, as long as they adhere to the defined gRPC contracts and registration process.
 *   **Community Contributions (Future):** A well-defined module SDK and clear documentation can encourage community contributions for new connectors, steps, and sinks.
 *   **Quarkus for Java Modules:** If Java is chosen, Quarkus significantly speeds up development with features like live coding, simplified configuration, and easy native compilation.
 
-This combination of a solid architectural foundation and the ability to leverage existing technologies allows the Rokkon Engine to rapidly expand its ecosystem of integrations.
+This combination of a solid architectural foundation and the ability to leverage existing technologies allows the Pipeline Engine to rapidly expand its ecosystem of integrations.

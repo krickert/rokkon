@@ -1,0 +1,33 @@
+version: '3.8'
+
+services:
+  # Step 1: Test seeding works
+  
+  consul-server:
+    image: hashicorp/consul:latest
+    command: agent -dev -ui -client=0.0.0.0
+    ports:
+      - "8500:8500"
+    networks:
+      - test-net
+
+  # Seed config
+  consul-seeder:
+    image: rokkon/seed-engine-consul-config:latest
+    depends_on:
+      - consul-server
+    networks:
+      - test-net
+    volumes:
+      - ./seed-data.json:/seed-data.json:ro
+    command: [
+      "-h", "consul-server",
+      "-p", "8500",
+      "--key", "config/application",
+      "--import", "/seed-data.json",
+      "--force"
+    ]
+
+networks:
+  test-net:
+    driver: bridge

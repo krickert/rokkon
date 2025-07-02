@@ -1,8 +1,8 @@
 package com.rokkon.pipeline.chunker;
 
 import com.rokkon.search.model.PipeDoc;
-import com.rokkon.pipeline.utils.ProcessingBuffer;
-import com.rokkon.pipeline.utils.ProcessingBufferFactory;
+import com.rokkon.pipeline.util.ProcessingBuffer;
+import com.rokkon.pipeline.util.ProcessingBufferFactory;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Singleton;
 import org.eclipse.microprofile.config.inject.ConfigProperty;

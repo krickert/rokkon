@@ -1,10 +1,10 @@
-# Rokkon Engine: Architecture Overview
+# Pipeline Engine: Architecture Overview
 
 ## High-Level Overview
 
-The Rokkon Engine is a powerful and flexible data processing pipeline designed for building complex, scalable, and language-agnostic data workflows. It empowers developers to create pipeline steps, connectors (sources of data), and sinks (destinations for data) using any programming language that supports gRPC.
+The Pipeline Engine is a powerful and flexible data processing pipeline designed for building complex, scalable, and language-agnostic data workflows. It empowers developers to create pipeline steps, connectors (sources of data), and sinks (destinations for data) using any programming language that supports gRPC.
 
-At its core, Rokkon is built around the concept of distributed, interconnected modules that communicate via gRPC and can leverage Kafka for asynchronous data transfer between steps. This architecture allows for:
+At its core, Pipeline is built around the concept of distributed, interconnected modules that communicate via gRPC and can leverage Kafka for asynchronous data transfer between steps. This architecture allows for:
 
 *   **Language Agnosticism:** Modules can be written in Python, Java, Go, Node.js, C++, Rust, or any other gRPC-supported language. This enables teams to use the best language for a specific task or leverage existing libraries and expertise.
 *   **Scalability:** Each pipeline step (module) can be independently scaled. The engine supports fan-in/fan-out patterns, allowing multiple instances of a module to process data in parallel or for data to be distributed across different subsequent steps.
@@ -30,9 +30,9 @@ Communication between steps can occur synchronously via gRPC or asynchronously v
 
 ```mermaid
 graph TD
-    subgraph "Rokkon Engine Core"
+    subgraph "Pipeline Engine Core"
         direction LR
-        Engine[Rokkon Engine API/Orchestrator]
+        Engine[pipeline-engine API/Orchestrator]
         Consul[Consul Service Discovery & KV Store]
         Kafka[Apache Kafka Messaging]
 
@@ -74,11 +74,11 @@ graph TD
 
 ### Role of Consul
 
-Consul plays a critical role in the Rokkon Engine ecosystem:
+Consul plays a critical role in the Pipeline Engine ecosystem:
 
-1.  **Service Discovery:** Each pipeline module (connector, step, sink) registers itself with Consul upon startup. The Rokkon Engine and other modules use Consul to discover the network location (IP address and port) of available services. This allows for dynamic scaling and resilience, as new instances are automatically discovered and failing instances are removed.
+1.  **Service Discovery:** Each pipeline module (connector, step, sink) registers itself with Consul upon startup. The Pipeline Engine and other modules use Consul to discover the network location (IP address and port) of available services. This allows for dynamic scaling and resilience, as new instances are automatically discovered and failing instances are removed.
 2.  **Health Checking:** Consul performs health checks on registered modules. The engine uses this health information to route data only to healthy instances, improving the overall reliability of the pipelines.
-3.  **Distributed Key-Value (KV) Store:** Rokkon Engine stores pipeline definitions, module configurations, and other dynamic operational data in the Consul KV store. This provides a centralized and consistent way to manage configurations, which can be updated dynamically without restarting the engine or modules. The engine watches for changes in Consul and adapts pipeline behavior accordingly.
+3.  **Distributed Key-Value (KV) Store:** Pipeline Engine stores pipeline definitions, module configurations, and other dynamic operational data in the Consul KV store. This provides a centralized and consistent way to manage configurations, which can be updated dynamically without restarting the engine or modules. The engine watches for changes in Consul and adapts pipeline behavior accordingly.
 
 ```mermaid
 graph TD
@@ -90,9 +90,9 @@ graph TD
     end
 
     subgraph "Configuration Management"
-        AdminUI[Admin UI/CLI] -- Writes Pipeline Config --> EngineConsulWriter[Engine-Consul Writer Service]
+        AdminUI[Admin UI/CLI] -- Writes Pipeline Config --> EngineConsulWriter[engine/consul Writer Service]
         EngineConsulWriter -- Stores Config --> ConsulKV[(Consul KV Store)]
-        RokkonEngine[Rokkon Engine] -- Reads Pipeline Config --> ConsulKV
+        pipeline-engine[pipeline-engine] -- Reads Pipeline Config --> ConsulKV
         ModuleA[Module A] -- Reads Own Config --> ConsulKV
     end
 
@@ -102,7 +102,7 @@ graph TD
 
     class M1,M2,M3,ModuleA service;
     class Consul,ConsulKV consulComponent;
-    class AdminUI,EngineConsulWriter,RokkonEngine admin;
+    class AdminUI,EngineConsulWriter,PipelineEngine admin;
 ```
 
 ## Example Scenario: Building a Document Processing and Analysis Pipeline
@@ -197,15 +197,15 @@ graph LR
     class OpenSearch1,OpenSearch2 sink;
 ```
 
-This example demonstrates how Rokkon's architecture supports complex data processing workflows, including fan-in from multiple sources, sequential processing, parallel processing with fan-out (to `Embedder` and `Embedder 2`), and fan-out to multiple sinks for purposes like A/B testing. Each component can be developed, deployed, and scaled independently.
+This example demonstrates how Pipeline's architecture supports complex data processing workflows, including fan-in from multiple sources, sequential processing, parallel processing with fan-out (to `Embedder` and `Embedder 2`), and fan-out to multiple sinks for purposes like A/B testing. Each component can be developed, deployed, and scaled independently.
 
 ## Further Reading
 
-To understand how such pipelines are constructed and managed within the Rokkon Engine, refer to the following documentation:
+To understand how such pipelines are constructed and managed within the Pipeline Engine, refer to the following documentation:
 
 *   **Pipeline Design (`Pipeline_design.md`):** This document details the logical design of pipeline clusters, pipelines, pipeline steps, and modules. It also covers the dynamic configuration system.
-*   **Module Deployment (`Module_deployment.md`):** Explains the process of deploying and registering modules with the Rokkon Engine.
-*   **Rokkon Protobufs (`rokkon-protobuf/README.md`):** Describes the gRPC service definitions and message types that form the communication backbone of the engine and its modules.
-*   **Developer Notes (`DEVELOPER_NOTES/`):** Contains various notes relevant to the design and implementation details, including specific architectural decisions and plans. (Refer to `DEVELOPER_NOTES/rokkon-engine/ARCHITECTURE_AND_PLAN.md` for more engine-specific details).
+*   **Module Deployment (`Module_deployment.md`):** Explains the process of deploying and registering modules with the Pipeline Engine.
+*   **Pipeline Protobufs (`commons/protobuf/README.md`):** Describes the gRPC service definitions and message types that form the communication backbone of the engine and its modules.
+*   **Developer Notes (`DEVELOPER_NOTES/`):** Contains various notes relevant to the design and implementation details, including specific architectural decisions and plans. (Refer to `DEVELOPER_NOTES/pipeline-engine/ARCHITECTURE_AND_PLAN.md` for more engine-specific details).
 
-By leveraging gRPC for inter-module communication and Consul for service discovery and configuration, the Rokkon Engine provides a robust platform for building sophisticated, distributed data processing applications.
+By leveraging gRPC for inter-module communication and Consul for service discovery and configuration, the Pipeline Engine provides a robust platform for building sophisticated, distributed data processing applications.

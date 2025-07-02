@@ -1,0 +1,17 @@
+# Integration test configuration
+consul:
+  enabled: true
+  host: localhost
+  port: 8500
+
+quarkus:
+  consul-config:
+    enabled: false
+  
+  log:
+    level: INFO
+    category:
+      "com.rokkon.pipeline.engine.grpc":
+        level: DEBUG
+      "com.rokkon.pipeline.consul":
+        level: DEBUG

@@ -1,0 +1,295 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rokkon.com/schemas/pipeline-config.json",
+  "title": "Pipeline Configuration",
+  "description": "Defines a data processing pipeline with named steps",
+  "type": "object",
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Unique pipeline name",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "minLength": 1,
+      "maxLength": 255
+    },
+    "pipelineSteps": {
+      "type": "object",
+      "description": "Map of step IDs to step configurations",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "$ref": "#/definitions/pipelineStepConfig"
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": ["name"],
+  "additionalProperties": false,
+  "definitions": {
+    "pipelineStepConfig": {
+      "type": "object",
+      "description": "Configuration for a single pipeline step",
+      "properties": {
+        "stepName": {
+          "type": "string",
+          "description": "Human-readable step name",
+          "minLength": 1
+        },
+        "stepType": {
+          "type": "string",
+          "description": "Type of pipeline step",
+          "enum": ["INITIAL_PIPELINE", "PIPELINE", "SINK"]
+        },
+        "description": {
+          "type": "string",
+          "description": "Step description"
+        },
+        "customConfigSchemaId": {
+          "type": "string",
+          "description": "Reference to custom configuration schema"
+        },
+        "customConfig": {
+          "$ref": "#/definitions/jsonConfigOptions"
+        },
+        "kafkaInputs": {
+          "type": "array",
+          "description": "Kafka input definitions",
+          "items": {
+            "$ref": "#/definitions/kafkaInputDefinition"
+          }
+        },
+        "outputs": {
+          "type": "object",
+          "description": "Output routing configuration",
+          "patternProperties": {
+            "^.*$": {
+              "$ref": "#/definitions/outputTarget"
+            }
+          }
+        },
+        "maxRetries": {
+          "type": "integer",
+          "description": "Maximum retry attempts",
+          "minimum": 0,
+          "default": 0
+        },
+        "retryBackoffMs": {
+          "type": "integer",
+          "description": "Initial retry backoff in milliseconds",
+          "minimum": 0,
+          "default": 1000
+        },
+        "maxRetryBackoffMs": {
+          "type": "integer",
+          "description": "Maximum retry backoff in milliseconds",
+          "minimum": 0,
+          "default": 30000
+        },
+        "retryBackoffMultiplier": {
+          "type": "number",
+          "description": "Exponential backoff multiplier",
+          "exclusiveMinimum": 0,
+          "default": 2.0
+        },
+        "stepTimeoutMs": {
+          "type": ["integer", "null"],
+          "description": "Step execution timeout in milliseconds",
+          "minimum": 1
+        },
+        "processorInfo": {
+          "$ref": "#/definitions/processorInfo"
+        }
+      },
+      "required": ["stepName", "stepType", "processorInfo"],
+      "additionalProperties": false
+    },
+    "jsonConfigOptions": {
+      "type": "object",
+      "description": "Custom configuration options",
+      "properties": {
+        "jsonConfig": {
+          "type": ["object", "null"],
+          "description": "Arbitrary JSON configuration"
+        },
+        "configParams": {
+          "type": "object",
+          "description": "String key-value parameters",
+          "patternProperties": {
+            "^.*$": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "kafkaInputDefinition": {
+      "type": "object",
+      "description": "Kafka input configuration",
+      "properties": {
+        "listenTopics": {
+          "type": "array",
+          "description": "Topics to consume from",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1
+        },
+        "consumerGroupId": {
+          "type": "string",
+          "description": "Kafka consumer group ID"
+        },
+        "kafkaConsumerProperties": {
+          "type": "object",
+          "description": "Additional Kafka consumer properties",
+          "patternProperties": {
+            "^.*$": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": ["listenTopics"],
+      "additionalProperties": false
+    },
+    "outputTarget": {
+      "type": "object",
+      "description": "Output routing target",
+      "properties": {
+        "targetStepName": {
+          "type": "string",
+          "description": "Name of the target step",
+          "minLength": 1
+        },
+        "transportType": {
+          "type": "string",
+          "description": "Transport mechanism",
+          "enum": ["GRPC", "KAFKA", "INTERNAL"]
+        },
+        "grpcTransport": {
+          "$ref": "#/definitions/grpcTransportConfig"
+        },
+        "kafkaTransport": {
+          "$ref": "#/definitions/kafkaTransportConfig"
+        }
+      },
+      "required": ["targetStepName", "transportType"],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": { "transportType": { "const": "GRPC" } }
+          },
+          "then": {
+            "required": ["grpcTransport"]
+          }
+        },
+        {
+          "if": {
+            "properties": { "transportType": { "const": "KAFKA" } }
+          },
+          "then": {
+            "required": ["kafkaTransport"]
+          }
+        }
+      ]
+    },
+    "grpcTransportConfig": {
+      "type": "object",
+      "description": "gRPC transport configuration",
+      "properties": {
+        "serviceName": {
+          "type": "string",
+          "description": "Consul service name for discovery"
+        },
+        "grpcClientProperties": {
+          "type": "object",
+          "description": "gRPC client properties",
+          "patternProperties": {
+            "^.*$": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "kafkaTransportConfig": {
+      "type": "object",
+      "description": "Kafka transport configuration",
+      "properties": {
+        "topic": {
+          "type": "string",
+          "description": "Target Kafka topic",
+          "minLength": 1
+        },
+        "partitionKeyField": {
+          "type": "string",
+          "description": "Field to use for partition key",
+          "default": "pipedocId"
+        },
+        "compressionType": {
+          "type": "string",
+          "description": "Compression algorithm",
+          "enum": ["none", "gzip", "snappy", "lz4", "zstd"],
+          "default": "snappy"
+        },
+        "batchSize": {
+          "type": "integer",
+          "description": "Batch size in bytes",
+          "minimum": 0,
+          "default": 16384
+        },
+        "lingerMs": {
+          "type": "integer",
+          "description": "Linger time in milliseconds",
+          "minimum": 0,
+          "default": 10
+        },
+        "kafkaProducerProperties": {
+          "type": "object",
+          "description": "Additional Kafka producer properties",
+          "patternProperties": {
+            "^.*$": {
+              "type": "string"
+            }
+          }
+        }
+      },
+      "required": ["topic"],
+      "additionalProperties": false
+    },
+    "processorInfo": {
+      "type": "object",
+      "description": "Processor configuration",
+      "properties": {
+        "grpcServiceName": {
+          "type": "string",
+          "description": "External gRPC service name"
+        },
+        "internalProcessorBeanName": {
+          "type": "string",
+          "description": "Internal processor bean name"
+        }
+      },
+      "oneOf": [
+        {
+          "required": ["grpcServiceName"],
+          "properties": {
+            "grpcServiceName": { "minLength": 1 },
+            "internalProcessorBeanName": { "maxLength": 0 }
+          }
+        },
+        {
+          "required": ["internalProcessorBeanName"],
+          "properties": {
+            "internalProcessorBeanName": { "minLength": 1 },
+            "grpcServiceName": { "maxLength": 0 }
+          }
+        }
+      ],
+      "additionalProperties": false
+    }
+  }
+}

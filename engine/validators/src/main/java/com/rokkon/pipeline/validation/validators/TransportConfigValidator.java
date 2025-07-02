@@ -6,6 +6,7 @@ import com.rokkon.pipeline.validation.PipelineConfigValidatable;
 import com.rokkon.pipeline.validation.ValidationResult;
 import com.rokkon.pipeline.validation.ValidationResultFactory;
 import jakarta.enterprise.context.ApplicationScoped;
+import org.jboss.logging.Logger;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -17,8 +18,11 @@ import java.util.Map;
 @ApplicationScoped
 public class TransportConfigValidator implements PipelineConfigValidator {
     
+    private static final Logger LOG = Logger.getLogger(TransportConfigValidator.class);
+    
     @Override
     public ValidationResult validate(PipelineConfigValidatable validatable) {
+        LOG.debugf("TransportConfigValidator.validate called with: %s", validatable);
         PipelineConfig config = (PipelineConfig) validatable;
         if (config == null || config.pipelineSteps() == null || config.pipelineSteps().isEmpty()) {
             return ValidationResultFactory.success();
@@ -57,7 +61,10 @@ public class TransportConfigValidator implements PipelineConfigValidator {
                         String outputPrefix = stepPrefix + "Output '" + outputKey + "': ";
                         
                         // Validate based on transport type
+                        LOG.debugf("Checking output transport type: %s, kafkaTransport: %s, grpcTransport: %s", 
+                            output.transportType(), output.kafkaTransport(), output.grpcTransport());
                         if (output.transportType() == TransportType.KAFKA && output.kafkaTransport() != null) {
+                            LOG.debugf("Validating Kafka transport config: %s", output.kafkaTransport());
                             validateKafkaTransport(outputPrefix, output.kafkaTransport(), errors, warnings);
                         } else if (output.transportType() == TransportType.GRPC && output.grpcTransport() != null) {
                             validateGrpcTransport(outputPrefix, output.grpcTransport(), errors, warnings);
@@ -69,9 +76,12 @@ public class TransportConfigValidator implements PipelineConfigValidator {
             }
         }
         
-        return errors.isEmpty() ? 
+        ValidationResult result = errors.isEmpty() ? 
             (warnings.isEmpty() ? ValidationResultFactory.success() : ValidationResultFactory.successWithWarnings(warnings)) : 
             ValidationResultFactory.failure(errors, warnings);
+        LOG.debugf("TransportConfigValidator returning result: valid=%s, errors=%s, warnings=%s", 
+            result.valid(), result.errors(), result.warnings());
+        return result;
     }
     
     private void validateKafkaInput(String prefix, KafkaInputDefinition kafkaInput, 
@@ -142,8 +152,10 @@ public class TransportConfigValidator implements PipelineConfigValidator {
         }
         
         // Batch size validation
+        LOG.debugf("Validating batch size: %s", kafkaTransport.batchSize());
         if (kafkaTransport.batchSize() != null) {
             if (kafkaTransport.batchSize() < 1) {
+                LOG.debugf("Batch size %d is less than 1, adding error", kafkaTransport.batchSize());
                 errors.add(prefix + "Batch size must be at least 1");
             } else if (kafkaTransport.batchSize() > 1048576) { // 1MB
                 warnings.add(prefix + "Very large batch size (" + kafkaTransport.batchSize() + 
@@ -152,8 +164,10 @@ public class TransportConfigValidator implements PipelineConfigValidator {
         }
         
         // Linger ms validation
+        LOG.debugf("Validating linger ms: %s", kafkaTransport.lingerMs());
         if (kafkaTransport.lingerMs() != null) {
             if (kafkaTransport.lingerMs() < 0) {
+                LOG.debugf("Linger ms %d is negative, adding error", kafkaTransport.lingerMs());
                 errors.add(prefix + "Linger ms cannot be negative");
             } else if (kafkaTransport.lingerMs() > 1000) {
                 warnings.add(prefix + "High linger ms (" + kafkaTransport.lingerMs() + 

@@ -121,7 +121,7 @@ This phase is documented in detail in `mock-engine-project-plan.md`. The mock en
 **Tasks**:
 1. Add dependencies to connector-server:
    - `io.quarkus:quarkus-grpc`
-   - `project(":rokkon-protobuf")` (for proto definitions only)
+   - `project(":commons-protobuf")` (for proto definitions only)
    - `project(":rokkon-engine-new:commons")`
    - `io.quarkus:quarkus-jdbc-postgresql`
    - `io.quarkus:quarkus-hibernate-orm-panache`
@@ -131,7 +131,7 @@ This phase is documented in detail in `mock-engine-project-plan.md`. The mock en
    quarkus:
      generate-code:
        grpc:
-         scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
+         scan-for-proto: com.rokkon.pipeline:commons-protobuf,com.google.api.grpc:proto-google-common-protos
    ```
    
 3. Add Consul client for service discovery:

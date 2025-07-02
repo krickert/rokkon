@@ -1,0 +1,69 @@
+{
+  "connect": {
+    "enabled": true
+  },
+  "ports": {
+    "grpc": 8502
+  },
+  "enable_script_checks": true,
+  "services": [
+    {
+      "name": "pipeline-engine",
+      "port": 38082,
+      "connect": {
+        "sidecar_service": {
+          "port": 21000,
+          "proxy": {
+            "upstreams": []
+          }
+        }
+      }
+    },
+    {
+      "name": "pipeline-engine-grpc",
+      "port": 48082,
+      "connect": {
+        "sidecar_service": {
+          "port": 21001,
+          "proxy": {
+            "upstreams": []
+          }
+        }
+      }
+    },
+    {
+      "name": "echo",
+      "port": 49091,
+      "connect": {
+        "sidecar_service": {
+          "port": 21002,
+          "proxy": {
+            "upstreams": [
+              {
+                "destination_name": "pipeline-engine-grpc",
+                "local_bind_port": 48082
+              }
+            ]
+          }
+        }
+      }
+    },
+    {
+      "name": "test",
+      "port": 49092,
+      "connect": {
+        "sidecar_service": {
+          "port": 21003,
+          "proxy": {
+            "upstreams": [
+              {
+                "destination_name": "pipeline-engine-grpc",
+                "local_bind_port": 48082
+              }
+            ]
+          }
+        }
+      }
+    }
+  ]
+}

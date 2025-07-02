@@ -1,0 +1,5 @@
+quarkus:
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf
+      scan-for-imports: com.rokkon.pipeline:rokkon-protobuf,com.google.protobuf:protobuf-java,com.google.api.grpc:proto-google-common-protos

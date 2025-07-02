@@ -4,6 +4,8 @@
 !gradle/wrapper/gradle-wrapper.jar
 !**/src/main/**/build/
 !**/src/test/**/build/
+.claude
+.consul
 
 # IntelliJ IDEA
 .idea/
@@ -95,3 +97,4 @@ backup-hosed-modules
 
 old_*
 old_rokkon-to-migrate/**
+/consul-data/node-id

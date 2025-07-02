@@ -1,0 +1,32 @@
+quarkus:
+  application:
+    name: rokkon-integration-tests
+  
+  # HTTP configuration for tests
+  http:
+    test-port: 0  # Use random port to avoid conflicts
+    
+  # Test configuration
+  test:
+    # Increase test timeout for container startup
+    native-image-wait-time: PT300S
+    
+  # Logging
+  log:
+    level: INFO
+    category:
+      "com.rokkon.integration":
+        level: DEBUG
+      "org.testcontainers":
+        level: INFO
+        
+# Default test properties (can be overridden by test resources)
+consul:
+  host: localhost
+  port: 8500
+  
+rokkon:
+  engine:
+    url: http://localhost:8080
+    grpc:
+      port: 49000

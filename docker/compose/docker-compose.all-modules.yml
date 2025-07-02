@@ -1,0 +1,366 @@
+# docker/compose/docker-compose.all-modules.yml
+# Full deployment with Engine, Echo, Test, Parser, Chunker, and Embedder modules
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. CONSUL SERVER - Central Service Discovery
+  # ==========================================
+  consul-server:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-server
+    ports:
+      - "8500:8500"      # HTTP API & UI
+      - "8600:8600/tcp"  # DNS
+      - "8600:8600/udp"  # DNS
+    volumes:
+      - consul_data:/consul/data
+    command: >
+      agent -server -ui 
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -bootstrap-expect=1 
+      -dev
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    healthcheck:
+      test: ["CMD", "consul", "info"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - pipeline-network
+
+  # ==========================================
+  # 2. CONFIGURATION SEEDER - One-time Job
+  # ==========================================
+  seeder:
+    build:
+      context: ../../cli/seed-engine-consul-config
+      dockerfile: Dockerfile
+    container_name: consul-seeder
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        java -jar build/quarkus-app/quarkus-run.jar -h consul-server -p 8500 --key config/application --import seed-data.json --force &&
+        java -jar build/quarkus-app/quarkus-run.jar -h consul-server -p 8500 --key config/docker-compose --import seed-data.json --force
+    volumes:
+      - ../../cli/seed-engine-consul-config/seed-data.json:/app/seed-data.json:ro
+    networks:
+      - pipeline-network
+
+  # ==========================================
+  # 3. ENGINE WITH SIDECAR
+  # ==========================================
+  consul-agent-engine:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-engine
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${ENGINE_REST_PORT:-39000}:39000"
+      - "${ENGINE_GRPC_PORT:-49000}:49000"
+    command: >
+      agent 
+      -node="engine-sidecar"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-network
+
+  engine:
+    image: ${ENGINE_IMAGE:-rokkon/rokkon-engine:latest}
+    container_name: engine-app
+    depends_on:
+      seeder:
+        condition: service_completed_successfully
+      consul-agent-engine:
+        condition: service_started
+    environment:
+      - QUARKUS_PROFILE=${PROFILE:-docker-compose}
+      - QUARKUS_HTTP_PORT=39000
+      - QUARKUS_GRPC_SERVER_PORT=49000
+      - CLUSTER_NAME=${CLUSTER_NAME:-docker-cluster}
+      - PIPELINE_CLUSTER_NAME=${CLUSTER_NAME:-docker-cluster}
+      - PIPELINE_ENGINE_NAME=${ENGINE_NAME:-engine-docker}
+    network_mode: "service:consul-agent-engine"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:39000/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 4. ECHO MODULE WITH SIDECAR
+  # ==========================================
+  consul-agent-echo:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-echo
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${ECHO_MODULE_REST_PORT:-39090}:39090"
+      - "${ECHO_MODULE_GRPC_PORT:-49090}:49090"
+    command: >
+      agent 
+      -node="echo-sidecar"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-network
+
+  echo-module:
+    image: ${ECHO_MODULE_IMAGE:-rokkon/echo-module:latest}
+    container_name: echo-module-app
+    depends_on:
+      engine:
+        condition: service_healthy
+      consul-agent-echo:
+        condition: service_started
+    environment:
+      - MODULE_NAME=echo
+      - MODULE_HOST=consul-agent-echo
+      - MODULE_HTTP_PORT=39090
+      - MODULE_GRPC_PORT=49090
+      - QUARKUS_HTTP_PORT=39090
+      - QUARKUS_GRPC_SERVER_PORT=49090
+      - ENGINE_HOST=consul-agent-engine
+      - ENGINE_PORT=49000
+      - QUARKUS_PROFILE=${PROFILE:-docker-compose}
+      - JAVA_OPTS=-Xmx1g -Xms512m
+    network_mode: "service:consul-agent-echo"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # ==========================================
+  # 5. TEST MODULE WITH SIDECAR
+  # ==========================================
+  consul-agent-test:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-test
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${TEST_MODULE_REST_PORT:-39095}:39095"
+      - "${TEST_MODULE_GRPC_PORT:-49095}:49095"
+    command: >
+      agent 
+      -node="test-sidecar"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-network
+
+  test-module:
+    image: ${TEST_MODULE_IMAGE:-rokkon/test-module:latest}
+    container_name: test-module-app
+    depends_on:
+      engine:
+        condition: service_healthy
+      consul-agent-test:
+        condition: service_started
+    environment:
+      - MODULE_NAME=test-module
+      - MODULE_HOST=consul-agent-test
+      - MODULE_HTTP_PORT=39095
+      - MODULE_GRPC_PORT=49095
+      - QUARKUS_HTTP_PORT=39095
+      - QUARKUS_GRPC_SERVER_PORT=49095
+      - ENGINE_HOST=consul-agent-engine
+      - ENGINE_PORT=49000
+      - QUARKUS_PROFILE=${PROFILE:-docker-compose}
+      - JAVA_OPTS=-Xmx1g -Xms512m
+    network_mode: "service:consul-agent-test"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # ==========================================
+  # 6. PARSER MODULE WITH SIDECAR
+  # ==========================================
+  consul-agent-parser:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-parser
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${PARSER_MODULE_REST_PORT:-39093}:39093"
+      - "${PARSER_MODULE_GRPC_PORT:-49093}:49093"
+    command: >
+      agent 
+      -node="parser-sidecar"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-network
+
+  parser-module:
+    image: ${PARSER_MODULE_IMAGE:-rokkon/parser-module:latest}
+    container_name: parser-module-app
+    depends_on:
+      engine:
+        condition: service_healthy
+      consul-agent-parser:
+        condition: service_started
+    environment:
+      - MODULE_NAME=parser
+      - MODULE_HOST=consul-agent-parser
+      - MODULE_HTTP_PORT=39093
+      - MODULE_GRPC_PORT=49093
+      - QUARKUS_HTTP_PORT=39093
+      - QUARKUS_GRPC_SERVER_PORT=49093
+      - ENGINE_HOST=consul-agent-engine
+      - ENGINE_PORT=49000
+      - QUARKUS_PROFILE=${PROFILE:-docker-compose}
+      - JAVA_OPTS=-Xmx1g -Xms512m
+    network_mode: "service:consul-agent-parser"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # ==========================================
+  # 7. CHUNKER MODULE WITH SIDECAR
+  # ==========================================
+  consul-agent-chunker:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-chunker
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${CHUNKER_MODULE_REST_PORT:-39092}:39092"
+      - "${CHUNKER_MODULE_GRPC_PORT:-49092}:49092"
+    command: >
+      agent 
+      -node="chunker-sidecar"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-network
+
+  chunker-module:
+    image: ${CHUNKER_MODULE_IMAGE:-pipeline/chunker:latest}
+    container_name: chunker-module-app
+    depends_on:
+      engine:
+        condition: service_healthy
+      consul-agent-chunker:
+        condition: service_started
+    environment:
+      - MODULE_NAME=chunker
+      - MODULE_HOST=consul-agent-chunker
+      - MODULE_HTTP_PORT=39092
+      - MODULE_GRPC_PORT=49092
+      - QUARKUS_HTTP_PORT=39092
+      - QUARKUS_GRPC_SERVER_PORT=49092
+      - ENGINE_HOST=consul-agent-engine
+      - ENGINE_PORT=49000
+      - QUARKUS_PROFILE=${PROFILE:-docker-compose}
+      # Increase memory for NLP models
+      - JAVA_OPTS=-Xmx4g -Xms1g
+    network_mode: "service:consul-agent-chunker"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  # ==========================================
+  # 8. EMBEDDER MODULE WITH SIDECAR
+  # ==========================================
+  consul-agent-embedder:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-embedder
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${EMBEDDER_MODULE_REST_PORT:-39094}:39094"
+      - "${EMBEDDER_MODULE_GRPC_PORT:-49094}:49094"
+    command: >
+      agent 
+      -node="embedder-sidecar"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-network
+
+  embedder-module:
+    image: ${EMBEDDER_MODULE_IMAGE:-pipeline/embedder:latest}
+    container_name: embedder-module-app
+    depends_on:
+      engine:
+        condition: service_healthy
+      consul-agent-embedder:
+        condition: service_started
+    environment:
+      - MODULE_NAME=embedder
+      - MODULE_HOST=consul-agent-embedder
+      - MODULE_HTTP_PORT=39094
+      - MODULE_GRPC_PORT=49094
+      - QUARKUS_HTTP_PORT=39094
+      - QUARKUS_GRPC_SERVER_PORT=49094
+      - ENGINE_HOST=consul-agent-engine
+      - ENGINE_PORT=49000
+      - QUARKUS_PROFILE=${PROFILE:-docker-compose}
+      # Increase memory for ML models
+      - JAVA_OPTS=-Xmx8g -Xms2g
+    network_mode: "service:consul-agent-embedder"
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+
+# ==========================================
+# NETWORKS & VOLUMES
+# ==========================================
+networks:
+  pipeline-network:
+    driver: bridge
+
+volumes:
+  consul_data:

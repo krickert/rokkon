@@ -1,0 +1,18 @@
+greeting:
+  message: "hello"
+
+quarkus:
+  application:
+    name: test-utilities
+  http:
+    port: 38097
+    host: 0.0.0.0
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:protobuf
+      scan-for-imports: com.google.protobuf:protobuf-java,com.google.api.grpc:proto-google-common-protos
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG

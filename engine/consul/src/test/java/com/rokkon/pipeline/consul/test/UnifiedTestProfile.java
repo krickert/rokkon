@@ -188,7 +188,7 @@ public class UnifiedTestProfile implements QuarkusTestProfile {
                 kvPrefix = "test/" + config.testClassName;
             }
         }
-        overrides.put("rokkon.consul.kv-prefix", kvPrefix);
+        overrides.put("pipeline.consul.kv-prefix", kvPrefix);
         
         // Apply configuration based on current test needs
         overrides.put("quarkus.consul.enabled", String.valueOf(config.consulEnabled));

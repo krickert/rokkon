@@ -5,7 +5,7 @@ import com.google.protobuf.Empty;
 import com.google.protobuf.Struct;
 import com.google.protobuf.util.JsonFormat;
 import com.rokkon.search.model.*;
-import com.rokkon.pipeline.utils.ProcessingBuffer;
+import com.rokkon.pipeline.util.ProcessingBuffer;
 import com.rokkon.search.sdk.*;
 import com.rokkon.search.sdk.RegistrationRequest;
 import com.rokkon.search.sdk.ServiceRegistrationResponse;
@@ -57,18 +57,21 @@ public class ChunkerServiceImpl implements PipeStepProcessor {
     public Uni<ServiceRegistrationResponse> getServiceRegistration(RegistrationRequest request) {
         return Uni.createFrom().item(() -> {
             try {
-                ServiceRegistrationResponse registration = ServiceRegistrationResponse.newBuilder()
-                        .setModuleName("chunker-module")
+                ServiceRegistrationResponse.Builder registrationBuilder = ServiceRegistrationResponse.newBuilder()
+                        .setModuleName("chunker")
                         .setJsonConfigSchema(ChunkerOptions.getJsonV7Schema())
-                        .build();
+                        .setHealthCheckPassed(true)  // Always pass health check for now
+                        .setHealthCheckMessage("Chunker module is healthy and ready to process documents");
 
                 LOG.info("Returned service registration for chunker module");
-                return registration;
+                return registrationBuilder.build();
 
             } catch (Exception e) {
                 LOG.error("Error getting service registration", e);
                 return ServiceRegistrationResponse.newBuilder()
-                    .setModuleName("chunker-module")
+                    .setModuleName("chunker")
+                    .setHealthCheckPassed(false)
+                    .setHealthCheckMessage("Error getting service registration: " + e.getMessage())
                     .build();
             }
         });

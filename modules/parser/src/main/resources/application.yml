@@ -5,7 +5,7 @@ quarkus:
     port: 39091
   generate-code:
     grpc:
-      scan-for-proto: com.rokkon.pipeline:rokkon-protobuf,com.google.api.grpc:proto-google-common-protos
+      scan-for-proto: com.rokkon.pipeline:protobuf,com.google.api.grpc:proto-google-common-protos
   grpc:
     server:
       port: 49091

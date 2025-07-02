@@ -4,7 +4,7 @@ import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
 import com.rokkon.pipeline.consul.test.UnifiedTestProfile;
 import com.rokkon.pipeline.validation.ValidationResultFactory;
-import com.rokkon.pipeline.utils.ObjectMapperFactory;
+import com.rokkon.pipeline.util.ObjectMapperFactory;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import io.quarkus.test.junit.QuarkusTest;
 import io.quarkus.test.junit.TestProfile;

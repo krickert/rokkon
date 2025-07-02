@@ -28,16 +28,14 @@ COPY --chown=185 build/quarkus-app/app/ /deployments/app/
 COPY --chown=185 build/quarkus-app/quarkus/ /deployments/quarkus/
 
 # Copy the CLI tool for module registration
-COPY --chown=185 build/rokkon-cli.jar /deployments/rokkon-cli.jar
+COPY --chown=185 build/docker/register-module-cli.jar /deployments/pipeline-cli.jar
 
 # Create a wrapper script for the CLI
-RUN echo '#!/bin/bash' > /usr/local/bin/rokkon && \
-    echo 'java -jar /deployments/rokkon-cli.jar "$@"' >> /usr/local/bin/rokkon && \
-    chmod +x /usr/local/bin/rokkon
+RUN echo '#!/bin/bash' > /usr/local/bin/pipeline && \
+    echo 'java -jar /deployments/pipeline-cli.jar "$@"' >> /usr/local/bin/pipeline && \
+    chmod +x /usr/local/bin/pipeline
 
-# Copy the module entrypoint script (for starting the backend module)
-COPY --chown=185 build/module-entrypoint.sh /deployments/module-entrypoint.sh
-RUN chmod +x /deployments/module-entrypoint.sh
+# Note: proxy-module uses its own proxy-entrypoint.sh
 
 # Copy the proxy entrypoint script
 COPY --chown=185 proxy-entrypoint.sh /deployments/proxy-entrypoint.sh

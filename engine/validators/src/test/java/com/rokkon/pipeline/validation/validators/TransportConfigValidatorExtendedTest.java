@@ -28,70 +28,26 @@ public class TransportConfigValidatorExtendedTest extends TransportConfigValidat
     
     @Test
     void testKafkaInputWithNoTopics() {
-        KafkaInputDefinition kafkaInput = new KafkaInputDefinition(
-            Collections.emptyList(), // No topics
-            "test-consumer-group",
-            null
-        );
-        
-        PipelineStepConfig.ProcessorInfo processorInfo = new PipelineStepConfig.ProcessorInfo(
-            "service", null
-        );
-        
-        PipelineStepConfig step = new PipelineStepConfig(
-            "processor",
-            StepType.PIPELINE,
-            "Test step",
-            null, null,
-            List.of(kafkaInput),
-            Collections.emptyMap(),
-            null, null, null, null, null,
-            processorInfo
-        );
-        
-        PipelineConfig config = new PipelineConfig(
-            "test-pipeline",
-            Map.of("step1", step)
-        );
-        
-        ValidationResult result = getValidator().validate(config);
-        assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).hasSize(1);
-        assertThat(result.errors().get(0)).contains("Must have at least one topic");
+        // KafkaInputDefinition constructor throws IllegalArgumentException for empty topics
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            new KafkaInputDefinition(
+                Collections.emptyList(), // No topics
+                "test-consumer-group",
+                null
+            );
+        });
     }
     
     @Test
     void testKafkaInputWithBlankTopic() {
-        KafkaInputDefinition kafkaInput = new KafkaInputDefinition(
-            List.of(""), // Blank topic
-            "test-consumer-group",
-            null
-        );
-        
-        PipelineStepConfig.ProcessorInfo processorInfo = new PipelineStepConfig.ProcessorInfo(
-            "service", null
-        );
-        
-        PipelineStepConfig step = new PipelineStepConfig(
-            "processor",
-            StepType.PIPELINE,
-            "Test step",
-            null, null,
-            List.of(kafkaInput),
-            Collections.emptyMap(),
-            null, null, null, null, null,
-            processorInfo
-        );
-        
-        PipelineConfig config = new PipelineConfig(
-            "test-pipeline",
-            Map.of("step1", step)
-        );
-        
-        ValidationResult result = getValidator().validate(config);
-        assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).hasSize(1);
-        assertThat(result.errors().get(0)).contains("Topic name cannot be null or blank");
+        // KafkaInputDefinition constructor throws IllegalArgumentException for blank topics
+        org.junit.jupiter.api.Assertions.assertThrows(IllegalArgumentException.class, () -> {
+            new KafkaInputDefinition(
+                List.of(""), // Blank topic
+                "test-consumer-group",
+                null
+            );
+        });
     }
     
     @Test
@@ -184,19 +140,23 @@ public class TransportConfigValidatorExtendedTest extends TransportConfigValidat
     
     @Test
     void testKafkaTransportWithNegativeBatchSize() {
+        // Note: KafkaTransportConfig normalizes negative batch size to default (16384)
         KafkaTransportConfig kafkaTransport = new KafkaTransportConfig(
             "output-topic",
             null,
             null,
-            -1, // Negative batch size
+            -1, // Negative batch size gets normalized to 16384
             null,
             null
         );
         
+        // Verify that negative batch size is normalized
+        assertThat(kafkaTransport.batchSize()).isEqualTo(16384);
+        
         PipelineStepConfig.OutputTarget output = new PipelineStepConfig.OutputTarget(
             "next-step",
             TransportType.KAFKA,
-            null,
+            null, // grpcTransport
             kafkaTransport
         );
         
@@ -221,21 +181,25 @@ public class TransportConfigValidatorExtendedTest extends TransportConfigValidat
         );
         
         ValidationResult result = getValidator().validate(config);
-        assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).hasSize(1);
-        assertThat(result.errors().get(0)).contains("Batch size must be at least 1");
+        // Should be valid since batch size is normalized to 16384
+        assertThat(result.valid()).isTrue();
+        assertThat(result.errors()).isEmpty();
     }
     
     @Test
     void testKafkaTransportWithNegativeLingerMs() {
+        // Note: KafkaTransportConfig normalizes negative linger ms to default (10)
         KafkaTransportConfig kafkaTransport = new KafkaTransportConfig(
             "output-topic",
             null,
             null,
             null,
-            -5, // Negative linger ms
+            -5, // Negative linger ms gets normalized to 10
             null
         );
+        
+        // Verify that negative linger ms is normalized
+        assertThat(kafkaTransport.lingerMs()).isEqualTo(10);
         
         PipelineStepConfig.OutputTarget output = new PipelineStepConfig.OutputTarget(
             "next-step",
@@ -265,9 +229,9 @@ public class TransportConfigValidatorExtendedTest extends TransportConfigValidat
         );
         
         ValidationResult result = getValidator().validate(config);
-        assertThat(result.valid()).isFalse();
-        assertThat(result.errors()).hasSize(1);
-        assertThat(result.errors().get(0)).contains("Linger ms cannot be negative");
+        // Should be valid since linger ms is normalized to 10
+        assertThat(result.valid()).isTrue();
+        assertThat(result.errors()).isEmpty();
     }
     
     @Test

@@ -4,25 +4,14 @@ plugins {
     `maven-publish`
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 dependencies {
-    // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
+    // Module BOM provides all standard module dependencies
+    implementation(platform(project(":bom:module")))
 
-    // Core dependencies (arc, grpc, protobuf, commons) come from BOM
-
-    // Additional Quarkus extensions needed by this module
-    implementation("io.quarkus:quarkus-rest-jackson")
-    implementation("io.quarkus:quarkus-container-image-docker")
-    implementation("io.quarkus:quarkus-smallrye-health")
-    implementation("io.quarkus:quarkus-smallrye-openapi")
-    implementation("io.quarkus:quarkus-micrometer")
-    implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
-    implementation("io.quarkus:quarkus-opentelemetry")
+    // Module-specific dependencies only
+    implementation("io.quarkus:quarkus-opentelemetry") // Not in module BOM by default
 
     // Security extensions
     implementation("io.quarkus:quarkus-security")
@@ -39,11 +28,11 @@ dependencies {
     testImplementation("io.grpc:grpc-services") // Version from BOM
     testImplementation("org.testcontainers:testcontainers") // Version from BOM
     testImplementation("org.testcontainers:junit-jupiter") // Version from BOM
-    testImplementation(project(":test-utilities"))
+    testImplementation(project(":testing:util"))
 
     // Mockito for mocking in tests
-    testImplementation("org.mockito:mockito-core:5.3.1")
-    testImplementation("org.mockito:mockito-junit-jupiter:5.3.1")
+    testImplementation("org.mockito:mockito-core")
+    testImplementation("org.mockito:mockito-junit-jupiter")
     testImplementation("io.quarkus:quarkus-junit5-mockito")
 }
 
@@ -74,38 +63,30 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
-// Copy module entrypoint script and CLI jar for Docker build
-tasks.register<Copy>("copyModuleEntrypoint") {
-    from(rootProject.file("scripts/module-entrypoint.sh"))
-    into(layout.buildDirectory)
-    rename { "module-entrypoint.sh" }
-}
-
-tasks.register<Copy>("copyRokkonCli") {
-    dependsOn(":engine:cli-register:quarkusBuild")
-    from(project(":engine:cli-register").file("build/quarkus-app/quarkus-run.jar"))
-    into(layout.buildDirectory)
-    rename { "rokkon-cli.jar" }
-}
-
-// Create a task that runs after all Quarkus tasks are complete
-tasks.register("postQuarkusTasks") {
-    // This task will run after quarkusBuild is complete, but is not part of the dependency chain
-    // This breaks the circular dependency
-    doLast {
-        // This task does nothing itself, but serves as a hook for other tasks
-        println("Running post-Quarkus tasks")
+// Configuration to consume the CLI jar from cli-register-module
+val cliJar by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "cli-jar"))
     }
 }
 
-// Make sure postQuarkusTasks runs after quarkusBuild
-tasks.named("quarkusBuild") {
-    finalizedBy("postQuarkusTasks")
+dependencies {
+    cliJar(project(":cli:register-module", "cliJar"))
 }
 
-// Make copyModuleEntrypoint and copyRokkonCli run after postQuarkusTasks
-tasks.named("postQuarkusTasks") {
-    finalizedBy("copyModuleEntrypoint", "copyRokkonCli")
+// Copy CLI jar for Docker build
+tasks.register<Copy>("copyDockerAssets") {
+    from(cliJar) {
+        rename { "register-module-cli.jar" }
+    }
+    into(layout.buildDirectory.dir("docker"))
+}
+
+// Hook the copy task before Docker build
+tasks.named("quarkusBuild") {
+    dependsOn("copyDockerAssets")
 }
 
 publishing {

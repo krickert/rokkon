@@ -91,12 +91,12 @@ COPY --chown=185 build/quarkus-app/app/ /deployments/app/
 COPY --chown=185 build/quarkus-app/quarkus/ /deployments/quarkus/
 
 # Copy the CLI tool
-COPY --chown=185 rokkon-cli.jar /deployments/rokkon-cli.jar
+COPY --chown=185 pipeline-cli.jar /deployments/pipeline-cli.jar
 
 # Create a wrapper script for the CLI in the deployments directory
-RUN echo '#!/bin/bash' > /deployments/rokkon && \
-    echo 'java -jar /deployments/rokkon-cli.jar "$@"' >> /deployments/rokkon && \
-    chmod +x /deployments/rokkon
+RUN echo '#!/bin/bash' > /deployments/pipeline && \
+    echo 'java -jar /deployments/pipeline-cli.jar "$@"' >> /deployments/pipeline && \
+    chmod +x /deployments/pipeline
 
 # Set PATH to include the deployments directory
 ENV PATH="/deployments:${PATH}"
@@ -105,8 +105,8 @@ ENV PATH="/deployments:${PATH}"
 COPY --chown=185 module-entrypoint.sh /deployments/module-entrypoint.sh
 RUN chmod +x /deployments/module-entrypoint.sh
 
-EXPOSE 8080
-EXPOSE 9090
+EXPOSE 39095
+EXPOSE 49095
 USER 185
 ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"

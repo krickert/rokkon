@@ -1,7 +1,7 @@
 package com.rokkon.echo;
 
 import com.rokkon.search.model.PipeStream;
-import com.rokkon.search.utils.SampleDataLoader;
+import com.rokkon.search.util.SampleDataLoader;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;

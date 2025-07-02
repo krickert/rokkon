@@ -1,14 +1,14 @@
-# Rokkon Engine: Monitoring and Operations Logging
+# Pipeline Engine: Monitoring and Operations Logging
 
-Effective monitoring and comprehensive logging are essential for understanding the behavior of the Rokkon Engine and its pipelines, troubleshooting issues, and ensuring operational stability. The strategy involves leveraging Quarkus's built-in capabilities, integrating with standard monitoring tools like Prometheus and Grafana, and implementing advanced logging practices.
+Effective monitoring and comprehensive logging are essential for understanding the behavior of the Pipeline Engine and its pipelines, troubleshooting issues, and ensuring operational stability. The strategy involves leveraging Quarkus's built-in capabilities, integrating with standard monitoring tools like Prometheus and Grafana, and implementing advanced logging practices.
 
 ## Monitoring Strategy
 
-The monitoring approach focuses on collecting metrics from various components of the Rokkon ecosystem and visualizing them through dashboards.
+The monitoring approach focuses on collecting metrics from various components of the Pipeline ecosystem and visualizing them through dashboards.
 
 ### 1. Prometheus for Metrics Collection
 
-*   **Quarkus Micrometer Extension:** Quarkus applications (Rokkon Engine, Java-based modules) will use the Micrometer extension (`quarkus-micrometer-registry-prometheus`). Micrometer provides a vendor-neutral application metrics facade.
+*   **Quarkus Micrometer Extension:** Quarkus applications (Pipeline Engine, Java-based modules) will use the Micrometer extension (`quarkus-micrometer-registry-prometheus`). Micrometer provides a vendor-neutral application metrics facade.
     *   This extension automatically exposes a `/q/metrics` endpoint that Prometheus can scrape.
     *   It provides various built-in metrics:
         *   JVM metrics (memory, CPU, threads, GC).
@@ -16,7 +16,7 @@ The monitoring approach focuses on collecting metrics from various components of
         *   gRPC client/server metrics.
         *   Kafka consumer/producer metrics.
         *   CDI bean metrics.
-*   **Custom Application Metrics:** Rokkon Engine and modules will define custom Micrometer metrics to track business-specific information:
+*   **Custom Application Metrics:** Pipeline Engine and modules will define custom Micrometer metrics to track business-specific information:
     *   `pipedocs_processed_total{pipeline_id, step_id, status}`: Counter for processed PipeDocs.
     *   `pipedoc_processing_time_seconds{pipeline_id, step_id}`: Histogram/Timer for processing duration.
     *   `pipeline_errors_total{pipeline_id, step_id, error_type}`: Counter for errors.
@@ -24,17 +24,17 @@ The monitoring approach focuses on collecting metrics from various components of
     *   `module_instance_active_count{module_type}`: Gauge for active module instances.
     *   `consul_kv_watch_events_total{key_path}`: Counter for Consul configuration change events.
 *   **Prometheus Server:** A Prometheus server will be deployed to scrape these `/q/metrics` endpoints from:
-    *   Rokkon Engine instances.
+    *   Pipeline Engine instances.
     *   Individual pipeline module instances (if they expose Prometheus metrics, which is straightforward for Quarkus-based modules).
     *   Consul (Consul itself exposes metrics in Prometheus format).
     *   Kafka (Kafka brokers and ZooKeeper can be configured to expose JMX metrics, which can be exported to Prometheus via JMX Exporter).
-*   **Service Discovery for Scraping:** Prometheus can be configured to use Consul for service discovery to find and scrape metrics from dynamically scaled Rokkon Engine and module instances.
+*   **Service Discovery for Scraping:** Prometheus can be configured to use Consul for service discovery to find and scrape metrics from dynamically scaled Pipeline Engine and module instances.
 
 ### 2. Grafana for Visualization and Dashboards
 
 *   Grafana will be used as the visualization layer, with Prometheus as its primary data source.
 *   **Dashboards:** Custom Grafana dashboards will be created to provide insights into:
-    *   **Engine Overview:** Health, resource usage, overall throughput, error rates of the Rokkon Engine instances.
+    *   **Engine Overview:** Health, resource usage, overall throughput, error rates of the Pipeline Engine instances.
     *   **Pipeline Performance:** End-to-end latency, throughput, error rates per pipeline. Drill-downs into individual step performance.
     *   **Module Health & Performance:** Resource usage (CPU, memory), processing rates, error rates per module type and instance.
     *   **Kafka Monitoring:** Broker health, topic message rates, consumer lag, partition distribution.
@@ -44,7 +44,7 @@ The monitoring approach focuses on collecting metrics from various components of
 ```mermaid
 graph TD
     subgraph "Metrics Sources"
-        RokkonEngine["Rokkon Engine Instances <br> (/q/metrics)"]
+        PipelineEngine["Pipeline Engine Instances <br> (/q/metrics)"]
         Module1["Module 1 Instances <br> (/q/metrics or other format)"]
         ModuleN["Module N Instances <br> (/q/metrics or other format)"]
         ConsulServer["Consul Servers <br> (/v1/agent/metrics)"]
@@ -52,7 +52,7 @@ graph TD
     end
 
     subgraph "Monitoring Stack"
-        Prometheus[Prometheus Server] -- Scrapes --> RokkonEngine
+        Prometheus[Prometheus Server] -- Scrapes --> PipelineEngine
         Prometheus -- Scrapes --> Module1
         Prometheus -- Scrapes --> ModuleN
         Prometheus -- Scrapes --> ConsulServer
@@ -73,7 +73,7 @@ graph TD
     classDef stack fill:#lightgreen,stroke:#333,stroke-width:2px;
     classDef user fill:#lightcoral,stroke:#333,stroke-width:2px;
 
-    class RokkonEngine,Module1,ModuleN,ConsulServer,KafkaCluster source;
+    class PipelineEngine,Module1,ModuleN,ConsulServer,KafkaCluster source;
     class Prometheus,Grafana stack;
     class Operator user;
 ```
@@ -86,7 +86,7 @@ graph TD
     *   Significant Kafka consumer lag.
     *   Low disk space on Kafka brokers.
     *   Unhealthy module instances detected by Consul.
-    *   Rokkon Engine instance down.
+    *   Pipeline Engine instance down.
     *   High resource utilization (CPU, memory).
 *   Alerts can be routed to various notification channels (Email, Slack, PagerDuty, etc.).
 
@@ -100,16 +100,16 @@ Comprehensive and structured logging is crucial for debugging and auditing.
     *   Key information to include in log entries:
         *   Timestamp
         *   Log level (INFO, WARN, ERROR, DEBUG)
-        *   Service name (e.g., `rokkon-engine`, `parser-module`)
+        *   Service name (e.g., `pipeline-engine`, `parser-module`)
         *   Instance ID / Hostname
         *   Thread name
         *   **Correlation ID (`trace_id`, `span_id`):** Essential for tracing a request or `PipeDoc` as it flows through multiple services/steps.
-        *   `pipeline_id`, `step_id`, `document_id`: Contextual information for Rokkon.
+        *   `pipeline_id`, `step_id`, `document_id`: Contextual information for Pipeline.
         *   Message
         *   Stack trace (for errors)
 
 2.  **Log Collection and Aggregation:**
-    *   Logs from all Rokkon Engine instances, module instances, Consul, and Kafka will be collected and aggregated into a centralized log management system.
+    *   Logs from all Pipeline Engine instances, module instances, Consul, and Kafka will be collected and aggregated into a centralized log management system.
     *   Common choices:
         *   **ELK Stack (Elasticsearch, Logstash, Kibana):** Elasticsearch for storage and search, Logstash for parsing and enrichment (or Fluentd/Fluent Bit for collection), Kibana for visualization and querying.
         *   **Loki with Grafana:** Grafana Loki is a horizontally scalable, highly available, multi-tenant log aggregation system, designed to be cost-effective and easy to operate. It integrates well with Prometheus and Grafana.
@@ -124,7 +124,7 @@ Comprehensive and structured logging is crucial for debugging and auditing.
 ```mermaid
 graph LR
     subgraph "Log Sources (Containers/Services)"
-        RokkonEngineLogs[Rokkon Engine Instances]
+        PipelineEngineLogs[Pipeline Engine Instances]
         Module1Logs[Module 1 Instances]
         ModuleNLogs[Module N Instances]
         ConsulLogs[Consul Servers]
@@ -132,7 +132,7 @@ graph LR
     end
 
     subgraph "Log Collection & Processing"
-        LogCollector["Log Collector <br> (e.g., Fluentd, Fluent Bit, Promtail)"] -- "Collects From" --> RokkonEngineLogs
+        LogCollector["Log Collector <br> (e.g., Fluentd, Fluent Bit, Promtail)"] -- "Collects From" --> PipelineEngineLogs
         LogCollector -- "Collects From" --> Module1Logs
         LogCollector -- "Collects From" --> ModuleNLogs
         LogCollector -- "Collects From" --> ConsulLogs
@@ -151,7 +151,7 @@ graph LR
     classDef collection fill:#lightgreen,stroke:#333,stroke-width:2px;
     classDef access fill:#lightcoral,stroke:#333,stroke-width:2px;
 
-    class RokkonEngineLogs,Module1Logs,ModuleNLogs,ConsulLogs,KafkaLogs source;
+    class PipelineEngineLogs,Module1Logs,ModuleNLogs,ConsulLogs,KafkaLogs source;
     class LogCollector,LogStorage collection;
     class LogQueryUI,Operator access;
 ```
@@ -178,4 +178,4 @@ While the current focus is on building the core engine, the architecture is desi
 
 *(Refer to `Planned_integrations.md` for a detailed list of planned connectors, pipeline steps, and sinks.)*
 
-By implementing a robust monitoring and logging strategy using tools like Prometheus, Grafana, and a centralized logging solution, operators will have the necessary visibility to manage the Rokkon Engine effectively, diagnose problems quickly, and ensure the reliability and performance of data pipelines.
+By implementing a robust monitoring and logging strategy using tools like Prometheus, Grafana, and a centralized logging solution, operators will have the necessary visibility to manage the Pipeline Engine effectively, diagnose problems quickly, and ensure the reliability and performance of data pipelines.

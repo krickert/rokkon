@@ -1,10 +1,10 @@
-# Rokkon Engine: Initialization and Startup
+# Pipeline Engine: Initialization and Startup
 
-The Rokkon Engine is designed to be deployable in various environments, including Docker containers, standalone Java applications, and Kubernetes clusters. Its initialization process involves several key stages, focusing on configuration loading, service discovery integration, and preparing for pipeline orchestration.
+The Pipeline Engine is designed to be deployable in various environments, including Docker containers, standalone Java applications, and Kubernetes clusters. Its initialization process involves several key stages, focusing on configuration loading, service discovery integration, and preparing for pipeline orchestration.
 
 ## Application Startup Sequence
 
-The general startup sequence for the Rokkon Engine (typically a Quarkus application) is as follows:
+The general startup sequence for the Pipeline Engine (typically a Quarkus application) is as follows:
 
 1.  **JVM Initialization:** The Java Virtual Machine starts.
 2.  **Quarkus Bootstrap:**
@@ -13,7 +13,7 @@ The general startup sequence for the Rokkon Engine (typically a Quarkus applicat
 3.  **Configuration Loading (Multi-Source):**
     *   **`application.yml` (or `.properties`):** Base static configuration is loaded from the packaged application resources. This includes default ports, basic settings, and pointers to external configuration sources.
     *   **Environment Variables:** Environment variables can override settings from `application.yml`. This is common for deployment-specific parameters like database URLs, Consul host/port, etc.
-    *   **Consul Configuration (`quarkus-consul-config`):** If enabled, Quarkus connects to the Consul KV store at the configured path (e.g., `rokkon/<cluster_name>/config`) and loads application-level configuration. This allows dynamic configuration of the engine itself.
+    *   **Consul Configuration (`quarkus-consul-config`):** If enabled, Quarkus connects to the Consul KV store at the configured path (e.g., `pipeline/<cluster_name>/config`) and loads application-level configuration. This allows dynamic configuration of the engine itself.
         *   The engine might also load specific configurations it's responsible for managing, like whitelists or global settings, from other Consul paths.
 4.  **Dependency Injection (CDI):** Quarkus initializes its CDI container, instantiating and injecting beans (services, resources, etc.). This includes:
     *   Core engine services (pipeline manager, execution engine).
@@ -22,7 +22,7 @@ The general startup sequence for the Rokkon Engine (typically a Quarkus applicat
     *   Clients for external services (e.g., Consul client for service discovery via Stork, Kafka clients).
 5.  **Service Discovery Initialization (Stork):**
     *   Stork, integrated with Quarkus, initializes its service discovery providers (e.g., Consul). It starts polling Consul for available instances of module services that the engine might need to communicate with.
-6.  **gRPC Server Start:** The gRPC server embedded within the Rokkon Engine starts, listening on the configured port (e.g., `49000`) for incoming requests from modules or administrative tools.
+6.  **gRPC Server Start:** The gRPC server embedded within the Pipeline Engine starts, listening on the configured port (e.g., `49000`) for incoming requests from modules or administrative tools.
 7.  **HTTP Server Start:** The HTTP server (e.g., Vert.x based, part of Quarkus) starts, listening on its configured port (e.g., `38090`) for REST API calls and serving any web UI components.
 8.  **Engine Seeding Process (Initial Configuration Setup):**
     *   This is a critical step, especially for new deployments or when bootstrapping a cluster. The engine might trigger or rely on an external `seed-config` utility.
@@ -41,7 +41,7 @@ sequenceDiagram
     participant Quarkus as Quarkus Runtime
     participant Consul as Consul Server
     participant Kafka as Kafka Cluster (Optional)
-    participant Engine as Rokkon Engine Logic
+    participant Engine as Pipeline Engine Logic
 
     OS ->> JVM: Start Java Process
     JVM ->> Quarkus: Initialize Quarkus
@@ -74,7 +74,7 @@ sequenceDiagram
 ## Deployment Environments
 
 *   **Docker Environment:**
-    *   The Rokkon Engine is packaged as a Docker image containing the Quarkus application JAR and necessary dependencies.
+    *   The Pipeline Engine is packaged as a Docker image containing the Quarkus application JAR and necessary dependencies.
     *   `Dockerfile.jvm` (or native) defines how the image is built.
     *   Configuration is typically managed via:
         *   Environment variables passed to the Docker container (`docker run -e CONSUL_HOST=...`).
@@ -83,7 +83,7 @@ sequenceDiagram
     *   Networking is configured to allow the engine to reach Consul, Kafka, and subsequently, the pipeline modules (which might also be Docker containers).
 
 *   **Standalone Execution:**
-    *   The engine can be run as a standard Java application: `java -jar rokkon-engine-quarkus-run.jar`.
+    *   The engine can be run as a standard Java application: `java -jar pipeline-engine-quarkus-run.jar`.
     *   Configuration can be provided via:
         *   A local `application.yml` or `application.properties` file.
         *   Command-line arguments (`-Dquarkus.http.port=8081`).
@@ -92,7 +92,7 @@ sequenceDiagram
     *   This mode is often used for local development or smaller deployments where container orchestration is not required.
 
 *   **Kubernetes (on any cloud):**
-    *   The Docker image of the Rokkon Engine is deployed as a Kubernetes `Deployment` or `StatefulSet`.
+    *   The Docker image of the Pipeline Engine is deployed as a Kubernetes `Deployment` or `StatefulSet`.
     *   A Kubernetes `Service` exposes the engine's gRPC and HTTP ports.
     *   Configuration is managed using:
         *   Kubernetes `ConfigMaps` and `Secrets`, often mounted as files or environment variables. These can provide bootstrap configuration, including Consul addresses.
@@ -102,7 +102,7 @@ sequenceDiagram
 
 ## Engine Seeding Process and Consul Configuration
 
-The "seeding" process ensures that Consul has the necessary foundational configuration for the Rokkon Engine to operate, especially when a new cluster or environment is set up. This is often handled by the `engine/seed-config` utility.
+The "seeding" process ensures that Consul has the necessary foundational configuration for the Pipeline Engine to operate, especially when a new cluster or environment is set up. This is often handled by the `engine/seed-config` utility.
 
 1.  **Purpose of Seeding:**
     *   To initialize default `PipelineClusterConfig` for one or more clusters.
@@ -119,7 +119,7 @@ The "seeding" process ensures that Consul has the necessary foundational configu
 3.  **How Config is Stored in Consul:**
     *   Configurations are stored as values (JSON, YAML, or properties format) under specific keys in the Consul KV store.
     *   **Example Structure:**
-        *   `rokkon/` (root path for all Rokkon configurations)
+        *   `pipeline/` (root path for all Pipeline configurations)
             *   `default_cluster/` (a specific pipeline cluster)
                 *   `cluster-config` (JSON/properties: `PipelineClusterConfig` for `default_cluster`)
                 *   `pipelines/`
@@ -145,8 +145,8 @@ graph TD
     end
 
     subgraph "Engine Runtime"
-        RokkonEngine[Rokkon Engine] -- Reads Config --> ConsulKV
-        RokkonEngine -- Watches for Changes --> ConsulKV
+        PipelineEngine[Pipeline Engine] -- Reads Config --> ConsulKV
+        PipelineEngine -- Watches for Changes --> ConsulKV
     end
 
     User/Operator -- Executes --> SeedConfigUtil
@@ -157,12 +157,12 @@ graph TD
 
     class SeedConfigUtil util;
     class SeedDataSource,ConsulKV store;
-    class RokkonEngine runtime;
+    class PipelineEngine runtime;
 ```
 
 ## Potential for Quarkus Security Features
 
-Quarkus offers robust built-in security features that can be integrated into the Rokkon Engine to enhance its security posture.
+Quarkus offers robust built-in security features that can be integrated into the Pipeline Engine to enhance its security posture.
 
 1.  **Authentication:**
     *   **Okta/OAuth2/OIDC:** Quarkus has excellent support for OpenID Connect, which can be used to secure REST APIs and potentially even gRPC services (e.g., by passing tokens in metadata). This would allow integration with identity providers like Okta, Keycloak, etc., for user authentication (e.g., for accessing the admin UI or control APIs).
@@ -228,6 +228,6 @@ public class PipelineResource {
     *   Quarkus Guides on Consul Config, gRPC, REST, Security (OIDC, RBAC), Stork.
     *   Quarkus deployment guides for Docker and Kubernetes.
 *   **Consul Documentation:** For understanding KV store interaction and service discovery mechanisms.
-*   **`DEVELOPER_NOTES/engine/seed-config/INSTRUCTIONS.md`:** For specifics on the seeding utility.
+*   **`DEVELOPER_NOTES/engine/seed-config/README.md`:** For specifics on the seeding utility.
 
-By combining Quarkus's robust application framework with Consul's service discovery and configuration management capabilities, the Rokkon Engine can achieve a flexible and reliable initialization process across diverse deployment environments, with strong potential for integrating advanced security features.
+By combining Quarkus's robust application framework with Consul's service discovery and configuration management capabilities, the Pipeline Engine can achieve a flexible and reliable initialization process across diverse deployment environments, with strong potential for integrating advanced security features.

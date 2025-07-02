@@ -1,0 +1,82 @@
+package com.rokkon.integration;
+
+import io.quarkus.test.junit.QuarkusTest;
+import org.junit.jupiter.api.Test;
+import org.testcontainers.consul.ConsulContainer;
+import org.testcontainers.containers.GenericContainer;
+import org.testcontainers.containers.Network;
+import org.testcontainers.utility.DockerImageName;
+
+import java.time.Duration;
+import java.util.concurrent.TimeUnit;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Debug test to understand Consul networking issues.
+ */
+@QuarkusTest 
+public class ConsulDebugTest {
+    
+    @Test
+    public void testConsulNetworking() throws Exception {
+        Network network = Network.newNetwork();
+        
+        // Start Consul server in dev mode
+        ConsulContainer consulServer = new ConsulContainer(DockerImageName.parse("hashicorp/consul:latest"))
+                .withNetwork(network)
+                .withNetworkAliases("consul-server")
+                .withCommand("agent", "-dev", "-server", "-bootstrap",
+                           "-bind=0.0.0.0",
+                           "-client=0.0.0.0", "-ui",
+                           "-datacenter=dc1", "-node=consul-server");
+        
+        consulServer.start();
+        
+        System.out.println("=== Consul Server Started ===");
+        System.out.println("Container ID: " + consulServer.getContainerId());
+        System.out.println("Network: " + network.getId());
+        System.out.println("HTTP Port: " + consulServer.getMappedPort(8500));
+        
+        // Wait for leader
+        Thread.sleep(3000);
+        
+        // Start a Consul agent
+        GenericContainer<?> consulAgent = new GenericContainer<>(DockerImageName.parse("hashicorp/consul:latest"))
+                .withNetwork(network)
+                .withNetworkAliases("consul-agent")
+                .withCommand("agent", 
+                           "-retry-join=consul-server",
+                           "-bind=0.0.0.0",
+                           "-client=0.0.0.0",
+                           "-datacenter=dc1",
+                           "-node=test-agent")
+                .withStartupTimeout(Duration.ofSeconds(30))
+                .withLogConsumer(frame -> System.out.print("[AGENT] " + frame.getUtf8String()));
+        
+        consulAgent.start();
+        
+        System.out.println("=== Consul Agent Started ===");
+        
+        // Give it time to join
+        Thread.sleep(5000);
+        
+        // Check cluster members via HTTP API
+        java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+        java.net.http.HttpRequest request = java.net.http.HttpRequest.newBuilder()
+                .uri(java.net.URI.create("http://localhost:" + consulServer.getMappedPort(8500) + "/v1/agent/members"))
+                .build();
+        java.net.http.HttpResponse<String> response = client.send(request, java.net.http.HttpResponse.BodyHandlers.ofString());
+        
+        System.out.println("Cluster members: " + response.body());
+        
+        // Should have 2 members
+        assertThat(response.body()).contains("consul-server");
+        assertThat(response.body()).contains("test-agent");
+        
+        // Cleanup
+        consulAgent.stop();
+        consulServer.stop();
+        network.close();
+    }
+}

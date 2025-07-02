@@ -3,7 +3,7 @@ package com.rokkon.parser;
 import com.google.protobuf.Struct;
 import com.google.protobuf.Value;
 import com.rokkon.search.model.*;
-import com.rokkon.pipeline.utils.ProcessingBuffer;
+import com.rokkon.pipeline.util.ProcessingBuffer;
 import com.rokkon.search.sdk.*;
 import com.rokkon.parser.util.DocumentParser;
 import io.quarkus.grpc.GrpcService;
@@ -126,7 +126,7 @@ public class ParserServiceImpl implements PipeStepProcessor {
         LOG.debug("Parser service registration requested");
 
         ServiceRegistrationResponse.Builder responseBuilder = ServiceRegistrationResponse.newBuilder()
-                .setModuleName("parser-module");
+                .setModuleName("parser");
 
         try {
             // Load the JSON schema from resources

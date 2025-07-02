@@ -17,13 +17,13 @@ public class NoConsulTestProfile implements QuarkusTestProfile {
             "quarkus.consul.enabled", "false",
             
             // Set a default cluster name for tests
-            "rokkon.cluster.name", "unit-test-cluster",
+            "pipeline.cluster.name", "unit-test-cluster",
             
             // Disable health checks that might connect to Consul
             "quarkus.health.extensions.enabled", "false",
             
             // Use test KV prefix for isolation
-            "rokkon.consul.kv-prefix", "test",
+            "pipeline.consul.kv-prefix", "test",
             
             // Configure test validators
             "test.validators.mode", "empty",

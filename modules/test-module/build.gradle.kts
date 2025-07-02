@@ -4,25 +4,14 @@ plugins {
     `maven-publish`
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 dependencies {
-    // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
+    // Module BOM provides all standard module dependencies
+    implementation(platform(project(":bom:module")))
 
-    // Core dependencies (arc, grpc, protobuf, commons) come from BOM
-
-    // Additional Quarkus extensions needed by this module
-    implementation("io.quarkus:quarkus-rest-jackson")
-    implementation("io.quarkus:quarkus-container-image-docker")
-    implementation("io.quarkus:quarkus-smallrye-health")
-    implementation("io.quarkus:quarkus-smallrye-openapi")
-    implementation("io.quarkus:quarkus-micrometer")
-    implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
-    implementation("io.quarkus:quarkus-opentelemetry")
+    // Module-specific dependencies only
+    // OpenTelemetry is now in the module BOM
 
     // Testing dependencies
     testImplementation("io.quarkus:quarkus-junit5")
@@ -31,7 +20,8 @@ dependencies {
     testImplementation("io.grpc:grpc-services") // Version from BOM
     testImplementation("org.testcontainers:testcontainers") // Version from BOM
     testImplementation("org.testcontainers:junit-jupiter") // Version from BOM
-    testImplementation(project(":test-utilities"))
+    testImplementation(project(":testing:util"))
+    testImplementation(project(":testing:server-util"))
 }
 
 group = "com.rokkon.pipeline"
@@ -48,10 +38,6 @@ quarkus {
     }
 }
 
-// Exclude integration tests from regular test task (like reference implementation)
-tasks.test {
-    exclude("**/*IT.class")
-}
 
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
@@ -64,26 +50,29 @@ tasks.withType<JavaCompile> {
 // Standard processResources configuration
 // If we need project properties in the future, we can add them as standard application properties
 
+// Configuration to consume the CLI jar from cli-register-module
+val cliJar by configurations.creating {
+    isCanBeConsumed = false
+    isCanBeResolved = true
+    attributes {
+        attribute(Usage.USAGE_ATTRIBUTE, objects.named(Usage::class, "cli-jar"))
+    }
+}
+
+dependencies {
+    cliJar(project(":cli:register-module", "cliJar"))
+}
+
 // Copy CLI jar for Docker build
 tasks.register<Copy>("copyDockerAssets") {
-    dependsOn(":engine:cli-register:quarkusBuild")
-    from(project(":engine:cli-register").file("build/quarkus-app/quarkus-run.jar")) {
-        rename { "rokkon-cli.jar" }
+    from(cliJar) {
+        rename { "pipeline-cli.jar" }
     }
     into(layout.buildDirectory.dir("docker"))
 }
 
 // Hook the copy task before Docker build
 tasks.named("quarkusBuild") {
-    dependsOn("copyDockerAssets")
-}
-
-// Fix task dependencies
-tasks.named("quarkusGenerateCode") {
-    dependsOn("copyDockerAssets")
-}
-
-tasks.named("processResources") {
     dependsOn("copyDockerAssets")
 }
 

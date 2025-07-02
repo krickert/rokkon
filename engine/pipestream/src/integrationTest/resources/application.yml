@@ -1,0 +1,18 @@
+quarkus:
+  application:
+    name: rokkon-engine-test
+  http:
+    port: 0  # Use random port for tests
+  grpc:
+    server:
+      port: 0  # Use random port for tests
+  consul-config:
+    enabled: false  # Disable consul config for integration tests
+  consul:
+    devservices:
+      enabled: false  # Disable dev services, we use testcontainers
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG

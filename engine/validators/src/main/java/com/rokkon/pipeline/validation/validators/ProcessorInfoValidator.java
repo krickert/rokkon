@@ -4,12 +4,14 @@ import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.model.PipelineStepConfig;
 import com.rokkon.pipeline.validation.PipelineConfigValidator;
 import com.rokkon.pipeline.validation.PipelineConfigValidatable;
+import com.rokkon.pipeline.validation.ValidationMode;
 import com.rokkon.pipeline.validation.ValidationResult;
 import com.rokkon.pipeline.validation.ValidationResultFactory;
 import jakarta.enterprise.context.ApplicationScoped;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Validates processor information configuration for pipeline steps.
@@ -105,5 +107,11 @@ public class ProcessorInfoValidator implements PipelineConfigValidator {
     @Override
     public String getValidatorName() {
         return "ProcessorInfoValidator";
+    }
+    
+    @Override
+    public Set<ValidationMode> supportedModes() {
+        // Only run in PRODUCTION mode - design and testing modes may have incomplete processor info
+        return Set.of(ValidationMode.PRODUCTION);
     }
 }

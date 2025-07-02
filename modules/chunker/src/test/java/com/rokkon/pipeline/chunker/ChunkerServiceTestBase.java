@@ -260,7 +260,7 @@ public abstract class ChunkerServiceTestBase {
                 .awaitItem()
                 .getItem();
 
-        assertThat(registration.getModuleName()).isEqualTo("chunker-module");
+        assertThat(registration.getModuleName()).isEqualTo("chunker");
         // Verify that the JSON schema is provided
         assertThat(registration.hasJsonConfigSchema()).isTrue();
         assertThat(registration.getJsonConfigSchema()).contains("ChunkerOptions");

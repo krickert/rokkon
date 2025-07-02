@@ -6,6 +6,7 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Default;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -29,7 +30,7 @@ public class PipelineValidatorProducer {
     
     @Produces
     @Composite
-    @Default
+    @Named("compositePipelineValidator")
     @ApplicationScoped
     public PipelineConfigValidator producePipelineConfigValidator() {
         List<ConfigValidator<PipelineConfigValidatable>> validatorList = new ArrayList<>();

@@ -1,0 +1,170 @@
+# docker/compose/docker-compose.parser-module.yml
+# Working configuration for parser module with sidecar pattern
+# Parser module will be accessible at:
+# - HTTP: http://localhost:39093
+# - gRPC: localhost:49093
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. CONSUL SERVER - Central Service Discovery
+  # ==========================================
+  consul-server:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-server
+    ports:
+      - "8500:8500"      # HTTP API & UI
+      - "8600:8600/tcp"  # DNS
+      - "8600:8600/udp"  # DNS
+    volumes:
+      - consul_data:/consul/data
+    command: >
+      agent -server -ui 
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -bootstrap-expect=1 
+      -dev
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    healthcheck:
+      test: ["CMD", "consul", "info"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - pipeline-network
+
+  # ==========================================
+  # 2. CONFIGURATION SEEDER - One-time Job
+  # ==========================================
+  seeder:
+    build:
+      context: ../../cli/seed-engine-consul-config
+      dockerfile: Dockerfile
+    container_name: consul-seeder
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        java -jar build/quarkus-app/quarkus-run.jar -h consul-server -p 8500 --key config/application --import seed-data.json --force &&
+        java -jar build/quarkus-app/quarkus-run.jar -h consul-server -p 8500 --key config/docker-compose --import seed-data.json --force
+    volumes:
+      - ../../cli/seed-engine-consul-config/seed-data.json:/app/seed-data.json:ro
+    networks:
+      - pipeline-network
+
+  # ==========================================
+  # 3. ENGINE SIDECAR - Consul Agent for Engine
+  # ==========================================
+  consul-agent-engine:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-engine
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${ENGINE_REST_PORT:-39000}:39000"
+      - "${ENGINE_GRPC_PORT:-49000}:49000"
+    command: >
+      agent 
+      -node="engine-sidecar"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-network
+
+  # ==========================================
+  # 3a. ENGINE APPLICATION
+  # ==========================================
+  engine:
+    image: ${ENGINE_IMAGE:-rokkon/rokkon-engine:latest}
+    container_name: engine-app
+    depends_on:
+      seeder:
+        condition: service_completed_successfully
+      consul-agent-engine:
+        condition: service_started
+    environment:
+      # Only set what the profile can't know
+      - QUARKUS_PROFILE=${PROFILE:-docker-compose}
+      # Port overrides
+      - QUARKUS_HTTP_PORT=39000
+      - QUARKUS_GRPC_SERVER_PORT=49000
+      # Optional overrides for cluster configuration
+      - CLUSTER_NAME=${CLUSTER_NAME:-docker-cluster}
+      - PIPELINE_CLUSTER_NAME=${CLUSTER_NAME:-docker-cluster}
+      - PIPELINE_ENGINE_NAME=${ENGINE_NAME:-engine-docker}
+    network_mode: "service:consul-agent-engine"  # Share network with sidecar
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:39000/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 4. PARSER MODULE SIDECAR - Consul Agent for Parser Module
+  # ==========================================
+  consul-agent-parser:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-parser
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${PARSER_MODULE_REST_PORT:-39093}:39093"
+      - "${PARSER_MODULE_GRPC_PORT:-49093}:49093"
+    command: >
+      agent 
+      -node="parser-sidecar"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-network
+
+  # ==========================================
+  # 4a. PARSER MODULE APPLICATION
+  # ==========================================
+  parser-module:
+    image: ${PARSER_MODULE_IMAGE:-rokkon/parser-module:latest}
+    container_name: parser-module-app
+    depends_on:
+      engine:
+        condition: service_healthy
+      consul-agent-parser:
+        condition: service_started
+    environment:
+      # Module Configuration
+      - MODULE_NAME=parser
+      - MODULE_HOST=consul-agent-parser
+      - MODULE_HTTP_PORT=39093
+      - MODULE_GRPC_PORT=49093
+      # Override Quarkus ports
+      - QUARKUS_HTTP_PORT=39093
+      - QUARKUS_GRPC_SERVER_PORT=49093
+      # Engine connection for registration
+      - ENGINE_HOST=consul-agent-engine
+      - ENGINE_PORT=49000
+      # Let module discover engine via Consul service discovery
+      # The module will query Consul for the "pipeline-engine" service
+      - QUARKUS_PROFILE=${PROFILE:-docker-compose}
+    network_mode: "service:consul-agent-parser"  # Share network with sidecar
+
+# ==========================================
+# NETWORKS & VOLUMES
+# ==========================================
+networks:
+  pipeline-network:
+    driver: bridge
+
+volumes:
+  consul_data:

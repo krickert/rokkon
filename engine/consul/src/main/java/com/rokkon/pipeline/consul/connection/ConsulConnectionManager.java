@@ -41,7 +41,7 @@ public class ConsulConnectionManager {
     private final AtomicReference<ConsulConnectionConfig> currentConfig = new AtomicReference<>();
     private final AtomicReference<ConsulClient> currentClient = new AtomicReference<>();
     
-    void onStart(@jakarta.enterprise.event.Observes io.quarkus.runtime.StartupEvent ev) {
+    public void onStart(@jakarta.enterprise.event.Observes io.quarkus.runtime.StartupEvent ev) {
         // Check if consul is enabled from configuration (could be from persisted file or application.yml)
         if (consulEnabled) {
             // The configuration should already be loaded by the ConfigSource

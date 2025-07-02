@@ -1,0 +1,15 @@
+version: '3.8'
+
+services:
+  # Consul server for service discovery and configuration
+  consul-server:
+    image: hashicorp/consul:latest
+    expose:
+      - "8500"
+      - "8600/udp"
+    command: agent -dev -ui -client=0.0.0.0 -bind=0.0.0.0
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 3

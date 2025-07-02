@@ -47,7 +47,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
     
     private static final Logger LOG = Logger.getLogger(GlobalModuleRegistryServiceImpl.class);
     
-    @ConfigProperty(name = "rokkon.consul.kv-prefix", defaultValue = "rokkon")
+    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "rokkon")
     String kvPrefix;
     
     @Inject
@@ -127,6 +127,18 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
                 }
                 
                 // Check if there are existing modules with the same name
+                // Check for duplicate host/port combination
+                boolean duplicateEndpoint = existingModules.stream()
+                    .anyMatch(m -> m.host().equals(host) && m.port() == port);
+                
+                if (duplicateEndpoint) {
+                    LOG.warnf("Module already registered at %s:%d", host, port);
+                    return Uni.createFrom().failure(new WebApplicationException(
+                        String.format("A module is already registered at %s:%d", host, port),
+                        Response.Status.CONFLICT
+                    ));
+                }
+                
                 List<ModuleRegistration> sameNameModules = existingModules.stream()
                     .filter(m -> m.moduleName().equals(moduleName))
                     .toList();
@@ -149,8 +161,8 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
                     }
                 }
                 
-                // Validate the module is accessible using engine connection
-                return validateModuleConnection(engineHost, enginePort, moduleName);
+                // Validate the module is accessible
+                return validateModuleConnection(host, port, moduleName);
             })
             .onItem().transformToUni(valid -> {
                 if (!valid) {
@@ -185,6 +197,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
                 serviceMeta.put("moduleName", moduleName);
                 serviceMeta.put("implementationId", implementationId);
                 serviceMeta.put("serviceType", serviceType);
+                serviceMeta.put("service-type", "MODULE");  // Add standard service-type for dashboard
                 serviceMeta.put("version", version);
                 serviceMeta.put("registeredAt", String.valueOf(registration.registeredAt()));
                 

@@ -4,26 +4,24 @@ plugins {
     `maven-publish`
 }
 
-repositories {
-    mavenCentral()
-    mavenLocal()
-}
+
 
 dependencies {
-    // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
+    // Library BOM provides all standard library dependencies
+    implementation(platform(project(":bom:library")))
     
-    // Quarkus dependencies come from BOM
+    // Library-specific dependencies only
     implementation("io.quarkus:quarkus-jackson")
     implementation("io.quarkus:quarkus-hibernate-validator")
+    implementation("jakarta.annotation:jakarta.annotation-api")
     
-    // Depend on rokkon-commons which includes protobuf definitions
-    implementation(project(":rokkon-commons"))
-    // Depend on engine-models for the data structures
-    implementation(project(":engine:models"))
+    // Project dependencies - interface is already provided by library BOM
+    // but we need to explicitly declare it since we use it directly
+    implementation(project(":commons:interface"))
     
+    // Test dependencies
     testImplementation("io.quarkus:quarkus-junit5")
-    testImplementation("org.assertj:assertj-core") // Version managed by BOM
+    testImplementation("org.assertj:assertj-core")
 }
 
 group = "com.rokkon.pipeline"
@@ -34,31 +32,14 @@ java {
     targetCompatibility = JavaVersion.VERSION_21
 }
 
-// Configure test tasks
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
-    useJUnitPlatform()
 }
-
-// Exclude integration tests from regular test task (Quarkus handles this)
-tasks.test {
-    exclude("**/*IT.class")
-}
-
 tasks.withType<JavaCompile> {
     options.encoding = "UTF-8"
-    options.compilerArgs.addAll(listOf("-parameters", "--enable-preview"))
+    options.compilerArgs.add("-parameters")
 }
 
-tasks.withType<JavaExec> {
-    jvmArgs("--enable-preview")
-}
-
-quarkus {
-    buildForkOptions {
-        jvmArgs("--enable-preview")
-    }
-}
 
 publishing {
     publications {
@@ -68,7 +49,3 @@ publishing {
     }
 }
 
-// Suppress the enforced platform validation
-tasks.withType<GenerateModuleMetadata> {
-    suppressedValidationErrors.add("enforced-platform")
-}

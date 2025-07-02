@@ -49,7 +49,7 @@ rokkon:
   
   consul:
     # KV prefix is set dynamically by UnifiedTestProfile
-    kv-prefix: ${rokkon.consul.kv-prefix:test}
+    kv-prefix: ${pipeline.consul.kv-prefix:test}
     cleanup:
       enabled: true
       interval: 5m

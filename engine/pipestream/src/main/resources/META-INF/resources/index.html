@@ -1,0 +1,280 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pipeline Engine Dashboard</title>
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.1/font/bootstrap-icons.css" rel="stylesheet">
+    <link href="css/dashboard.css" rel="stylesheet">
+</head>
+<body>
+    <div class="container mt-4">
+        <header class="d-flex justify-content-between align-items-center mb-4">
+            <h1>
+                <span class="text-primary" id="applicationName">Loading...</span> Dashboard
+            </h1>
+            <div>
+                <span id="engineStatus" class="badge bg-secondary">Checking...</span>
+            </div>
+        </header>
+
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Engine Status</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Engine API:</span>
+                            <span id="pingStatus">Checking...</span>
+                        </div>
+                        <div class="d-flex justify-content-between mb-3">
+                            <span>Consul Connection:</span>
+                            <span id="consulStatus">Checking...</span>
+                        </div>
+                        <button id="refreshStatus" class="btn btn-primary">
+                            <i class="bi bi-arrow-clockwise"></i> Refresh Status
+                        </button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- Statistics Section -->
+            <div class="col-md-6">
+                <div class="card">
+                    <div class="card-header">
+                        <h5 class="mb-0">Service Statistics</h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <h3 id="totalModules" class="text-primary">0</h3>
+                                    <small class="text-muted">Total Modules</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <h3 id="healthyModules" class="text-success">0</h3>
+                                    <small class="text-muted">Healthy Modules</small>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="row mt-3">
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <h3 id="baseServices" class="text-info">0</h3>
+                                    <small class="text-muted">Base Services</small>
+                                </div>
+                            </div>
+                            <div class="col-6">
+                                <div class="text-center">
+                                    <h3 id="zombieCount" class="text-warning">0</h3>
+                                    <small class="text-muted">Zombie Instances</small>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Navigation Tabs -->
+        <ul class="nav nav-tabs mt-4" role="tablist">
+            <li class="nav-item" role="presentation">
+                <button class="nav-link active" data-bs-toggle="tab" data-bs-target="#services" data-target="services" type="button" role="tab">
+                    <i class="bi bi-server"></i> Services
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#pipelines" data-target="pipelines" type="button" role="tab">
+                    <i class="bi bi-diagram-3"></i> Pipelines
+                </button>
+            </li>
+            <li class="nav-item" role="presentation">
+                <button class="nav-link" data-bs-toggle="tab" data-bs-target="#clusters" data-target="clusters" type="button" role="tab">
+                    <i class="bi bi-collection"></i> Clusters
+                </button>
+            </li>
+        </ul>
+        
+        <!-- Tab Content -->
+        <div class="tab-content mt-3">
+            <!-- Services Tab -->
+            <div class="tab-pane fade show active" id="services" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5>All Services</h5>
+                    <div>
+                        <button class="btn btn-primary" onclick="Modules.showRegisterModuleModal()">
+                            <i class="bi bi-plus-circle"></i> Register Module
+                        </button>
+                        <button class="btn btn-warning ms-2" onclick="Modules.cleanupZombies()">
+                            <i class="bi bi-trash"></i> Cleanup Zombies
+                        </button>
+                    </div>
+                </div>
+                <div id="allServicesList">
+                    <p class="text-muted">Loading services...</p>
+                </div>
+            </div>
+            
+            <!-- Pipelines Tab -->
+            <div class="tab-pane fade" id="pipelines" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5>Pipeline Configurations</h5>
+                    <button class="btn btn-primary" onclick="Pipelines.showCreatePipelineModal()">
+                        <i class="bi bi-plus-circle"></i> Create Pipeline
+                    </button>
+                </div>
+                <div id="pipelinesList">
+                    <p class="text-muted">Loading pipelines...</p>
+                </div>
+            </div>
+            
+            <!-- Clusters Tab -->
+            <div class="tab-pane fade" id="clusters" role="tabpanel">
+                <div class="d-flex justify-content-between align-items-center mb-3">
+                    <h5>Cluster Management</h5>
+                    <button class="btn btn-primary" onclick="Clusters.showCreateClusterModal()">
+                        <i class="bi bi-plus-circle"></i> Create Cluster
+                    </button>
+                </div>
+                <div id="clustersList">
+                    <p class="text-muted">Loading clusters...</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Auto-refresh toggle -->
+        <div class="form-check form-switch position-fixed bottom-0 end-0 m-3">
+            <input class="form-check-input" type="checkbox" id="autoRefreshToggle" checked>
+            <label class="form-check-label" for="autoRefreshToggle">
+                Auto-refresh (30s)
+            </label>
+        </div>
+    </div>
+    
+    <!-- Register Module Modal -->
+    <div class="modal fade" id="registerModuleModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Register New Module</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label for="moduleName" class="form-label">Module Name</label>
+                            <input type="text" class="form-control" id="moduleName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="implementationId" class="form-label">Implementation ID</label>
+                            <input type="text" class="form-control" id="implementationId" required>
+                        </div>
+                        <div class="row">
+                            <div class="col">
+                                <label for="moduleHost" class="form-label">Host</label>
+                                <input type="text" class="form-control" id="moduleHost" required>
+                            </div>
+                            <div class="col">
+                                <label for="modulePort" class="form-label">Port</label>
+                                <input type="number" class="form-control" id="modulePort" required>
+                            </div>
+                        </div>
+                        <div class="mb-3 mt-3">
+                            <label for="serviceType" class="form-label">Service Type</label>
+                            <select class="form-control" id="serviceType">
+                                <option value="GRPC">gRPC</option>
+                                <option value="HTTP">HTTP</option>
+                            </select>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="Modules.registerModule()">Register</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Pipeline Modal -->
+    <div class="modal fade" id="pipelineModal" tabindex="-1">
+        <div class="modal-dialog modal-lg">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title" id="pipelineModalTitle">Create Pipeline</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label for="pipelineName" class="form-label">Pipeline Name</label>
+                            <input type="text" class="form-control" id="pipelineName" required>
+                        </div>
+                        <div class="mb-3">
+                            <label for="pipelineDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="pipelineDescription" rows="2"></textarea>
+                        </div>
+                        <div class="mb-3">
+                            <div class="d-flex justify-content-between align-items-center mb-2">
+                                <label class="form-label mb-0">Pipeline Steps</label>
+                                <button type="button" class="btn btn-sm btn-primary" onclick="Pipelines.addPipelineStep()">
+                                    <i class="bi bi-plus"></i> Add Step
+                                </button>
+                            </div>
+                            <div id="pipelineSteps">
+                                <!-- Pipeline steps will be added here dynamically -->
+                            </div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="Pipelines.savePipeline()">Save Pipeline</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Cluster Modal -->
+    <div class="modal fade" id="createClusterModal" tabindex="-1">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New Cluster</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <div class="modal-body">
+                    <form>
+                        <div class="mb-3">
+                            <label for="newClusterName" class="form-label">Cluster Name</label>
+                            <input type="text" class="form-control" id="newClusterName" pattern="[a-z0-9-]+" required>
+                            <div class="form-text">Use lowercase letters, numbers, and hyphens only</div>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="button" class="btn btn-primary" onclick="Clusters.createCluster()">Create Cluster</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
+    
+    <!-- Application Scripts -->
+    <script src="js/api.js"></script>
+    <script src="js/validation.js"></script>
+    <script src="js/services.js"></script>
+    <script src="js/modules.js"></script>
+    <script src="js/pipelines.js"></script>
+    <script src="js/clusters.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

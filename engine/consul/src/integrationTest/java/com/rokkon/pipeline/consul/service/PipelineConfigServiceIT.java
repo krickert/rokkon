@@ -5,8 +5,10 @@ import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
-import com.rokkon.pipeline.validation.CompositeValidator;
-import com.rokkon.pipeline.validation.Validator;
+import com.rokkon.pipeline.validation.CompositePipelineConfigValidator;
+import com.rokkon.pipeline.validation.PipelineConfigValidator;
+import com.rokkon.pipeline.validation.ConfigValidator;
+import com.rokkon.pipeline.validation.PipelineConfigValidatable;
 import com.rokkon.pipeline.validation.validators.RequiredFieldsValidator;
 import com.rokkon.pipeline.validation.validators.StepTypeValidator;
 import io.quarkus.test.common.QuarkusTestResource;
@@ -19,6 +21,9 @@ import java.util.List;
 /**
  * Integration test for PipelineConfigService running in prod mode.
  * Extends PipelineConfigServiceTestBase to reuse common test logic.
+ * 
+ * This follows the pattern described in TESTING_STRATEGY.md where integration tests should
+ * NOT use dependency injection but instead create their dependencies directly.
  */
 @QuarkusIntegrationTest
 @QuarkusTestResource(ConsulTestResource.class)
@@ -31,37 +36,37 @@ class PipelineConfigServiceIT extends PipelineConfigServiceTestBase {
     void initClients() {
         // In integration tests, we create services directly since we're testing
         // from outside the application container
-        
+
         // Get Consul host and port from system properties set by ConsulTestResource
         // These will be the exposed ports accessible from the host machine
         String consulHost = System.getProperty("consul.host", "localhost");
         String consulPort = System.getProperty("consul.port", "8500");
-        
+
         // Create service implementations directly
         ObjectMapper objectMapper = new ObjectMapper();
-        
+
         // Create ClusterService
         ClusterServiceImpl clusterServiceImpl = new ClusterServiceImpl();
         setField(clusterServiceImpl, "consulHost", consulHost);
         setField(clusterServiceImpl, "consulPort", consulPort);
         setField(clusterServiceImpl, "objectMapper", objectMapper);
         this.clusterServiceClient = clusterServiceImpl;
-        
+
         // Create PipelineConfigService
         PipelineConfigServiceImpl pipelineConfigServiceImpl = new PipelineConfigServiceImpl();
         setField(pipelineConfigServiceImpl, "consulHost", consulHost);
         setField(pipelineConfigServiceImpl, "consulPort", consulPort);
         setField(pipelineConfigServiceImpl, "objectMapper", objectMapper);
         setField(pipelineConfigServiceImpl, "clusterService", clusterServiceClient);
-        
+
         // Create validators for pipeline config service
-        List<Validator<PipelineConfig>> validators = List.of(
+        List<ConfigValidator<PipelineConfigValidatable>> validators = List.of(
             new RequiredFieldsValidator(),
             new StepTypeValidator()
         );
-        CompositeValidator<PipelineConfig> validator = new CompositeValidator<>("pipeline-validator", validators);
+        CompositePipelineConfigValidator validator = new CompositePipelineConfigValidator(validators);
         setField(pipelineConfigServiceImpl, "validator", validator);
-        
+
         this.pipelineConfigServiceClient = pipelineConfigServiceImpl;
     }
 
@@ -75,9 +80,6 @@ class PipelineConfigServiceIT extends PipelineConfigServiceTestBase {
         return clusterServiceClient;
     }
 
-    // TODO: Create REST client implementations that call HTTP endpoints
-    // These will need to be implemented once REST endpoints are created
-    
     /**
      * Helper method to set private fields via reflection.
      * Needed for integration tests where we manually construct services.

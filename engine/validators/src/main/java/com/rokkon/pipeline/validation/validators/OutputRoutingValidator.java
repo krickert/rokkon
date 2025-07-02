@@ -3,6 +3,7 @@ package com.rokkon.pipeline.validation.validators;
 import com.rokkon.pipeline.config.model.*;
 import com.rokkon.pipeline.validation.PipelineConfigValidator;
 import com.rokkon.pipeline.validation.PipelineConfigValidatable;
+import com.rokkon.pipeline.validation.ValidationMode;
 import com.rokkon.pipeline.validation.ValidationResult;
 import com.rokkon.pipeline.validation.ValidationResultFactory;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -188,5 +189,11 @@ public class OutputRoutingValidator implements PipelineConfigValidator {
     @Override
     public String getValidatorName() {
         return "OutputRoutingValidator";
+    }
+    
+    @Override
+    public Set<ValidationMode> supportedModes() {
+        // Only run in PRODUCTION mode - design and testing modes may have incomplete routing
+        return Set.of(ValidationMode.PRODUCTION);
     }
 }

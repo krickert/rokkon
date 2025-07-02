@@ -1,0 +1,115 @@
+version: '3.8'
+
+services:
+  # Consul server for service discovery and configuration
+  consul-server:
+    image: hashicorp/consul:latest
+    command: agent -dev -ui -client=0.0.0.0 -bind=0.0.0.0
+    expose:
+      - "8500"
+      - "8600/udp"
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Seed application config
+  consul-seeder-app:
+    image: rokkon/seed-engine-consul-config:latest
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    networks:
+      - test-network
+    volumes:
+      - ./seed-data.json:/seed-data.json:ro
+    command: [
+      "-h", "consul-server",
+      "-p", "8500",
+      "--key", "config/application",
+      "--import", "/seed-data.json",
+      "--force"
+    ]
+
+  # Seed cluster config
+  consul-seeder-cluster:
+    image: rokkon/seed-engine-consul-config:latest
+    depends_on:
+      consul-seeder-app:
+        condition: service_completed_successfully
+    networks:
+      - test-network
+    volumes:
+      - ./test-consul-config.properties:/config.properties:ro
+    command: [
+      "-h", "consul-server",
+      "-p", "8500",
+      "--key", "pipeline/test-cluster/config",
+      "--config", "/config.properties",
+      "--force"
+    ]
+
+  # Verify configs are seeded
+  consul-verify:
+    image: hashicorp/consul:latest
+    depends_on:
+      consul-seeder-cluster:
+        condition: service_completed_successfully
+    networks:
+      - test-network
+    entrypoint: ["/bin/sh", "-c"]
+    command: |
+      "set -e; \
+      echo '=== Verifying Consul configs ==='; \
+      export CONSUL_HTTP_ADDR=consul-server:8500; \
+      echo 'Waiting for Consul to stabilize...'; \
+      sleep 2; \
+      echo ''; \
+      echo 'Checking config/application:'; \
+      consul kv get config/application && echo '✓ Application config found' || (echo '✗ Application config NOT FOUND!' && exit 1); \
+      echo ''; \
+      echo 'Checking pipeline/test-cluster/config:'; \
+      consul kv get pipeline/test-cluster/config && echo '✓ Cluster config found' || (echo '✗ Cluster config NOT FOUND!' && exit 1); \
+      echo ''; \
+      echo 'Listing all keys in Consul:'; \
+      consul kv get -recurse -keys || echo 'No keys found'; \
+      echo ''; \
+      echo '=== All configs verified! ==='"
+
+  # Pipeline Engine - starts after configs are verified
+  pipeline-engine:
+    image: rokkon/engine:latest
+    environment:
+      - QUARKUS_HTTP_PORT=38082
+      - QUARKUS_GRPC_SERVER_PORT=48082
+      - QUARKUS_CONSUL_HOST=consul-server
+      - QUARKUS_CONSUL_PORT=8500
+      - QUARKUS_CONSUL_CONFIG_ENABLED=true
+      - QUARKUS_PROFILE=test
+      - CLUSTER_NAME=test-cluster
+      - ROKKON_CLUSTER_NAME=test-cluster
+      - ROKKON_ENGINE_NAME=test-engine
+      # Enable debug mode
+      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    expose:
+      - "38082"  # HTTP port
+      - "48082"  # gRPC port
+      - "5005"   # Debug port
+    depends_on:
+      consul-verify:
+        condition: service_completed_successfully
+    networks:
+      - test-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:38082/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+networks:
+  test-network:
+    name: test-pipeline-network
+    driver: bridge

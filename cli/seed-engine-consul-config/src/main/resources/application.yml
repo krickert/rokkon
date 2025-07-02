@@ -1,0 +1,38 @@
+# Consul connection defaults
+consul:
+  host: localhost
+  port: 8500
+
+quarkus:
+  # Disable Quarkus banner for cleaner CLI output
+  banner:
+    enabled: false
+  
+  # Generate gRPC code from proto files
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:protobuf
+      scan-for-imports: com.google.protobuf:protobuf-java,com.google.api.grpc:proto-google-common-protos
+  
+  # Disable HTTP server completely
+  http:
+    port: -1
+    ssl-port: -1
+    test-port: -1
+    test-ssl-port: -1
+  
+  # Ensure management interface is also disabled
+  management:
+    enabled: false
+  
+  # Other settings
+  vertx:
+    prefer-native-transport: false
+  shutdown:
+    timeout: 1s
+  
+  # Logging configuration
+  log:
+    console:
+      format: "%d{HH:mm:ss} %-5p %m%n"
+    level: INFO

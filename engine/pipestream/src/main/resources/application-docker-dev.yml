@@ -1,0 +1,47 @@
+# Docker Dev Profile - for running Quarkus dev mode in Docker
+# Use with: -Dquarkus.profile=docker-dev
+
+quarkus:
+  # HTTP configuration
+  http:
+    host: 0.0.0.0  # Listen on all interfaces
+    port: 38090
+
+  # gRPC configuration  
+  grpc:
+    server:
+      host: 0.0.0.0  # Listen on all interfaces
+      port: 49000
+
+  # Dev mode configuration
+  dev:
+    instrumentation: true
+
+  # Live reload configuration
+  live-reload:
+    password: changeme
+    url: http://0.0.0.0:38090
+
+  # Console configuration for remote access
+  console:
+    enabled: true
+
+  # Log configuration
+  log:
+    level: INFO
+    console:
+      enable: true
+    category:
+      "com.rokkon.pipeline":
+        level: DEBUG
+      "io.quarkus.deployment.dev":
+        level: DEBUG
+
+# Consul configuration for Docker network
+consul:
+  host: ${CONSUL_HOST:consul}  # Use service name in Docker network
+  port: ${CONSUL_PORT:8500}
+
+# Engine configuration
+engine:
+  host: ${ENGINE_HOST:rokkon-engine}

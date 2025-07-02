@@ -1,0 +1,75 @@
+quarkus:
+  application:
+    name: rokkon-proxy-module
+    version: 1.0.0
+  grpc:
+    server:
+      port: 9090
+      host: 0.0.0.0
+      enable-reflection-service: true
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:protobuf,com.google.api.grpc:proto-google-common-protos
+  http:
+    auth:
+      basic: true
+      basic.realm: PipeStepProcessor
+      permission:
+        authenticated:
+          paths: /*
+          policy: authenticated
+  security:
+    users:
+      file:
+        enabled: true
+        users: users.properties
+        roles: roles.properties
+  container-image:
+    build: false  # Set to true when you want to build the image
+    push: false   # Set to true when you want to push to registry
+    registry: "registry.rokkon.com:8443"
+    image: "rokkon/proxy-module:${quarkus.application.version}"
+    dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
+    group: rokkon
+  log:
+    console:
+      enable: true
+      format: "%d{HH:mm:ss} %-5p [%c{2.}] (%t) %s%e%n"
+      level: INFO
+    category:
+      "com.rokkon.proxy":
+        level: DEBUG
+  health:
+    extensions:
+      enabled: true
+    openapi:
+      included: true
+  micrometer:
+    export:
+      prometheus:
+        enabled: true
+    binder:
+      http-server:
+        enabled: true
+      system:
+        enabled: true
+      jvm:
+        enabled: true
+  opentelemetry:
+    enabled: true
+    tracer:
+      exporter:
+        otlp:
+          endpoint: http://localhost:4317
+
+# Module configuration
+module:
+  host: localhost
+  port: 9091
+
+# Test profile
+"%test":
+  quarkus:
+    grpc:
+      server:
+        port: 0  # Use random port for tests

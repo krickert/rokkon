@@ -1,0 +1,34 @@
+package com.rokkon.integration;
+
+import io.quarkus.test.junit.QuarkusTest;
+import jakarta.inject.Inject;
+import org.eclipse.microprofile.config.inject.ConfigProperty;
+import org.junit.jupiter.api.Test;
+
+import static org.assertj.core.api.Assertions.assertThat;
+
+/**
+ * Simple test to verify the Quarkus test framework is working
+ * without any container dependencies.
+ */
+@QuarkusTest
+public class SimpleContainerTest {
+    
+    @Inject
+    @ConfigProperty(name = "quarkus.application.version", defaultValue = "1.0.0-SNAPSHOT")
+    String version;
+    
+    @Inject
+    @ConfigProperty(name = "quarkus.application.name", defaultValue = "testing-integration")
+    String appName;
+    
+    @Test
+    public void testQuarkusFrameworkWorks() {
+        System.out.println("✅ Quarkus test framework is working!");
+        System.out.println("Application: " + appName);
+        System.out.println("Version: " + version);
+        
+        assertThat(version).isNotNull();
+        assertThat(appName).isNotNull();
+    }
+}

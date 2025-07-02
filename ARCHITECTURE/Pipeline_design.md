@@ -1,8 +1,8 @@
-# Rokkon Engine: Pipeline Design
+# Pipeline Engine: Pipeline Design
 
 ## Logical Design Hierarchy
 
-The Rokkon Engine organizes data processing workflows using a hierarchical structure. This design allows for clear separation of concerns, modularity, and scalability. The main components of this hierarchy are: Clusters, Pipelines, Pipeline Steps, and Modules.
+The Pipeline Engine organizes data processing workflows using a hierarchical structure. This design allows for clear separation of concerns, modularity, and scalability. The main components of this hierarchy are: Clusters, Pipelines, Pipeline Steps, and Modules.
 
 ```mermaid
 graph TD
@@ -50,7 +50,7 @@ graph TD
     *   A cluster is the highest-level organizational unit. It represents a logical grouping of pipelines, often associated with a specific tenant, project, or environment (e.g., "production-text-processing", "development-image-analysis").
     *   Each cluster can have its own default configurations, such as default Kafka topics or error handling strategies, that pipelines within it can inherit or override.
     *   Clusters provide a namespace for pipelines, helping to manage and isolate different sets of workflows.
-    *   Configuration for clusters is typically stored in Consul (e.g., `rokkon/<cluster_name>/cluster-config`).
+    *   Configuration for clusters is typically stored in Consul (e.g., `pipeline/<cluster_name>/cluster-config`).
 
 2.  **Pipelines (`PipelineConfig`):**
     *   A pipeline defines a specific end-to-end data processing workflow. It consists of an ordered sequence of pipeline steps.
@@ -62,7 +62,7 @@ graph TD
         *   `description`: Human-readable description.
         *   `initial_steps`: A list of starting step IDs.
         *   `steps`: A collection of all pipeline step configurations within this pipeline.
-    *   Pipeline configurations are stored in Consul (e.g., `rokkon/<cluster_name>/pipelines/<pipeline_id>`).
+    *   Pipeline configurations are stored in Consul (e.g., `pipeline/<cluster_name>/pipelines/<pipeline_id>`).
 
 3.  **Pipeline Steps (`PipelineStepConfig`):**
     *   A pipeline step represents a single stage of processing within a pipeline.
@@ -82,17 +82,17 @@ graph TD
     *   Examples: `gutenberg-connector`, `html-parser`, `text-chunker`, `bert-embedder`, `opensearch-sink`.
     *   Modules are developed independently and can be written in any gRPC-supported language.
     *   They register with Consul, advertising their type (e.g., "parser", "embedder"), version, and capabilities.
-    *   The Rokkon Engine discovers available modules via Consul and matches them to pipeline steps based on the `module_type` specified in the step configuration.
+    *   The Pipeline Engine discovers available modules via Consul and matches them to pipeline steps based on the `module_type` specified in the step configuration.
     *   A single registered module (e.g., `parser-module-v1.2`) can serve multiple pipeline steps across various pipelines, potentially with different configurations for each step.
 
 ## Dynamic Configuration System
 
-A cornerstone of the Rokkon Engine's flexibility is its dynamic configuration system, primarily managed through Consul's Key-Value (KV) store.
+A cornerstone of the Pipeline Engine's flexibility is its dynamic configuration system, primarily managed through Consul's Key-Value (KV) store.
 
 *   **Centralized Storage:** All configurations for clusters, pipelines, and steps are stored in Consul. This provides a single source of truth.
-    *   Example Path in Consul: `rokkon/default_cluster/pipelines/my_document_pipeline`
+    *   Example Path in Consul: `pipeline/default_cluster/pipelines/my_document_pipeline`
     *   The value at this path would be a JSON (or properties) representation of the `PipelineConfig`.
-*   **Hot Reloading/Dynamic Updates:** The Rokkon Engine (and potentially individual modules) can watch for changes to these configurations in Consul.
+*   **Hot Reloading/Dynamic Updates:** The Pipeline Engine (and potentially individual modules) can watch for changes to these configurations in Consul.
     *   When a pipeline configuration is updated in Consul, the engine can detect this change and dynamically adjust the pipeline's behavior without requiring a restart. This could involve:
         *   Adding or removing steps.
         *   Changing the module used for a step.
@@ -106,28 +106,28 @@ A cornerstone of the Rokkon Engine's flexibility is its dynamic configuration sy
 
 sequenceDiagram
     participant User/Admin as User/Admin
-    participant RokkonCLI as Rokkon CLI/UI
+    participant PipelineCLI as Pipeline CLI/UI
     participant EngineConsulWriter as Engine-Consul Writer Service
     participant ConsulKV as Consul KV Store
-    participant RokkonEngine as Rokkon Engine
+    participant PipelineEngine as Pipeline Engine
     participant ModuleA as Module A Instance
 
-    User/Admin ->> RokkonCLI: Update Pipeline X: Change Step S config (e.g., model_name)
-    RokkonCLI ->> EngineConsulWriter: Request to update config for Pipeline X, Step S
+    User/Admin ->> PipelineCLI: Update Pipeline X: Change Step S config (e.g., model_name)
+    PipelineCLI ->> EngineConsulWriter: Request to update config for Pipeline X, Step S
     EngineConsulWriter ->> ConsulKV: Read current config for Pipeline X (with ModifyIndex)
     ConsulKV -->> EngineConsulWriter: Current config + ModifyIndex
     EngineConsulWriter ->> EngineConsulWriter: Validate new configuration
     EngineConsulWriter ->> ConsulKV: Write updated config for Pipeline X (using CAS with ModifyIndex)
     ConsulKV -->> EngineConsulWriter: Write Successful
-    EngineConsulWriter -->> RokkonCLI: Update Acknowledged
+    EngineConsulWriter -->> PipelineCLI: Update Acknowledged
 
-    Note over ConsulKV, RokkonEngine: Rokkon Engine is watching 'rokkon/cluster/pipelines/PipelineX'
-    ConsulKV ->> RokkonEngine: Notification: Config for Pipeline X changed
-    RokkonEngine ->> RokkonEngine: Reloads Pipeline X configuration
-    RokkonEngine ->> RokkonEngine: Adjusts internal routing, parameters for Step S
+    Note over ConsulKV, PipelineEngine: Pipeline Engine is watching 'pipeline/cluster/pipelines/PipelineX'
+    ConsulKV ->> PipelineEngine: Notification: Config for Pipeline X changed
+    PipelineEngine ->> PipelineEngine: Reloads Pipeline X configuration
+    PipelineEngine ->> PipelineEngine: Adjusts internal routing, parameters for Step S
 
     alt Step S uses Module A
-        RokkonEngine ->> ModuleA: (If applicable) Send updated Step S config (e.g., via gRPC call or module polls Consul)
+        PipelineEngine ->> ModuleA: (If applicable) Send updated Step S config (e.g., via gRPC call or module polls Consul)
         ModuleA ->> ModuleA: Reconfigure itself for Step S (e.g., load new model)
     end
 ```
@@ -136,13 +136,13 @@ sequenceDiagram
 
 Modules (connectors, sinks, pipeline steps) are fundamentally gRPC services that adhere to specific interfaces defined by Rokkon's Protocol Buffers (protobufs). This allows them to be integrated into the Rokkon Engine.
 
-### Core Protobuf Definitions (`rokkon-protobuf`)
+### Core Protobuf Definitions (`commons/protobuf`)
 
-The `rokkon-protobuf` project defines the contracts for module communication. Key services and messages include:
+The `commons/protobuf` project defines the contracts for module communication. Key services and messages include:
 
 *   **`PipeStepProcessor.proto`:** Defines the primary service that processing modules (steps, connectors, sinks) must implement.
     ```protobuf
-    // Located in rokkon-protobuf/src/main/proto/services/pipe_step_processor.proto
+    // Located in commons/protobuf/src/main/proto/services/pipe_step_processor.proto
     service PipeStepProcessor {
       // Processes a single PipeDoc or a stream of PipeDocs
       // Can be unary or client/server streaming depending on the module's nature
@@ -192,7 +192,7 @@ import grpc
 from concurrent import futures
 import time
 
-# Assume these are generated from rokkon-protobuf
+# Assume these are generated from commons/protobuf
 import pipe_step_processor_pb2 as ps_pb2
 import pipe_step_processor_pb2_grpc as ps_grpc_pb2
 from google.protobuf import empty_pb2
@@ -325,4 +325,4 @@ public class EmbedderModule extends PipeStepProcessorImplBase {
 4.  **Efficiency:** Protobufs serialize to a compact binary format, making data transmission efficient.
 5.  **Rich Data Structures:** Support for complex data types, including nested messages, lists (repeated fields), and maps.
 
-By defining these clear gRPC interfaces, Rokkon allows developers to focus on the core logic of their connectors, processing steps, or sinks, using the tools and languages they are most comfortable with, while ensuring interoperability within the broader pipeline ecosystem. The dynamic configuration system then wires these modules together into meaningful workflows.
+By defining these clear gRPC interfaces, Pipeline allows developers to focus on the core logic of their connectors, processing steps, or sinks, using the tools and languages they are most comfortable with, while ensuring interoperability within the broader pipeline ecosystem. The dynamic configuration system then wires these modules together into meaningful workflows.

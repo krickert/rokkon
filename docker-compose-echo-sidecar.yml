@@ -1,0 +1,34 @@
+version: '3.8'
+
+services:
+  echo-module:
+    image: pipeline/echo-module:latest
+    container_name: echo-module
+    environment:
+      - MODULE_HOST=localhost
+      - MODULE_PORT=49091
+      - QUARKUS_GRPC_SERVER_PORT=49091
+      - QUARKUS_HTTP_PORT=39091
+      - ENGINE_HOST=pipeline-engine
+      - ENGINE_GRPC_PORT=48082
+      - CONSUL_HOST=consul  # Consul sidecar will handle this
+      - CONSUL_PORT=8500
+    networks:
+      - pipeline-network
+
+  echo-sidecar:
+    image: hashicorp/consul:latest
+    container_name: echo-sidecar
+    network_mode: "service:echo-module"  # Share network namespace with module
+    command: >
+      consul connect proxy -sidecar-for module-echo
+      -admin-bind 127.0.0.1:19000
+    environment:
+      - CONSUL_HTTP_ADDR=host.docker.internal:8500  # Connect to host Consul
+    depends_on:
+      - echo-module
+
+networks:
+  pipeline-network:
+    driver: bridge
+    external: true  # Use existing network from dev.sh

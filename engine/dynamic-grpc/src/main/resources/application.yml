@@ -1,0 +1,36 @@
+quarkus:
+  application:
+    name: dynamic-grpc
+  
+  generate-code:
+    grpc:
+      scan-for-proto: com.rokkon.pipeline:protobuf
+      codegen:
+        type: mutiny
+  
+  # Cache configuration for gRPC channels
+  cache:
+    caffeine:
+      "grpc-channels":
+        expire-after-write: 10m
+        maximum-size: 100
+  
+  # Logging
+  log:
+    level: INFO
+    category:
+      "com.rokkon":
+        level: DEBUG
+      "io.grpc":
+        level: INFO
+
+# Consul configuration
+consul:
+  host: ${CONSUL_HOST:localhost}
+  port: ${CONSUL_PORT:8500}
+
+# Test profile  
+"%test":
+  quarkus:
+    log:
+      level: INFO

@@ -33,7 +33,7 @@ This tool is essential for setting up and maintaining the Rokkon Engine configur
 ### Building from Source
 ```shell
 # Clone the repository
-git clone https://github.com/your-org/rokkon.git
+git clone https://github.com/krickert/rokkon.git
 cd rokkon
 
 # Build the project

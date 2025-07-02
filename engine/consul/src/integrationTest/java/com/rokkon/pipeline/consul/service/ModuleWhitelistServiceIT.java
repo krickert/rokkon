@@ -1,54 +1,166 @@
 package com.rokkon.pipeline.consul.service;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.rokkon.pipeline.config.model.*;
 import com.rokkon.pipeline.config.service.ClusterService;
 import com.rokkon.pipeline.config.service.ModuleWhitelistService;
 import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.config.model.ModuleWhitelistRequest;
 import com.rokkon.pipeline.config.model.ModuleWhitelistResponse;
-import com.rokkon.pipeline.consul.test.ConsulTestResource;
-import com.rokkon.pipeline.consul.test.MockTestModuleContainerResource;
+import com.rokkon.pipeline.consul.ConsulTestResource;
+import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
+import com.rokkon.pipeline.consul.test.IsolatedConsulKvIntegrationTestBase;
+import com.rokkon.pipeline.util.ObjectMapperFactory;
+import com.rokkon.pipeline.validation.CompositeValidator;
+import com.rokkon.pipeline.validation.CompositeValidatorBuilder;
 import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.pipeline.validation.ValidationResultFactory;
+import com.rokkon.test.containers.ModuleContainerResource;
 import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusIntegrationTest;
+import io.quarkus.test.junit.QuarkusTestProfile;
+import io.quarkus.test.junit.TestProfile;
+import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
-import jakarta.inject.Inject;
+import io.vertx.ext.consul.ConsulClient;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.BeforeEach;
-import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
 import org.jboss.logging.Logger;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+import java.util.UUID;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
  * Integration tests for the ModuleWhitelistService.
  * Uses real Consul and Docker containers.
+ * 
+ * IMPORTANT: This test creates REAL instances of required objects instead of using CDI injection.
+ * This follows the pattern described in TESTING_STRATEGY.md where integration tests should
+ * extend a base class and override methods to provide real implementations.
  */
-@QuarkusTest
+@QuarkusIntegrationTest
 @QuarkusTestResource(ConsulTestResource.class)
-@QuarkusTestResource(MockTestModuleContainerResource.class)
-class ModuleWhitelistServiceIT {
+@QuarkusTestResource(ModuleWhitelistServiceIT.TestModuleContainerResource.class)
+@TestProfile(ModuleWhitelistServiceIT.ModuleWhitelistServiceITProfile.class)
+class ModuleWhitelistServiceIT extends IsolatedConsulKvIntegrationTestBase {
+
+    /**
+     * Custom test resource that provides the test module container.
+     */
+    public static class TestModuleContainerResource extends ModuleContainerResource {
+        public TestModuleContainerResource() {
+            super("rokkon/test-module:1.0.0-SNAPSHOT");
+        }
+    }
+
     private static final Logger LOG = Logger.getLogger(ModuleWhitelistServiceIT.class);
 
-    @Inject
-    ModuleWhitelistService whitelistService;
+    // Real implementation of services
+    private ModuleWhitelistServiceImpl whitelistService;
+    private ClusterServiceImpl clusterService;
+    private PipelineConfigServiceImpl pipelineConfigService;
 
-    @Inject
-    ClusterService clusterService;
-
-    @Inject
-    PipelineConfigService pipelineConfigService;
+    // Custom connection manager that uses our consulClient
+    private TestConsulConnectionManager connectionManager;
 
     private static final String TEST_CLUSTER = "test-cluster";
     private static final String TEST_MODULE = "test-module"; // This is what the container registers as
 
-    @BeforeEach
-    void setUp() {
-        // Try to create a test cluster - if it already exists, that's fine
+    @Override
+    protected void configureConsulConnection() {
+        // Get Consul host and port from system properties set by ConsulTestResource
+        String hostProp = System.getProperty("consul.host");
+        String portProp = System.getProperty("consul.port");
+
+        if (hostProp != null) {
+            consulHost = hostProp;
+            LOG.infof("Using Consul host from system property: %s", consulHost);
+        }
+
+        if (portProp != null) {
+            try {
+                consulPort = Integer.parseInt(portProp);
+                LOG.infof("Using Consul port from system property: %d", consulPort);
+            } catch (NumberFormatException e) {
+                LOG.errorf("Invalid consul.port: %s", portProp);
+            }
+        }
+    }
+
+    @Override
+    protected void onSetup() {
+        LOG.infof("Setting up ModuleWhitelistServiceIT with namespace: %s", testNamespace);
+
+        // Create ObjectMapper
+        ObjectMapper objectMapper = ObjectMapperFactory.createConfiguredMapper();
+
+        // Create connection manager that uses our consulClient
+        connectionManager = new TestConsulConnectionManager(consulClient);
+
+        // Create CompositeValidator for PipelineConfig that checks for whitelisted modules
+        CompositeValidator<PipelineConfig> pipelineValidator = CompositeValidatorBuilder.<PipelineConfig>create()
+            .withName("TestPipelineValidator")
+            .addValidator(config -> {
+                // Check if all modules in the pipeline are whitelisted
+                List<String> errors = new ArrayList<>();
+
+                for (var stepEntry : config.pipelineSteps().entrySet()) {
+                    String stepId = stepEntry.getKey();
+                    PipelineStepConfig step = stepEntry.getValue();
+
+                    if (step.processorInfo() != null && 
+                        step.processorInfo().grpcServiceName() != null &&
+                        !step.processorInfo().grpcServiceName().isBlank()) {
+
+                        String grpcServiceName = step.processorInfo().grpcServiceName();
+                        if (!"test-module".equals(grpcServiceName)) {
+                            errors.add(String.format(
+                                "Pipeline '%s', Step '%s': gRPC service '%s' is not whitelisted", 
+                                config.name(), stepId, grpcServiceName
+                            ));
+                        }
+                    }
+                }
+
+                return errors.isEmpty() ? 
+                    ValidationResultFactory.success() : 
+                    ValidationResultFactory.failure(errors);
+            })
+            .build();
+
+        // Create ClusterService implementation
+        clusterService = new ClusterServiceImpl();
+        clusterService.connectionManager = connectionManager;
+        clusterService.objectMapper = objectMapper;
+        clusterService.kvPrefix = testNamespace; // Use our isolated namespace
+
+        // Create PipelineConfigService implementation
+        pipelineConfigService = new PipelineConfigServiceImpl();
+        pipelineConfigService.consulHost = consulHost;
+        pipelineConfigService.consulPort = String.valueOf(consulPort);
+        pipelineConfigService.objectMapper = objectMapper;
+        pipelineConfigService.clusterService = clusterService;
+        pipelineConfigService.validator = pipelineValidator;
+        pipelineConfigService.kvPrefix = testNamespace; // Use our isolated namespace
+
+        // Create ModuleWhitelistService implementation
+        whitelistService = new ModuleWhitelistServiceImpl();
+        whitelistService.connectionManager = connectionManager;
+        whitelistService.objectMapper = objectMapper;
+        whitelistService.clusterService = clusterService;
+        whitelistService.pipelineConfigService = pipelineConfigService;
+        whitelistService.pipelineValidator = pipelineValidator;
+        whitelistService.kvPrefix = testNamespace; // Use our isolated namespace
+
+        LOG.info("Services created with isolated namespace");
+
+        // Create test cluster
         try {
             ValidationResult created = clusterService.createCluster(TEST_CLUSTER)
                 .await().indefinitely();
@@ -69,8 +181,10 @@ class ModuleWhitelistServiceIT {
         }
     }
 
-    @AfterEach
-    void tearDown() {
+    @Override
+    protected void onCleanup() {
+        LOG.info("Cleaning up ModuleWhitelistServiceIT");
+
         // Clean up any pipelines that might have been created
         try {
             pipelineConfigService.deletePipeline(TEST_CLUSTER, "test-pipeline")
@@ -96,12 +210,32 @@ class ModuleWhitelistServiceIT {
         } catch (Exception e) {
             LOG.debugf("Error cleaning up whitelisted modules: %s", e.getMessage());
         }
+    }
 
-        // Don't delete the cluster - let other tests reuse it
+    /**
+     * Custom connection manager that uses our consulClient
+     */
+    private class TestConsulConnectionManager extends ConsulConnectionManager {
+        private final io.vertx.mutiny.ext.consul.ConsulClient mutinyClient;
+        private final ConsulClient consulClient;
+
+        TestConsulConnectionManager(io.vertx.mutiny.ext.consul.ConsulClient mutinyClient) {
+            this.mutinyClient = mutinyClient;
+            this.consulClient = mutinyClient.getDelegate();
+        }
+
+        @Override
+        public Optional<ConsulClient> getClient() {
+            return Optional.of(consulClient);
+        }
+
+        @Override
+        public Optional<io.vertx.mutiny.ext.consul.ConsulClient> getMutinyClient() {
+            return Optional.of(mutinyClient);
+        }
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testWhitelistModuleNotInConsul() {
         // Try to whitelist a module that doesn't exist in Consul
         ModuleWhitelistRequest request = new ModuleWhitelistRequest(
@@ -121,7 +255,6 @@ class ModuleWhitelistServiceIT {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues or Docker container issues")
     void testWhitelistModuleSuccess() throws Exception {
         // Wait a bit for the test-module container to register itself in Consul
         Thread.sleep(2000);
@@ -154,7 +287,6 @@ class ModuleWhitelistServiceIT {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testListWhitelistedModules() {
         // Initially should be empty
         List<PipelineModuleConfiguration> modules = whitelistService.listWhitelistedModules(TEST_CLUSTER)
@@ -167,7 +299,6 @@ class ModuleWhitelistServiceIT {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testRemoveModuleFromWhitelist() {
         // Test removing a module that isn't whitelisted
         ModuleWhitelistResponse response = whitelistService.removeModuleFromWhitelist(TEST_CLUSTER, "not-whitelisted")
@@ -183,7 +314,6 @@ class ModuleWhitelistServiceIT {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues")
     void testCantCreatePipelineWithNonWhitelistedModule() {
         // Try to create a pipeline that uses a non-whitelisted module
         PipelineStepConfig step = new PipelineStepConfig(
@@ -211,7 +341,6 @@ class ModuleWhitelistServiceIT {
     }
 
     @Test
-    @Disabled("Test may fail due to Consul connectivity issues or Docker container issues")
     void testCantRemoveWhitelistedModuleInUse() throws Exception {
         // Wait for test-module to register
         Thread.sleep(2000);
@@ -255,5 +384,21 @@ class ModuleWhitelistServiceIT {
 
         assertThat(removeResponse.success()).isFalse();
         assertThat(removeResponse.message()).contains("currently used in pipeline");
+    }
+
+    /**
+     * Profile that configures test isolation
+     */
+    public static class ModuleWhitelistServiceITProfile implements QuarkusTestProfile {
+        @Override
+        public Map<String, String> getConfigOverrides() {
+            // Generate unique namespace for this test run
+            String testId = UUID.randomUUID().toString().substring(0, 8);
+            return Map.of(
+                "quarkus.consul-config.fail-on-missing-key", "false",
+                "quarkus.consul-config.watch", "false",
+                "smallrye.config.mapping.validate-unknown", "false"
+            );
+        }
     }
 }

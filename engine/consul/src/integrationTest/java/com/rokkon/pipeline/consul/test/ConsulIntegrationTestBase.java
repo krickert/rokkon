@@ -1,7 +1,7 @@
 package com.rokkon.pipeline.consul.test;
 
 import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusIntegrationTest;
 import io.smallrye.mutiny.Uni;
 import io.vertx.mutiny.core.Vertx;
 import io.vertx.mutiny.ext.consul.ConsulClient;
@@ -30,30 +30,29 @@ import java.io.IOException;
  * This allows tests to run in parallel against the same Consul instance
  * without interfering with each other.
  */
-@QuarkusTest
+@QuarkusIntegrationTest
 @QuarkusTestResource(ConsulTestResource.class)
 public abstract class ConsulIntegrationTestBase {
-    
+
     protected static final Logger LOG = Logger.getLogger(ConsulIntegrationTestBase.class);
-    
-    @Inject
-    protected Vertx vertx;
-    
-    @ConfigProperty(name = "consul.host")
-    protected String consulHost;
-    
-    @ConfigProperty(name = "consul.port")
-    protected int consulPort;
-    
+
+    // Create Vertx instance manually instead of using @Inject
+    protected Vertx vertx = Vertx.vertx();
+
+    // Get Consul host and port from system properties set by ConsulTestResource
+    // Use default values in case the properties aren't set
+    protected String consulHost = System.getProperty("consul.host", "localhost");
+    protected int consulPort = Integer.parseInt(System.getProperty("consul.port", "8500"));
+
     // Each test gets unique identifiers
     protected String testId;
     protected String testClusterName;
     protected String testKvPrefix;
     protected String testServicePrefix;
-    
+
     // Direct Consul client for verification
     protected ConsulClient consulClient;
-    
+
     @BeforeEach
     void setupBase(TestInfo testInfo) {
         // Generate unique test ID based on test method name and a short UUID
@@ -61,42 +60,42 @@ public abstract class ConsulIntegrationTestBase {
             .map(method -> method.getName())
             .orElse("unknown");
         String shortUuid = UUID.randomUUID().toString().substring(0, 8);
-        
+
         // Create unique identifiers for this test
         testId = methodName + "-" + shortUuid;
         testClusterName = "test-cluster-" + testId;
         testKvPrefix = "test-kv/" + testId + "/";
         testServicePrefix = "test-service-" + testId + "-";
-        
+
         LOG.infof("Setting up test '%s' with ID: %s", methodName, testId);
         LOG.infof("  Cluster: %s", testClusterName);
         LOG.infof("  KV Prefix: %s", testKvPrefix);
         LOG.infof("  Service Prefix: %s", testServicePrefix);
-        
+
         // Create Consul client for direct verification
         ConsulClientOptions options = new ConsulClientOptions()
             .setHost(consulHost)
             .setPort(consulPort);
         consulClient = ConsulClient.create(vertx, options);
-        
+
         // Allow subclasses to do additional setup
         setupTest();
     }
-    
+
     @AfterEach
     void teardownBase() {
         LOG.infof("Cleaning up test '%s'", testId);
-        
+
         try {
             // Clean up any services with our test prefix
             cleanupTestServices();
-            
+
             // Clean up any KV entries with our test prefix
             cleanupTestKvEntries();
-            
+
             // Allow subclasses to do additional cleanup
             cleanupTest();
-            
+
         } catch (Exception e) {
             LOG.errorf("Error during test cleanup: %s", e.getMessage());
         } finally {
@@ -105,7 +104,7 @@ public abstract class ConsulIntegrationTestBase {
             }
         }
     }
-    
+
     /**
      * Clean up all services that start with our test prefix.
      */
@@ -115,7 +114,7 @@ public abstract class ConsulIntegrationTestBase {
                 if (services == null || services.isEmpty()) {
                     return Uni.createFrom().voidItem();
                 }
-                
+
                 // Find all services that belong to this test
                 return Uni.join().all(
                     services.stream()
@@ -129,7 +128,7 @@ public abstract class ConsulIntegrationTestBase {
             })
             .await().atMost(Duration.ofSeconds(5));
     }
-    
+
     /**
      * Clean up all KV entries under our test prefix.
      */
@@ -139,35 +138,35 @@ public abstract class ConsulIntegrationTestBase {
             .onFailure().recoverWithNull() // Ignore if prefix doesn't exist
             .await().atMost(Duration.ofSeconds(5));
     }
-    
+
     /**
      * Get a prefixed service name for this test.
      */
     protected String getTestServiceName(String baseName) {
         return testServicePrefix + baseName;
     }
-    
+
     /**
      * Get a prefixed KV key for this test.
      */
     protected String getTestKvKey(String key) {
         return testKvPrefix + key;
     }
-    
+
     /**
      * Override this to perform additional test-specific setup.
      */
     protected void setupTest() {
         // Subclasses can override
     }
-    
+
     /**
      * Override this to perform additional test-specific cleanup.
      */
     protected void cleanupTest() {
         // Subclasses can override
     }
-    
+
     /**
      * Helper method to register a test service with health check.
      */
@@ -183,14 +182,14 @@ public abstract class ConsulIntegrationTestBase {
                     .setDeregisterAfter("30s"))
         );
     }
-    
+
     /**
      * Helper method to store test data in KV store.
      */
     protected Uni<Boolean> putTestKv(String key, String value) {
         return consulClient.putValue(getTestKvKey(key), value);
     }
-    
+
     /**
      * Helper method to get test data from KV store.
      */
@@ -198,7 +197,7 @@ public abstract class ConsulIntegrationTestBase {
         return consulClient.getValue(getTestKvKey(key))
             .map(keyValue -> keyValue != null ? keyValue.getValue() : null);
     }
-    
+
     /**
      * Find an available port for testing.
      */

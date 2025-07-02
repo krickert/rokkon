@@ -1,0 +1,42 @@
+{
+  "service": {
+    "name": "pipeline-engine",
+    "port": 38082,
+    "tags": ["engine", "http"],
+    "check": {
+      "http": "http://localhost:38082/q/health",
+      "interval": "10s"
+    },
+    "connect": {
+      "sidecar_service": {
+        "port": 21000,
+        "proxy": {
+          "local_service_address": "127.0.0.1",
+          "local_service_port": 38082,
+          "upstreams": []
+        }
+      }
+    }
+  },
+  "services": [
+    {
+      "name": "pipeline-engine-grpc",
+      "port": 48082,
+      "tags": ["engine", "grpc"],
+      "check": {
+        "tcp": "localhost:48082",
+        "interval": "10s"
+      },
+      "connect": {
+        "sidecar_service": {
+          "port": 21001,
+          "proxy": {
+            "local_service_address": "127.0.0.1",
+            "local_service_port": 48082,
+            "upstreams": []
+          }
+        }
+      }
+    }
+  ]
+}

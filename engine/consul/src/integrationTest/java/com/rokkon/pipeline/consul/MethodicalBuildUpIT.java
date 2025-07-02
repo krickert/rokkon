@@ -8,11 +8,11 @@ import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
 import com.rokkon.pipeline.consul.test.TestSeedingService;
 import com.rokkon.pipeline.validation.ValidationResult;
+import com.rokkon.test.containers.ModuleContainerResource;
 import io.quarkus.test.junit.QuarkusIntegrationTest;
 import io.quarkus.test.common.QuarkusTestResource;
 import io.smallrye.mutiny.helpers.test.UniAssertSubscriber;
 import org.junit.jupiter.api.*;
-import org.junit.jupiter.api.Disabled;
 import org.jboss.logging.Logger;
 
 import jakarta.inject.Inject;
@@ -32,12 +32,21 @@ import static org.assertj.core.api.Assertions.assertThat;
  * 5. Add first test-module pipeline step
  * 6. Run test-module 2x to ensure it runs twice
  */
-@Disabled("Integration test - requires full container setup including Consul and test-module containers")
 @QuarkusIntegrationTest
 @QuarkusTestResource(ConsulTestResource.class)
+@QuarkusTestResource(MethodicalBuildUpIT.TestModuleContainerResource.class)
 @TestInstance(TestInstance.Lifecycle.PER_CLASS)
 @TestMethodOrder(MethodOrderer.OrderAnnotation.class)
 class MethodicalBuildUpIT extends MethodicalBuildUpTestBase {
+
+    /**
+     * Custom test resource that provides the test module container.
+     */
+    public static class TestModuleContainerResource extends ModuleContainerResource {
+        public TestModuleContainerResource() {
+            super("rokkon/test-module:1.0.0-SNAPSHOT");
+        }
+    }
     private static final Logger LOG = Logger.getLogger(MethodicalBuildUpIT.class);
 
     @Inject

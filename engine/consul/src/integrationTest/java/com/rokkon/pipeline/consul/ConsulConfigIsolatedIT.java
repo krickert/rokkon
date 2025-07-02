@@ -1,9 +1,9 @@
 package com.rokkon.pipeline.consul;
 
 import com.rokkon.pipeline.consul.test.ConsulTestResource;
-import com.rokkon.pipeline.consul.test.IsolatedConsulKvTestBase;
+import com.rokkon.pipeline.consul.test.IsolatedConsulKvIntegrationTestBase;
 import io.quarkus.test.common.QuarkusTestResource;
-import io.quarkus.test.junit.QuarkusTest;
+import io.quarkus.test.junit.QuarkusIntegrationTest;
 import io.quarkus.test.junit.QuarkusTestProfile;
 import org.junit.jupiter.api.Disabled;
 import org.junit.jupiter.api.Test;
@@ -14,15 +14,14 @@ import java.util.UUID;
 import static org.assertj.core.api.Assertions.assertThat;
 
 /**
- * Integration test demonstrating how to use IsolatedConsulKvTestBase
- * for consul-config tests with isolated namespaces.
+ * Integration test demonstrating how to use isolated Consul KV namespaces
+ * for consul-config tests with @QuarkusIntegrationTest.
  */
-@Disabled("Integration test - requires full Consul setup")
-@QuarkusTest
+@QuarkusIntegrationTest
 @QuarkusTestResource(ConsulTestResource.class)
 @io.quarkus.test.junit.TestProfile(ConsulConfigIsolatedIT.IsolatedConfigProfile.class)
-public class ConsulConfigIsolatedIT extends IsolatedConsulKvTestBase {
-    
+public class ConsulConfigIsolatedIT extends IsolatedConsulKvIntegrationTestBase {
+
     @Test
     void testIsolatedConfigWrites() {
         // Write configuration to isolated namespace
@@ -35,16 +34,16 @@ public class ConsulConfigIsolatedIT extends IsolatedConsulKvTestBase {
                   - feature1
                   - feature2
             """;
-        
+
         writeValue("config/application", yamlConfig);
-        
+
         // Read it back
         String readConfig = readValue("config/application");
         assertThat(readConfig).isEqualTo(yamlConfig);
-        
+
         System.out.println("✓ Isolated config written to: " + getFullKey("config/application"));
     }
-    
+
     @Test
     void testMultipleConfigFiles() {
         // Write multiple config files
@@ -53,33 +52,33 @@ public class ConsulConfigIsolatedIT extends IsolatedConsulKvTestBase {
               url: jdbc:postgresql://localhost:5432/test
               pool-size: 10
             """);
-        
+
         writeValue("config/messaging", """
             messaging:
               kafka:
                 bootstrap-servers: localhost:9092
                 topic: test-topic
             """);
-        
+
         writeValue("config/security", """
             security:
               jwt:
                 issuer: test-issuer
                 secret: test-secret
             """);
-        
+
         // Verify all exist
         assertThat(keyExists("config/database")).isTrue();
         assertThat(keyExists("config/messaging")).isTrue();
         assertThat(keyExists("config/security")).isTrue();
-        
+
         System.out.println("✓ Multiple config files written successfully");
     }
-    
+
     @Test
     void testConfigUpdateScenario() {
         String configKey = "config/service";
-        
+
         // Initial config
         String v1Config = """
             service:
@@ -87,7 +86,7 @@ public class ConsulConfigIsolatedIT extends IsolatedConsulKvTestBase {
               enabled: false
             """;
         writeValue(configKey, v1Config);
-        
+
         // Update config
         String v2Config = """
             service:
@@ -96,33 +95,55 @@ public class ConsulConfigIsolatedIT extends IsolatedConsulKvTestBase {
               new-feature: active
             """;
         writeValue(configKey, v2Config);
-        
+
         // Verify update
         String currentConfig = readValue(configKey);
         assertThat(currentConfig).isEqualTo(v2Config);
-        
+
         System.out.println("✓ Config update successful");
     }
-    
+
     @Test
     void testConfigDeletion() {
         String configKey = "config/temporary";
-        
+
         // Write config
         writeValue(configKey, "temporary: config");
         assertThat(keyExists(configKey)).isTrue();
-        
+
         // Delete config
         deleteValue(configKey);
         assertThat(keyExists(configKey)).isFalse();
-        
+
         System.out.println("✓ Config deletion successful");
     }
-    
+
+    @Override
+    protected void configureConsulConnection() {
+        // Get Consul host and port from system properties
+        // These are set by ConsulTestResource
+        String host = System.getProperty("consul.host");
+        String port = System.getProperty("consul.port");
+
+        if (host != null) {
+            consulHost = host;
+        }
+
+        if (port != null) {
+            try {
+                consulPort = Integer.parseInt(port);
+            } catch (NumberFormatException e) {
+                System.err.println("Invalid consul.port: " + port);
+            }
+        }
+
+        System.out.println("Configuring Consul connection to: " + consulHost + ":" + consulPort);
+    }
+
     @Override
     protected void onSetup() {
         System.out.println("Setting up ConsulConfigIsolatedIT with namespace: " + testNamespace);
-        
+
         // Pre-populate some default config for all tests
         writeValue("config/defaults", """
             defaults:
@@ -130,13 +151,13 @@ public class ConsulConfigIsolatedIT extends IsolatedConsulKvTestBase {
               retry-count: 3
             """);
     }
-    
+
     @Override
     protected void onCleanup() {
         System.out.println("Cleaning up ConsulConfigIsolatedIT");
         // Any test-specific cleanup can go here
     }
-    
+
     /**
      * Profile that configures consul-config to use isolated namespaces.
      * This prevents tests from interfering with each other.

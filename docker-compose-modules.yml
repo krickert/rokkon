@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # Test Module - Testing and validation
+  test-module:
+    image: rokkon/test-module:latest
+    container_name: rokkon-test-module
+    ports:
+      - "8080:8080"  # HTTP
+      - "9000:9000"  # gRPC
+    environment:
+      - QUARKUS_GRPC_SERVER_PORT=9000
+      - QUARKUS_HTTP_PORT=8080
+      - MODULE_NAME=test-module
+      - MODULE_VERSION=1.0.0
+    networks:
+      - rokkon-network
+
+  # Echo Module - Simple echo service
+  echo:
+    image: rokkon/echo:latest
+    container_name: rokkon-echo
+    ports:
+      - "8081:8080"  # HTTP
+      - "9001:9000"  # gRPC
+    environment:
+      - QUARKUS_GRPC_SERVER_PORT=9000
+      - QUARKUS_HTTP_PORT=8080
+      - MODULE_NAME=echo
+      - MODULE_VERSION=1.0.0
+    networks:
+      - rokkon-network
+
+  # Chunker Module - Text chunking service
+  chunker:
+    image: rokkon/chunker:latest
+    container_name: rokkon-chunker
+    ports:
+      - "8082:8080"  # HTTP
+      - "9002:9000"  # gRPC
+    environment:
+      - QUARKUS_GRPC_SERVER_PORT=9000
+      - QUARKUS_HTTP_PORT=8080
+      - MODULE_NAME=chunker
+      - MODULE_VERSION=1.0.0
+      - CHUNKER_MAX_CHUNK_SIZE=1000
+      - CHUNKER_OVERLAP_SIZE=100
+    networks:
+      - rokkon-network
+
+  # Parser Module - Document parsing service
+  parser:
+    image: rokkon/parser:latest
+    container_name: rokkon-parser
+    ports:
+      - "8083:8080"  # HTTP
+      - "9003:9000"  # gRPC
+    environment:
+      - QUARKUS_GRPC_SERVER_PORT=9000
+      - QUARKUS_HTTP_PORT=8080
+      - MODULE_NAME=parser
+      - MODULE_VERSION=1.0.0
+      - PARSER_MAX_FILE_SIZE=100MB
+    networks:
+      - rokkon-network
+
+  # Embedder Module - Text embedding service
+  embedder:
+    image: rokkon/embedder:latest
+    container_name: rokkon-embedder
+    ports:
+      - "8084:8080"  # HTTP
+      - "9004:9000"  # gRPC
+    environment:
+      - QUARKUS_GRPC_SERVER_PORT=9000
+      - QUARKUS_HTTP_PORT=8080
+      - MODULE_NAME=embedder
+      - MODULE_VERSION=1.0.0
+      - EMBEDDER_MODEL=sentence-transformers/all-MiniLM-L6-v2
+    networks:
+      - rokkon-network
+
+networks:
+  rokkon-network:
+    driver: bridge
+    name: rokkon-network
+
+# Optional: Add volumes for persistent data
+volumes:
+  rokkon-data:
+    driver: local
