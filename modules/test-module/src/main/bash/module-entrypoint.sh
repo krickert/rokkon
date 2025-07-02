@@ -3,20 +3,18 @@ set -e
 
 # Configuration with defaults
 MODULE_HOST=${MODULE_HOST:-0.0.0.0}
-MODULE_PORT=${MODULE_PORT:-49095}
-ENGINE_HOST=${ROKKON_ENGINE_ADDRESS:-${ENGINE_HOST:-localhost}} # Allow override by ROKKON_ENGINE_ADDRESS
+MODULE_PORT=${MODULE_PORT:-9090}
+MODULE_HTTP_PORT=${MODULE_HTTP_PORT:-${MODULE_PORT}}
+MODULE_GRPC_PORT=${MODULE_GRPC_PORT:-${MODULE_PORT}}
+ENGINE_HOST=${ENGINE_HOST:-localhost}
 ENGINE_PORT=${ENGINE_PORT:-8081}
-CONSUL_HOST=${ROKKON_CONSUL_ADDRESS:-localhost} # Add CONSUL_HOST and allow override by ROKKON_CONSUL_ADDRESS
+CONSUL_HOST=${CONSUL_HOST:-""}
+CONSUL_PORT=${CONSUL_PORT:-"-1"}
 HEALTH_CHECK=${HEALTH_CHECK:-true}
 MAX_RETRIES=${MAX_RETRIES:-3}
 STARTUP_TIMEOUT=${STARTUP_TIMEOUT:-60}
 CHECK_INTERVAL=${CHECK_INTERVAL:-5}
 SHUTDOWN_ON_REGISTRATION_FAILURE=${SHUTDOWN_ON_REGISTRATION_FAILURE:-true}
-
-# The address that should be registered with Consul for health checks
-# This might be different from MODULE_HOST if running in Docker
-EXTERNAL_MODULE_HOST=${EXTERNAL_MODULE_HOST:-host.docker.internal}
-EXTERNAL_MODULE_PORT=${EXTERNAL_MODULE_PORT:-${MODULE_PORT}}
 
 # Function to register module with retries
 register_module() {
@@ -26,28 +24,23 @@ register_module() {
   while [ $retry_count -lt $MAX_RETRIES ] && [ "$success" = false ]; do
     echo "Registering module with engine (attempt $((retry_count+1))/${MAX_RETRIES})..."
     
-    # Build CLI command with all options
-    # CLI connects to module locally at localhost
-    local cli_cmd="rokkon register --module-host=localhost --module-port=${MODULE_PORT} --engine-host=${ENGINE_HOST} --engine-port=${ENGINE_PORT} --consul-host=${CONSUL_HOST}"
+    # Build CLI command with all options (use gRPC port for registration)
+    local cli_cmd="pipeline register --module-host=${MODULE_HOST} --module-port=${MODULE_GRPC_PORT} --engine-host=${ENGINE_HOST} --engine-port=${ENGINE_PORT}"
     
-    # Add the external address that the engine should use to reach this module
-    # This is what gets registered in Consul for health checks
-    if [ -n "$EXTERNAL_MODULE_HOST" ]; then
-      cli_cmd="$cli_cmd --registration-host=${EXTERNAL_MODULE_HOST}"
+    # Add optional parameters if provided
+    if [ -n "$CONSUL_HOST" ]; then
+      cli_cmd="$cli_cmd --consul-host=${CONSUL_HOST}"
     fi
     
-    if [ -n "$EXTERNAL_MODULE_PORT" ]; then
-      cli_cmd="$cli_cmd --registration-port=${EXTERNAL_MODULE_PORT}"
+    if [ "$CONSUL_PORT" != "-1" ]; then
+      cli_cmd="$cli_cmd --consul-port=${CONSUL_PORT}"
     fi
     
     if [ "$HEALTH_CHECK" = false ]; then
       cli_cmd="$cli_cmd --skip-health-check"
     fi
     
-    # Execute registration command with random HTTP port to avoid conflicts
-    # Set a random port for the CLI's HTTP server to avoid conflicts
-    export QUARKUS_HTTP_PORT=$((30000 + RANDOM % 10000))
-    
+    # Execute registration command
     if $cli_cmd; then
       echo "Module registered successfully!"
       success=true
@@ -68,10 +61,7 @@ register_module() {
 
 # Start the module in the background with port overrides
 echo "Starting module..."
-# Use QUARKUS_HTTP_PORT for HTTP and MODULE_PORT for gRPC services (with health checks)
-HTTP_PORT=${QUARKUS_HTTP_PORT:-39095}
-GRPC_PORT=${MODULE_PORT:-49095}
-java ${JAVA_OPTS} ${JAVA_OPTS_APPEND} -Dquarkus.http.port=${HTTP_PORT} -Dquarkus.grpc.server.port=${GRPC_PORT} -jar /deployments/quarkus-run.jar &
+java ${JAVA_OPTS} ${JAVA_OPTS_APPEND} -Dquarkus.http.port=${MODULE_HTTP_PORT} -Dquarkus.grpc.server.port=${MODULE_GRPC_PORT} -jar /deployments/quarkus-run.jar &
 MODULE_PID=$!
 
 # Give the module a moment to start up

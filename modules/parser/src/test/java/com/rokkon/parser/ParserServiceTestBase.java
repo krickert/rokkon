@@ -99,7 +99,7 @@ public abstract class ParserServiceTestBase {
                 .awaitItem()
                 .getItem();
         
-        assertThat(registration.getModuleName()).isEqualTo("parser-module");
+        assertThat(registration.getModuleName()).isEqualTo("parser");
         assertThat(registration.hasJsonConfigSchema()).isTrue();
         assertThat(registration.getHealthCheckPassed()).isTrue();
         assertThat(registration.getHealthCheckMessage()).contains("No health check performed");

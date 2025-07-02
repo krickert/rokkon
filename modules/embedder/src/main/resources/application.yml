@@ -2,13 +2,13 @@ quarkus:
   application:
     name: embedder-module
   http:
-    port: 39093
+    port: 39094
   generate-code:
     grpc:
       scan-for-proto: com.rokkon.pipeline:protobuf,com.google.api.grpc:proto-google-common-protos
   grpc:
     server:
-      port: 49093  # Different port from parser (49091) and chunker (49092)
+      port: 49094  # Different port from parser (49093) and chunker (49092)
       host: 0.0.0.0
       enable-reflection-service: true
       max-inbound-message-size: 1073741824  # 1GB
@@ -25,7 +25,7 @@ quarkus:
     build: false  # Set to true when you want to build the image
     push: false   # Set to true when you want to push to registry
     registry: "registry.rokkon.com:8443"
-    image: "rokkon/embedder-module:${quarkus.application.version}"
+    image: "pipeline/embedder:${quarkus.application.version}"
     dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
     group: rokkon
     # Credentials should be provided via environment variables:

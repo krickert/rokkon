@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-echo "Deploying Test Module and registering with Rokkon Engine"
+echo "Deploying Test Module and registering with Pipeline Engine"
 echo "========================================================"
 
 # Step 1: Build the Test Module and CLI tool
@@ -20,11 +20,11 @@ mkdir -p modules/test-module/build/docker
 
 # Copy the CLI jar to the expected location for the Docker build
 echo "Copying CLI jar to the expected location..."
-cp cli/register-module/build/quarkus-app/quarkus-run.jar modules/test-module/build/docker/rokkon-cli.jar
+cp cli/register-module/build/quarkus-app/quarkus-run.jar modules/test-module/build/docker/pipeline-cli.jar
 
 # Build the test-module Docker image
 echo "Building the test-module Docker image..."
-docker build -f modules/test-module/src/main/docker/Dockerfile.jvm -t rokkon/test-module:latest ./modules/test-module
+docker build -f modules/test-module/src/main/docker/Dockerfile.jvm -t pipeline/test-module:latest ./modules/test-module
 
 # Start the test-module service
 echo "Starting the test-module service..."
@@ -40,7 +40,7 @@ docker logs rokkon-test-module
 
 # Step 5: Manual Registration (if needed)
 echo "Step 5: If automatic registration failed, you can manually register the module using:"
-echo "docker exec rokkon-test-module rokkon register \\"
+echo "docker exec rokkon-test-module pipeline register \\"
 echo "  --module-host=localhost \\"
 echo "  --module-port=49095 \\"
 echo "  --engine-host=rokkon-engine \\"
@@ -60,5 +60,5 @@ docker logs rokkon-engine | grep "test-module"
 echo "3. Checking the test-module's health status..."
 curl http://localhost:39095/q/health
 
-echo "Deployment complete! The test-module should now be registered with the Rokkon Engine."
+echo "Deployment complete! The test-module should now be registered with the Pipeline Engine."
 echo "To stop and remove the services, run: docker compose -f docker-compose-test-module.yml down"

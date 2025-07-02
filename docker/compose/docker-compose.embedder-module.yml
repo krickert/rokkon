@@ -1,4 +1,8 @@
-# docker-compose.yml
+# docker/compose/docker-compose.embedder-module.yml
+# Working configuration for embedder module with sidecar pattern
+# Embedder module will be accessible at:
+# - HTTP: http://localhost:39094
+# - gRPC: localhost:49094
 version: '3.8'
 
 services:
@@ -35,7 +39,7 @@ services:
   # ==========================================
   seeder:
     build:
-      context: ./cli/seed-engine-consul-config
+      context: ../../cli/seed-engine-consul-config
       dockerfile: Dockerfile
     container_name: consul-seeder
     depends_on:
@@ -47,7 +51,7 @@ services:
         java -jar build/quarkus-app/quarkus-run.jar -h consul-server -p 8500 --key config/application --import seed-data.json --force &&
         java -jar build/quarkus-app/quarkus-run.jar -h consul-server -p 8500 --key config/docker-compose --import seed-data.json --force
     volumes:
-      - ./cli/seed-engine-consul-config/seed-data.json:/app/seed-data.json:ro
+      - ../../cli/seed-engine-consul-config/seed-data.json:/app/seed-data.json:ro
     networks:
       - pipeline-network
 
@@ -79,7 +83,7 @@ services:
   # 3a. ENGINE APPLICATION
   # ==========================================
   engine:
-    image: ${ENGINE_IMAGE}
+    image: ${ENGINE_IMAGE:-pipeline/engine:latest}
     container_name: engine-app
     depends_on:
       seeder:
@@ -104,20 +108,20 @@ services:
       retries: 5
 
   # ==========================================
-  # 4. ECHO MODULE SIDECAR - Consul Agent for Echo
+  # 4. EMBEDDER MODULE SIDECAR - Consul Agent for Embedder Module
   # ==========================================
-  consul-agent-echo:
+  consul-agent-embedder:
     image: hashicorp/consul:${CONSUL_VERSION:-1.21}
-    container_name: consul-agent-echo
+    container_name: consul-agent-embedder
     depends_on:
       consul-server:
         condition: service_healthy
     ports:
-      - "${ECHO_MODULE_REST_PORT:-39090}:39090"
-      - "${ECHO_MODULE_GRPC_PORT:-49090}:49090"
+      - "${EMBEDDER_MODULE_REST_PORT:-39094}:39094"
+      - "${EMBEDDER_MODULE_GRPC_PORT:-49094}:49094"
     command: >
       agent 
-      -node="echo-sidecar"
+      -node="embedder-sidecar"
       -client=0.0.0.0 
       -bind=0.0.0.0
       -retry-join=consul-server
@@ -128,32 +132,40 @@ services:
       - pipeline-network
 
   # ==========================================
-  # 4a. ECHO MODULE APPLICATION
+  # 4a. EMBEDDER MODULE APPLICATION
   # ==========================================
-  echo-module:
-    image: ${ECHO_MODULE_IMAGE}
-    container_name: echo-module-app
+  embedder-module:
+    image: ${EMBEDDER_MODULE_IMAGE:-pipeline/embedder:latest}
+    container_name: embedder-module-app
     depends_on:
       engine:
         condition: service_healthy
-      consul-agent-echo:
+      consul-agent-embedder:
         condition: service_started
     environment:
       # Module Configuration
-      - MODULE_NAME=echo
-      - MODULE_HOST=consul-agent-echo
-      - MODULE_HTTP_PORT=39090
-      - MODULE_GRPC_PORT=49090
+      - MODULE_NAME=embedder
+      - MODULE_HOST=consul-agent-embedder
+      - MODULE_HTTP_PORT=39094
+      - MODULE_GRPC_PORT=49094
       # Override Quarkus ports
-      - QUARKUS_HTTP_PORT=39090
-      - QUARKUS_GRPC_SERVER_PORT=49090
+      - QUARKUS_HTTP_PORT=39094
+      - QUARKUS_GRPC_SERVER_PORT=49094
       # Engine connection for registration
       - ENGINE_HOST=consul-agent-engine
       - ENGINE_PORT=49000
       # Let module discover engine via Consul service discovery
       # The module will query Consul for the "pipeline-engine" service
       - QUARKUS_PROFILE=${PROFILE:-docker-compose}
-    network_mode: "service:consul-agent-echo"  # Share network with sidecar
+      # Increase memory for ML models
+      - JAVA_OPTS=-Xmx8g -Xms2g
+    network_mode: "service:consul-agent-embedder"  # Share network with sidecar
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
 
 # ==========================================
 # NETWORKS & VOLUMES

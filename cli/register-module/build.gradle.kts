@@ -20,6 +20,10 @@ dependencies {
     // This won't be included in runtime, avoiding server components
     compileOnly("io.quarkus:quarkus-grpc")
     
+    // JSON processing dependencies needed for health checks
+    implementation("jakarta.json:jakarta.json-api")
+    implementation("io.quarkus:quarkus-jsonp")  // JSON-P implementation
+    
     // Test dependencies from BOM
     testImplementation("org.junit.jupiter:junit-jupiter")
     testImplementation("io.quarkus:quarkus-junit5")
@@ -33,6 +37,11 @@ version = "1.0.0-SNAPSHOT"
 java {
     sourceCompatibility = JavaVersion.VERSION_21
     targetCompatibility = JavaVersion.VERSION_21
+}
+
+// Configure Quarkus to build uber-jar
+quarkus {
+    quarkusBuildProperties.put("quarkus.package.jar.type", "uber-jar")
 }
 
 tasks.withType<Test> {
@@ -63,7 +72,7 @@ val cliJar by configurations.creating {
 
 // Expose the runner JAR from quarkusBuild
 artifacts {
-    add("cliJar", file("build/quarkus-app/quarkus-run.jar")) {
+    add("cliJar", file("build/register-module-1.0.0-SNAPSHOT-runner.jar")) {
         builtBy(tasks.named("quarkusBuild"))
     }
 }

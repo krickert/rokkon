@@ -1,7 +1,7 @@
 #!/bin/bash
 set -e
 
-# Script to set up automated module registration for a Rokkon module project
+# Script to set up automated module registration for a Pipeline module project
 # Usage: ./setup-module-registration.sh <module-directory>
 
 # Check if module directory is provided
@@ -48,14 +48,14 @@ tasks.register<Copy>("copyModuleEntrypoint") {
     rename { "module-entrypoint.sh" }
 }
 
-tasks.register<Copy>("copyRokkonCli") {
+tasks.register<Copy>("copyPipelineCli") {
     from(project(":engine:cli-register").tasks.named("quarkusBuild").map { it.outputs.files.singleFile })
     into(layout.buildDirectory)
-    rename { "rokkon-cli.jar" }
+    rename { "pipeline-cli.jar" }
 }
 
 tasks.named("quarkusBuild") {
-    finalizedBy("copyModuleEntrypoint", "copyRokkonCli")
+    finalizedBy("copyModuleEntrypoint", "copyPipelineCli")
 }
 EOF
 
@@ -100,12 +100,12 @@ RUN curl -sSL https://github.com/fullstorydev/grpcurl/releases/download/v1.8.7/g
     # Insert CLI and entrypoint script before ENTRYPOINT
     sed -i "${ENTRYPOINT_LINE}i\\
 # Copy the CLI tool\\
-COPY --chown=185 build/rokkon-cli.jar /deployments/rokkon-cli.jar\\
+COPY --chown=185 build/pipeline-cli.jar /deployments/pipeline-cli.jar\\
 \\
 # Create a wrapper script for the CLI\\
-RUN echo '#!/bin/bash' > /usr/local/bin/rokkon && \\\\\\
-    echo 'java -jar /deployments/rokkon-cli.jar \"\$@\"' >> /usr/local/bin/rokkon && \\\\\\
-    chmod +x /usr/local/bin/rokkon\\
+RUN echo '#!/bin/bash' > /usr/local/bin/pipeline && \\\\\\
+    echo 'java -jar /deployments/pipeline-cli.jar \"\$@\"' >> /usr/local/bin/pipeline && \\\\\\
+    chmod +x /usr/local/bin/pipeline\\
 \\
 # Copy the entrypoint script\\
 COPY --chown=185 build/module-entrypoint.sh /deployments/module-entrypoint.sh\\
@@ -144,10 +144,10 @@ cd $MODULE_DIR
 
 # Build Docker image
 echo "Building Docker image..."
-docker build -f src/main/docker/Dockerfile.jvm -t rokkon/$(basename "$MODULE_DIR"):latest .
+docker build -f src/main/docker/Dockerfile.jvm -t pipeline/$(basename "$MODULE_DIR"):latest .
 
 echo "Docker image built successfully!"
-echo "Run with: docker run -i --rm -p 9090:9090 -p 8080:8080 -e ENGINE_HOST=host.docker.internal rokkon/$(basename "$MODULE_DIR"):latest"
+echo "Run with: docker run -i --rm -p 9090:9090 -p 8080:8080 -e ENGINE_HOST=host.docker.internal pipeline/$(basename "$MODULE_DIR"):latest"
 EOF
   
   chmod +x "$DOCKER_BUILD"
@@ -174,10 +174,10 @@ cd $MODULE_DIR
 
 # Build Docker image
 echo "Building Docker image..."
-docker build -f src/main/docker/Dockerfile.jvm -t rokkon/$(basename "$MODULE_DIR"):latest .
+docker build -f src/main/docker/Dockerfile.jvm -t pipeline/$(basename "$MODULE_DIR"):latest .
 
 echo "Docker image built successfully!"
-echo "Run with: docker run -i --rm -p 9090:9090 -p 8080:8080 -e ENGINE_HOST=host.docker.internal rokkon/$(basename "$MODULE_DIR"):latest"
+echo "Run with: docker run -i --rm -p 9090:9090 -p 8080:8080 -e ENGINE_HOST=host.docker.internal pipeline/$(basename "$MODULE_DIR"):latest"
 EOF
     
     mv "$TMP_FILE" "$DOCKER_BUILD"
@@ -193,6 +193,6 @@ echo "Setup complete! The module in $MODULE_DIR is now configured for automated 
 echo "To build and run the module:"
 echo "  1. cd $MODULE_DIR"
 echo "  2. ./docker-build.sh"
-echo "  3. docker run -i --rm -p 9090:9090 -p 8080:8080 -e ENGINE_HOST=<engine-host> rokkon/$(basename "$MODULE_DIR"):latest"
+echo "  3. docker run -i --rm -p 9090:9090 -p 8080:8080 -e ENGINE_HOST=<engine-host> pipeline/$(basename "$MODULE_DIR"):latest"
 echo ""
 echo "For more information, see modules/README-registration.md"

@@ -1,4 +1,8 @@
-# docker-compose.yml
+# docker/compose/docker-compose.test-module-working.yml
+# Working configuration for test-module with sidecar pattern
+# Test module successfully registers and is accessible at:
+# - HTTP: http://localhost:39095
+# - gRPC: localhost:49095
 version: '3.8'
 
 services:
@@ -35,7 +39,7 @@ services:
   # ==========================================
   seeder:
     build:
-      context: ./cli/seed-engine-consul-config
+      context: ../../../cli/seed-engine-consul-config
       dockerfile: Dockerfile
     container_name: consul-seeder
     depends_on:
@@ -47,7 +51,7 @@ services:
         java -jar build/quarkus-app/quarkus-run.jar -h consul-server -p 8500 --key config/application --import seed-data.json --force &&
         java -jar build/quarkus-app/quarkus-run.jar -h consul-server -p 8500 --key config/docker-compose --import seed-data.json --force
     volumes:
-      - ./cli/seed-engine-consul-config/seed-data.json:/app/seed-data.json:ro
+      - ../../../cli/seed-engine-consul-config/seed-data.json:/app/seed-data.json:ro
     networks:
       - pipeline-network
 
@@ -79,7 +83,7 @@ services:
   # 3a. ENGINE APPLICATION
   # ==========================================
   engine:
-    image: ${ENGINE_IMAGE}
+    image: ${ENGINE_IMAGE:-rokkon/rokkon-engine:latest}
     container_name: engine-app
     depends_on:
       seeder:
@@ -104,20 +108,20 @@ services:
       retries: 5
 
   # ==========================================
-  # 4. ECHO MODULE SIDECAR - Consul Agent for Echo
+  # 4. TEST MODULE SIDECAR - Consul Agent for Test Module
   # ==========================================
-  consul-agent-echo:
+  consul-agent-test:
     image: hashicorp/consul:${CONSUL_VERSION:-1.21}
-    container_name: consul-agent-echo
+    container_name: consul-agent-test
     depends_on:
       consul-server:
         condition: service_healthy
     ports:
-      - "${ECHO_MODULE_REST_PORT:-39090}:39090"
-      - "${ECHO_MODULE_GRPC_PORT:-49090}:49090"
+      - "${TEST_MODULE_REST_PORT:-39095}:39095"
+      - "${TEST_MODULE_GRPC_PORT:-49095}:49095"
     command: >
       agent 
-      -node="echo-sidecar"
+      -node="test-sidecar"
       -client=0.0.0.0 
       -bind=0.0.0.0
       -retry-join=consul-server
@@ -128,32 +132,32 @@ services:
       - pipeline-network
 
   # ==========================================
-  # 4a. ECHO MODULE APPLICATION
+  # 4a. TEST MODULE APPLICATION
   # ==========================================
-  echo-module:
-    image: ${ECHO_MODULE_IMAGE}
-    container_name: echo-module-app
+  test-module:
+    image: ${TEST_MODULE_IMAGE:-rokkon/test-module:latest}
+    container_name: test-module-app
     depends_on:
       engine:
         condition: service_healthy
-      consul-agent-echo:
+      consul-agent-test:
         condition: service_started
     environment:
       # Module Configuration
-      - MODULE_NAME=echo
-      - MODULE_HOST=consul-agent-echo
-      - MODULE_HTTP_PORT=39090
-      - MODULE_GRPC_PORT=49090
+      - MODULE_NAME=test-module
+      - MODULE_HOST=consul-agent-test
+      - MODULE_HTTP_PORT=39095
+      - MODULE_GRPC_PORT=49095
       # Override Quarkus ports
-      - QUARKUS_HTTP_PORT=39090
-      - QUARKUS_GRPC_SERVER_PORT=49090
+      - QUARKUS_HTTP_PORT=39095
+      - QUARKUS_GRPC_SERVER_PORT=49095
       # Engine connection for registration
       - ENGINE_HOST=consul-agent-engine
       - ENGINE_PORT=49000
       # Let module discover engine via Consul service discovery
       # The module will query Consul for the "pipeline-engine" service
       - QUARKUS_PROFILE=${PROFILE:-docker-compose}
-    network_mode: "service:consul-agent-echo"  # Share network with sidecar
+    network_mode: "service:consul-agent-test"  # Share network with sidecar
 
 # ==========================================
 # NETWORKS & VOLUMES

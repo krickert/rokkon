@@ -197,6 +197,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
                 serviceMeta.put("moduleName", moduleName);
                 serviceMeta.put("implementationId", implementationId);
                 serviceMeta.put("serviceType", serviceType);
+                serviceMeta.put("service-type", "MODULE");  // Add standard service-type for dashboard
                 serviceMeta.put("version", version);
                 serviceMeta.put("registeredAt", String.valueOf(registration.registeredAt()));
                 

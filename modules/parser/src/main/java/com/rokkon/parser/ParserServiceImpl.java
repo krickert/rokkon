@@ -126,7 +126,7 @@ public class ParserServiceImpl implements PipeStepProcessor {
         LOG.debug("Parser service registration requested");
 
         ServiceRegistrationResponse.Builder responseBuilder = ServiceRegistrationResponse.newBuilder()
-                .setModuleName("parser-module");
+                .setModuleName("parser");
 
         try {
             // Load the JSON schema from resources

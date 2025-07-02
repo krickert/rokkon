@@ -66,7 +66,7 @@ dependencies {
 // Copy CLI jar for Docker build
 tasks.register<Copy>("copyDockerAssets") {
     from(cliJar) {
-        rename { "register-module-cli.jar" }
+        rename { "pipeline-cli.jar" }
     }
     into(layout.buildDirectory.dir("docker"))
 }

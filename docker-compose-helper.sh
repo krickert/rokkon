@@ -13,7 +13,7 @@ NC='\033[0m'
 # Functions
 show_status() {
     echo -e "\n${BLUE}🐳 Docker Compose Status:${NC}"
-    docker-compose ps
+    docker compose ps
 }
 
 show_endpoints() {
@@ -21,7 +21,7 @@ show_endpoints() {
     echo "  Consul UI:         http://localhost:8500/ui"
     echo "  Engine Dashboard:  http://localhost:38082/"
     echo "  Engine Health:     http://localhost:38082/q/health"
-    echo "  Engine Swagger:    http://localhost:38082/q/swagger-ui"
+    echo "  Engine Swagger:    http://localhost:38082/swagger-ui"
     echo "  Echo Module:       http://localhost:39092/"
     echo ""
     echo -e "${BLUE}📡 Internal Network (rokkon-network):${NC}"
@@ -32,7 +32,7 @@ show_endpoints() {
 
 start_services() {
     echo -e "${BLUE}Starting Docker Compose environment...${NC}"
-    docker-compose up -d
+    docker compose up -d
     
     echo -e "${YELLOW}Waiting for services to be ready...${NC}"
     sleep 10
@@ -54,22 +54,22 @@ start_services() {
 
 stop_services() {
     echo -e "${YELLOW}Stopping Docker Compose environment...${NC}"
-    docker-compose down
+    docker compose down
     echo -e "${GREEN}✅ Services stopped${NC}"
 }
 
 clean_all() {
     echo -e "${RED}Cleaning up everything (including volumes)...${NC}"
-    docker-compose down -v
+    docker compose down -v
     echo -e "${GREEN}✅ All cleaned up${NC}"
 }
 
 view_logs() {
     SERVICE=${1:-}
     if [ -z "$SERVICE" ]; then
-        docker-compose logs -f
+        docker compose logs -f
     else
-        docker-compose logs -f "$SERVICE"
+        docker compose logs -f "$SERVICE"
     fi
 }
 

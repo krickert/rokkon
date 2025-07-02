@@ -269,14 +269,10 @@ public class ModuleDiscoveryResource {
                     
                     // Fall back to tags if metadata not present
                     if (!isModule && !instances.isEmpty() && instances.get(0).tags() != null) {
-                        isModule = instances.get(0).tags().contains("pipeline-module");
+                        isModule = instances.get(0).tags().contains("module");
                     }
                     
-                    // For backward compatibility, also check name prefix
-                    if (!isModule && serviceName.startsWith("module-")) {
-                        isModule = true;
-                        moduleName = serviceName.substring(7);
-                    }
+                    // No longer using module- prefix convention
                     
                     if (isModule) {
                         // This is a module service
@@ -436,7 +432,7 @@ public class ModuleDiscoveryResource {
     private String determineServiceType(String serviceName) {
         return switch (serviceName) {
             case "consul" -> "infrastructure";
-            case "rokkon-engine" -> "orchestrator";
+            case "rokkon-engine", "pipeline-engine" -> "orchestrator";
             default -> "service";
         };
     }
