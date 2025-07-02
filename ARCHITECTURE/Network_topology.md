@@ -97,7 +97,7 @@ graph TD
             KafkaService[K8s Service: kafka] --> KafkaPods["Kafka Broker Pods <br> (StatefulSet)"]
         end
 
-        PipelineEnginePods -- K8s DNS: consul.data-services... --> ConsulPods
+        PipelineEnginePods -- K8s DNS: consul.data-services... ----> ConsulPods
         PipelineEnginePods -- K8s DNS: kafka.data-services... --> KafkaPods
 
         %% Module registration to Engine
@@ -154,7 +154,7 @@ graph TD
             KafkaService[K8s Service: kafka] --> KafkaPods["Kafka Broker Pods <br> (StatefulSet)"]
         end
 
-        PipelineEnginePods -- "K8s DNS: consul.data-services..." --> ConsulPods
+        PipelineEnginePods -- "K8s DNS: consul.data-services..." ----> ConsulPods
         PipelineEnginePods -- "K8s DNS: kafka.data-services..." --> KafkaPods
 
     %% Module registration to Engine
