@@ -1,5 +1,5 @@
 {
-  "rokkon": {
+  "pipeline": {
     "engine": {
       "grpc-port": 49000,
       "rest-port": 8080,

@@ -37,7 +37,7 @@ public class PipelineExecutorService {
 
     private static final Logger LOG = LoggerFactory.getLogger(PipelineExecutorService.class);
 
-    @ConfigProperty(name = "rokkon.cluster.name", defaultValue = "default-cluster")
+    @ConfigProperty(name = "pipeline.cluster.name", defaultValue = "default-cluster")
     String clusterName;
 
     @Inject

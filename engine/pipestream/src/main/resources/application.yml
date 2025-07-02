@@ -48,6 +48,11 @@ quarkus:
   # Jackson configuration for consistent JSON formatting
   jackson:
     property-naming-strategy: SNAKE_CASE
+
+# Pipeline configuration - using 'pipeline' prefix instead of 'rokkon'
+pipeline:
+  consul:
+    kv-prefix: pipeline  # This is the prefix for Consul KV store (default was 'rokkon')
   
   # Cache configuration for gRPC channels
   cache:

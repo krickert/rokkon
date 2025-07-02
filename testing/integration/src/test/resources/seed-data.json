@@ -1,5 +1,5 @@
 {
-  "rokkon": {
+  "pipeline": {
     "cluster": {
       "name": "test-cluster"
     },

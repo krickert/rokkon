@@ -26,15 +26,15 @@ public class NoConsulConfigTestProfile implements QuarkusTestProfile {
         config.put("quarkus.consul.devservices.enabled", "false");
         
         // Provide required engine configuration
-        config.put("rokkon.cluster.name", "test-cluster");
-        config.put("rokkon.engine.name", "test-engine");
-        config.put("rokkon.engine.startup.create-cluster", "false");
+        config.put("pipeline.cluster.name", "test-cluster");
+        config.put("pipeline.engine.name", "test-engine");
+        config.put("pipeline.engine.startup.create-cluster", "false");
         
         // Module whitelist configuration
-        config.put("rokkon.modules.whitelist[0]", "echo");
-        config.put("rokkon.modules.whitelist[1]", "test-module");
-        config.put("rokkon.modules.whitelist[2]", "chunker");
-        config.put("rokkon.modules.whitelist[3]", "parser");
+        config.put("pipeline.modules.whitelist[0]", "echo");
+        config.put("pipeline.modules.whitelist[1]", "test-module");
+        config.put("pipeline.modules.whitelist[2]", "chunker");
+        config.put("pipeline.modules.whitelist[3]", "parser");
         
         // gRPC configuration - use random ports for tests
         config.put("quarkus.grpc.server.port", "0");

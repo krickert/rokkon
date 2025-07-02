@@ -22,10 +22,10 @@ public class EngineInfoResource {
     @ConfigProperty(name = "quarkus.application.version", defaultValue = "unknown")
     String applicationVersion;
     
-    @ConfigProperty(name = "rokkon.cluster.name", defaultValue = "default")
+    @ConfigProperty(name = "pipeline.cluster.name", defaultValue = "default")
     String clusterName;
     
-    @ConfigProperty(name = "rokkon.engine.name", defaultValue = "engine-1")
+    @ConfigProperty(name = "pipeline.engine.name", defaultValue = "engine-1")
     String engineName;
     
     @GET
