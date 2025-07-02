@@ -1,0 +1,164 @@
+# docker-compose.yml
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. CONSUL SERVER - Central Service Discovery
+  # ==========================================
+  consul-server:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-server
+    ports:
+      - "8500:8500"      # HTTP API & UI
+      - "8600:8600/tcp"  # DNS
+      - "8600:8600/udp"  # DNS
+    volumes:
+      - consul_data:/consul/data
+    command: >
+      agent -server -ui 
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -bootstrap-expect=1 
+      -dev
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    healthcheck:
+      test: ["CMD", "consul", "info"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - rokkon-network
+
+  # ==========================================
+  # 2. CONFIGURATION SEEDER - One-time Job
+  # ==========================================
+  seeder:
+    build:
+      context: ./cli/seed-engine-consul-config
+      dockerfile: Dockerfile
+    container_name: consul-seeder
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    command:
+      - "java"
+      - "-jar"
+      - "build/quarkus-app/quarkus-run.jar"
+      - "-h"
+      - "consul-server"
+      - "-p"
+      - "8500"
+      - "--key"
+      - "config/${PROFILE:-docker-compose}"
+      - "--import"
+      - "seed-data.json"
+      - "--force"
+    volumes:
+      - ./cli/seed-engine-consul-config/seed-data.json:/app/seed-data.json:ro
+    networks:
+      - rokkon-network
+
+  # ==========================================
+  # 3. ENGINE SIDECAR - Consul Agent for Engine
+  # ==========================================
+  consul-agent-engine:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-engine
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    command: >
+      agent 
+      -node="engine-sidecar"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - rokkon-network
+
+  # ==========================================
+  # 3a. ENGINE APPLICATION
+  # ==========================================
+  engine:
+    image: ${ENGINE_IMAGE}
+    container_name: engine-app
+    depends_on:
+      seeder:
+        condition: service_completed_successfully
+      consul-agent-engine:
+        condition: service_started
+    ports:
+      - "${ENGINE_REST_PORT:-38082}:38082"
+      - "${ENGINE_GRPC_PORT:-48082}:48082"
+    environment:
+      # Only set what the profile can't know
+      - QUARKUS_PROFILE=${PROFILE:-docker-compose}
+      # Optional overrides for cluster configuration
+      - CLUSTER_NAME=${CLUSTER_NAME:-docker-cluster}
+      - PIPELINE_CLUSTER_NAME=${CLUSTER_NAME:-docker-cluster}
+      - PIPELINE_ENGINE_NAME=${ENGINE_NAME:-engine-docker}
+    network_mode: "service:consul-agent-engine"  # Share network with sidecar
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:38082/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # ==========================================
+  # 4. ECHO MODULE SIDECAR - Consul Agent for Echo
+  # ==========================================
+  consul-agent-echo:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-echo
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    command: >
+      agent 
+      -node="echo-sidecar"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - rokkon-network
+
+  # ==========================================
+  # 4a. ECHO MODULE APPLICATION
+  # ==========================================
+  echo-module:
+    image: ${ECHO_MODULE_IMAGE}
+    container_name: echo-module-app
+    depends_on:
+      engine:
+        condition: service_healthy
+      consul-agent-echo:
+        condition: service_started
+    ports:
+      - "${ECHO_MODULE_REST_PORT:-39092}:39092"
+      - "${ECHO_MODULE_GRPC_PORT:-49092}:49092"
+    environment:
+      # Module Configuration
+      - MODULE_NAME=echo
+      - MODULE_HTTP_PORT=39092
+      - MODULE_GRPC_PORT=49092
+      # Let module discover engine via Consul service discovery
+      # The module will query Consul for the "pipeline-engine" service
+      - QUARKUS_PROFILE=${PROFILE:-docker-compose}
+    network_mode: "service:consul-agent-echo"  # Share network with sidecar
+
+# ==========================================
+# NETWORKS & VOLUMES
+# ==========================================
+networks:
+  rokkon-network:
+    driver: bridge
+
+volumes:
+  consul_data:

@@ -41,7 +41,7 @@ public class DynamicGrpcTestResource {
     @Inject
     ConsulConnectionManager consulConnectionManager;
     
-    @ConfigProperty(name = "rokkon.engine.name", defaultValue = "engine-1")
+    @ConfigProperty(name = "pipeline.engine.name", defaultValue = "engine-1")
     String engineName;
     
     /**

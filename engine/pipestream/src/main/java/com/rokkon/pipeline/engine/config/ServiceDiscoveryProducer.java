@@ -21,7 +21,7 @@ public class ServiceDiscoveryProducer implements com.rokkon.pipeline.engine.grpc
     
     private static final Logger LOG = LoggerFactory.getLogger(ServiceDiscoveryProducer.class);
     
-    @ConfigProperty(name = "rokkon.service-discovery.type", defaultValue = "consul-direct")
+    @ConfigProperty(name = "pipeline.service-discovery.type", defaultValue = "consul-direct")
     String discoveryType;
     
     @Inject

@@ -1,9 +1,10 @@
 {
   "pipeline": {
     "engine": {
-      "grpc-port": 49000,
-      "rest-port": 8080,
-      "debug": false
+      "grpc-port": 48082,
+      "rest-port": 38082,
+      "debug": false,
+      "host": "127.0.0.1"
     },
     "consul": {
       "cleanup": {
