@@ -1,0 +1,139 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://rokkon.com/schemas/pipeline-instance.json",
+  "title": "Pipeline Instance",
+  "description": "Represents a deployed pipeline instance in a cluster",
+  "type": "object",
+  "properties": {
+    "instanceId": {
+      "type": "string",
+      "description": "Unique instance identifier",
+      "pattern": "^[a-zA-Z0-9_-]+$",
+      "minLength": 1
+    },
+    "pipelineDefinitionId": {
+      "type": "string",
+      "description": "Reference to pipeline definition",
+      "minLength": 1
+    },
+    "clusterName": {
+      "type": "string",
+      "description": "Target cluster name",
+      "minLength": 1
+    },
+    "name": {
+      "type": "string",
+      "description": "Human-readable instance name"
+    },
+    "description": {
+      "type": "string",
+      "description": "Instance description"
+    },
+    "status": {
+      "type": "string",
+      "description": "Current instance status",
+      "enum": ["STOPPED", "STARTING", "RUNNING", "STOPPING", "ERROR", "SUSPENDED"],
+      "default": "STOPPED"
+    },
+    "configOverrides": {
+      "type": "object",
+      "description": "Step-specific configuration overrides",
+      "patternProperties": {
+        "^[a-zA-Z0-9_-]+$": {
+          "$ref": "#/definitions/stepConfigOverride"
+        }
+      },
+      "additionalProperties": false
+    },
+    "kafkaTopicPrefix": {
+      "type": "string",
+      "description": "Prefix for Kafka topics"
+    },
+    "priority": {
+      "type": "integer",
+      "description": "Processing priority (1-1000)",
+      "minimum": 1,
+      "maximum": 1000,
+      "default": 500
+    },
+    "maxParallelism": {
+      "type": "integer",
+      "description": "Maximum parallel processing threads",
+      "minimum": 1,
+      "default": 10
+    },
+    "metadata": {
+      "type": "object",
+      "description": "Additional metadata",
+      "patternProperties": {
+        "^.*$": {
+          "type": "string"
+        }
+      }
+    },
+    "createdAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Creation timestamp"
+    },
+    "modifiedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last modification timestamp"
+    },
+    "startedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last start timestamp"
+    },
+    "stoppedAt": {
+      "type": "string",
+      "format": "date-time",
+      "description": "Last stop timestamp"
+    }
+  },
+  "required": ["instanceId", "pipelineDefinitionId", "clusterName"],
+  "additionalProperties": false,
+  "definitions": {
+    "stepConfigOverride": {
+      "type": "object",
+      "description": "Step-specific configuration override",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "description": "Whether this step is enabled"
+        },
+        "customConfig": {
+          "type": "object",
+          "properties": {
+            "jsonConfig": {
+              "type": ["object", "null"]
+            },
+            "configParams": {
+              "type": "object",
+              "patternProperties": {
+                "^.*$": {
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "maxRetries": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "stepTimeoutMs": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "priority": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "additionalProperties": false
+    }
+  }
+}

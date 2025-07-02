@@ -1,14 +1,14 @@
-# Rokkon Engine: Build System
+# Pipeline Engine: Build System
 
-The Rokkon Engine project and its associated modules primarily use Gradle as their build automation system. Gradle provides a flexible and powerful way to manage dependencies, compile code, run tests, package applications, and build Docker images. The build system is structured as a multi-project Gradle build, allowing for modularity and clear separation of concerns.
+The Pipeline Engine project and its associated modules primarily use Gradle as their build automation system. Gradle provides a flexible and powerful way to manage dependencies, compile code, run tests, package applications, and build Docker images. The build system is structured as a multi-project Gradle build, allowing for modularity and clear separation of concerns.
 
 ## Gradle Multi-Project Structure
 
-The Rokkon ecosystem is composed of several sub-projects, each with its own `build.gradle.kts` file. A top-level `settings.gradle.kts` file defines these sub-projects and their relationships.
+The Pipeline ecosystem is composed of several sub-projects, each with its own `build.gradle.kts` file. A top-level `settings.gradle.kts` file defines these sub-projects and their relationships.
 
 Key sub-projects typically include:
 
-*   **`rokkon-engine`:** The core engine application (Quarkus based).
+*   **`pipeline-engine`:** The core engine application (Quarkus based).
 *   **`engine/consul`:** Handles all write operations to Consul.
 *   **`commons/interface`:** Contains shared data models (POJOs, potentially generated from Protobufs).
 *   **`engine/validators`:** Provides validation logic for configurations and data.
@@ -23,7 +23,7 @@ Key sub-projects typically include:
     *   `modules/echo`
     *   `modules/proxy-module`
     *   (Each module is its own Gradle sub-project, often a Quarkus application if Java-based, or a simple project if in another language but still managed under the Gradle umbrella for build/Docker tasks).
-*   **`rokkon-bom` (Bill of Materials):** Manages dependency versions across projects.
+*   **`pipeline-bom` (Bill of Materials):** Manages dependency versions across projects.
 *   **`testing/util`:** Common code and resources for testing.
 
 ```mermaid
@@ -31,7 +31,7 @@ graph TD
     RootProject["Root Gradle Project <br> (settings.gradle.kts, build.gradle.kts)"]
 
     subgraph "Core Engine Projects"
-        Engine[rokkon-engine]
+        Engine[pipeline-engine]
         EngineConsul[engine/consul]
         EngineValidators[engine/validators]
         EngineCLI[cli/register-module]
@@ -41,7 +41,7 @@ graph TD
         Protobuf[commons/protobuf]
         Commons[commons/util]
         Interface[commons/interface]
-        BOM[rokkon-bom]
+        BOM[pipeline-bom]
         TestUtils[testing/util]
     end
 
@@ -111,7 +111,7 @@ Each Gradle sub-project (especially Quarkus-based ones) utilizes standard Gradle
 
 3.  **Packaging:**
     *   `./gradlew :<project-name>:jar`: Creates a standard JAR file.
-    *   `./gradlew :<project-name>:quarkusBuild` (for Quarkus projects): Creates an executable uber-JAR (in `build/quarkus-app/quarkus-run.jar`) and other artifacts needed for running the Quarkus application. This is the primary packaging task for deployable services like `rokkon-engine` or Java-based modules.
+    *   `./gradlew :<project-name>:quarkusBuild` (for Quarkus projects): Creates an executable uber-JAR (in `build/quarkus-app/quarkus-run.jar`) and other artifacts needed for running the Quarkus application. This is the primary packaging task for deployable services like `pipeline-engine` or Java-based modules.
 
 4.  **Building Docker Images (Quarkus Integration):**
     *   Quarkus has excellent integration with Docker image building.
@@ -121,20 +121,20 @@ Each Gradle sub-project (especially Quarkus-based ones) utilizes standard Gradle
             quarkus:
               container-image:
                 build: true
-                group: rokkon # Docker Hub username or organization
-                name: <module-name> # e.g., rokkon-engine, python-parser
+                group: pipeline # Docker Hub username or organization
+                name: <module-name> # e.g., pipeline-engine, python-parser
                 tag: latest # Or a dynamic version
-                registry: nas.rokkon.com:5000 # Optional private registry
+                registry: nas.pipeline.com:5000 # Optional private registry
                 push: false # Whether to auto-push after build
                 dockerfile: src/main/docker/Dockerfile.jvm # Path to Dockerfile
             ```
-    *   Many modules have a `docker-build.sh` script (e.g., `modules/chunker/docker-build.sh`) which often wraps the Gradle command for building the Docker image. This script might also handle pre-build steps like building dependent projects (e.g., ensuring `rokkon-cli.jar` is built before a module image that needs it).
+    *   Many modules have a `docker-build.sh` script (e.g., `modules/chunker/docker-build.sh`) which often wraps the Gradle command for building the Docker image. This script might also handle pre-build steps like building dependent projects (e.g., ensuring `pipeline-cli.jar` is built before a module image that needs it).
 
 5.  **Dependency Management:**
     *   Dependencies are declared in the `dependencies { ... }` block of each `build.gradle.kts` file.
-    *   The `rokkon-bom` (Bill of Materials) project is used to centralize and manage versions of common dependencies across all sub-projects. This ensures consistency and simplifies version updates.
+    *   The `pipeline-bom` (Bill of Materials) project is used to centralize and manage versions of common dependencies across all sub-projects. This ensures consistency and simplifies version updates.
         ```kotlin
-        // In rokkon-bom/build.gradle.kts
+        // In pipeline-bom/build.gradle.kts
         javaPlatform {
             allowDependencies()
         }
@@ -148,43 +148,43 @@ Each Gradle sub-project (especially Quarkus-based ones) utilizes standard Gradle
             }
         }
 
-        // In other sub-projects (e.g., rokkon-engine/build.gradle.kts)
+        // In other sub-projects (e.g., pipeline-engine/build.gradle.kts)
         dependencies {
-            implementation(platform(project(":rokkon-bom"))) // Import the BOM
+            implementation(platform(project(":pipeline-bom"))) // Import the BOM
             implementation("io.quarkus:quarkus-resteasy-reactive-jackson") // Version managed by Quarkus BOM
-            implementation("com.google.guava:guava") // Version managed by rokkon-bom
+            implementation("com.google.guava:guava") // Version managed by pipeline-bom
             implementation(project(":commons:interface")) // Dependency on another sub-project
         }
         ```
 
 ## CLIs and How They Work with Docker
 
-The Rokkon ecosystem includes several Command Line Interfaces (CLIs), and their interaction with Docker is important for module deployment and operations.
+The Pipeline ecosystem includes several Command Line Interfaces (CLIs), and their interaction with Docker is important for module deployment and operations.
 
-1.  **`cli/register-module` (`rokkon-cli.jar`):**
-    *   **Purpose:** Used by modules (typically within their `module-entrypoint.sh` script) to register themselves with the Rokkon Engine.
+1.  **`cli/register-module` (`pipeline-cli.jar`):**
+    *   **Purpose:** Used by modules (typically within their `module-entrypoint.sh` script) to register themselves with the Pipeline Engine.
     *   **Build:** This is a Quarkus application packaged as an executable JAR via `./gradlew :cli:register-module:quarkusBuild`.
     *   **Docker Integration:**
-        *   The `rokkon-cli.jar` is often copied into module Docker images during their build process.
+        *   The `pipeline-cli.jar` is often copied into module Docker images during their build process.
             ```gradle
             // In a module's build.gradle.kts (example task)
-            tasks.register<Copy>("copyRokkonCliForDocker") {
+            tasks.register<Copy>("copyPipelineCliForDocker") {
                 dependsOn(":cli:register-module:quarkusBuild") // Ensure CLI is built first
                 from(project(":cli:register-module").tasks.named("quarkusBuild").map { it.outputs.files.singleFile })
                 into(layout.buildDirectory.dir("docker-context")) // Or directly into where Dockerfile expects it
-                rename { "rokkon-cli.jar" }
+                rename { "pipeline-cli.jar" }
             }
             // This task would be a dependency for the Docker image build
             ```
         *   The module's `Dockerfile` then copies this JAR:
             ```dockerfile
             # In a module's Dockerfile
-            COPY build/docker-context/rokkon-cli.jar /deployments/rokkon-cli.jar
+            COPY build/docker-context/pipeline-cli.jar /deployments/pipeline-cli.jar
             ```
         *   The `module-entrypoint.sh` script inside the container then executes this JAR:
             ```bash
             # In module-entrypoint.sh
-            java -jar /deployments/rokkon-cli.jar register --module-host ... --engine-host ...
+            java -jar /deployments/pipeline-cli.jar register --module-host ... --engine-host ...
             ```
 
 2.  **`engine/seed-config` Utility:**
@@ -198,7 +198,7 @@ The Rokkon ecosystem includes several Command Line Interfaces (CLIs), and their 
             docker run --rm \
               -e CONSUL_HOST=my-consul-server \
               -v ./seed-data.json:/app/seed-data.json \
-              rokkon/seed-config-tool:latest --config /app/seed-data.json
+              pipeline/seed-config-tool:latest --config /app/seed-data.json
             ```
 
 3.  **Operational CLI (Hypothetical - for managing engine/pipelines):**
@@ -206,7 +206,7 @@ The Rokkon ecosystem includes several Command Line Interfaces (CLIs), and their 
     *   **Build:** Could be a Quarkus Picocli application or similar, packaged as an executable JAR or native executable.
     *   **Docker Integration:**
         *   This CLI would typically be run *outside* the main engine/module containers, on an operator's machine or a CI/CD runner.
-        *   It would communicate with the Rokkon Engine's REST API.
+        *   It would communicate with the Pipeline Engine's REST API.
         *   No direct Docker image integration is usually needed unless it's provided as a "CLI tool" Docker image for convenience.
 
 ## Build Scripts (`scripts/`)
@@ -217,13 +217,13 @@ The `scripts/` directory in the repository root contains various shell scripts t
 *   **`deploy-to-registry.sh`:** Pushes locally built Docker images to a configured container registry.
 *   **`deploy.sh`:** Might orchestrate deployment to a specific environment (e.g., Docker Compose, Kubernetes `kubectl apply`).
 *   **`test-all.sh`:** A convenience script to run all tests across all relevant sub-projects (`./gradlew test` or `./gradlew check`).
-*   **`setup-module-registration.sh`:** As per `DEVELOPER_NOTES/modules/README-registration.md`, this script helps set up a new module project with the necessary build configurations and Dockerfile modifications for automated registration using `rokkon-cli.jar`.
+*   **`setup-module-registration.sh`:** As per `DEVELOPER_NOTES/modules/README-registration.md`, this script helps set up a new module project with the necessary build configurations and Dockerfile modifications for automated registration using `pipeline-cli.jar`.
 
 These scripts often provide a higher-level interface to the underlying Gradle tasks and Docker commands, simplifying the developer and CI/CD experience.
 
 ## Continuous Integration / Continuous Deployment (CI/CD)
 
-While not explicitly detailed, a typical CI/CD pipeline for Rokkon would leverage this build system:
+While not explicitly detailed, a typical CI/CD pipeline for Pipeline would leverage this build system:
 
 1.  **Trigger:** Code push to a version control repository (e.g., Git).
 2.  **Build Stage:**
@@ -238,4 +238,4 @@ While not explicitly detailed, a typical CI/CD pipeline for Rokkon would leverag
     *   Run `./scripts/deploy.sh` or use tools like Helm, ArgoCD, Jenkins, GitLab CI to deploy the new image versions to target environments (dev, staging, prod). This would involve updating Kubernetes Deployments, restarting Docker Compose services, etc.
     *   Run `seed-config` utility if configuration schema changes or new default configurations are needed.
 
-The Gradle build system, with its multi-project structure, Quarkus integration, and supporting shell scripts, provides a comprehensive foundation for building, testing, and packaging the entire Rokkon Engine ecosystem.
+The Gradle build system, with its multi-project structure, Quarkus integration, and supporting shell scripts, provides a comprehensive foundation for building, testing, and packaging the entire Pipeline Engine ecosystem.

@@ -12,11 +12,13 @@ import com.rokkon.pipeline.validation.CompositeValidator;
 import com.rokkon.pipeline.validation.ConfigValidator;
 import com.rokkon.pipeline.validation.ValidationResult;
 import com.rokkon.pipeline.validation.ValidationResultFactory;
+import com.rokkon.pipeline.validation.ValidationMode;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.vertx.UniHelper;
 import io.vertx.ext.consul.ConsulClient;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
@@ -46,7 +48,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     ObjectMapper objectMapper;
     
     @Inject
-    CompositeValidator<PipelineConfig> validator;
+    CompositeValidator<PipelineConfig> pipelineValidator;
     
     @Inject
     PipelineInstanceService pipelineInstanceService;
@@ -158,6 +160,12 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     
     @Override
     public Uni<ValidationResult> createDefinition(String pipelineId, PipelineConfig definition) {
+        // Use production validation by default
+        return createDefinition(pipelineId, definition, ValidationMode.PRODUCTION);
+    }
+    
+    @Override
+    public Uni<ValidationResult> createDefinition(String pipelineId, PipelineConfig definition, ValidationMode validationMode) {
         // Check if already exists
         return definitionExists(pipelineId)
             .flatMap(exists -> {
@@ -165,9 +173,14 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                     return Uni.createFrom().item(ValidationResultFactory.failure("Pipeline definition '" + pipelineId + "' already exists"));
                 }
                 
-                // Validate the pipeline configuration
-                ValidationResult validationResult = validator.validate(definition);
-                if (!validationResult.valid()) {
+                // Validate the pipeline configuration with the specified mode
+                ValidationResult validationResult = pipelineValidator.validate(definition, validationMode);
+                // Check validation results based on mode
+                if (validationMode == ValidationMode.PRODUCTION && !validationResult.valid()) {
+                    // Production mode requires no errors
+                    return Uni.createFrom().item(validationResult);
+                } else if ((validationMode == ValidationMode.DESIGN || validationMode == ValidationMode.TESTING) && validationResult.hasErrors()) {
+                    // Design and Testing modes only fail on errors, allow warnings
                     return Uni.createFrom().item(validationResult);
                 }
                 
@@ -187,6 +200,8 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                             metadata.put("createdAt", Instant.now().toString());
                             metadata.put("modifiedAt", Instant.now().toString());
                             metadata.put("createdBy", "system"); // TODO: Add user context
+                            metadata.put("validationMode", validationMode.toString());
+                            metadata.put("hasWarnings", String.valueOf(validationResult.hasWarnings()));
                             
                             try {
                                 String metadataKey = kvPrefix + "/pipelines/definitions/" + pipelineId + PIPELINE_METADATA_SUFFIX;
@@ -196,7 +211,10 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                                     .map(metaSuccess -> {
                                         if (metaSuccess) {
                                             LOG.info("Created pipeline definition '{}' in Consul", pipelineId);
-                                            return ValidationResultFactory.success();
+                                            // Preserve warnings from original validation
+                                            return validationResult.hasWarnings() ? 
+                                                ValidationResultFactory.successWithWarnings(validationResult.warnings()) :
+                                                ValidationResultFactory.success();
                                         } else {
                                             return ValidationResultFactory.failure("Failed to store metadata");
                                         }
@@ -216,6 +234,12 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     
     @Override
     public Uni<ValidationResult> updateDefinition(String pipelineId, PipelineConfig definition) {
+        // Use production validation by default
+        return updateDefinition(pipelineId, definition, ValidationMode.PRODUCTION);
+    }
+    
+    @Override
+    public Uni<ValidationResult> updateDefinition(String pipelineId, PipelineConfig definition, ValidationMode validationMode) {
         // Check if exists
         return definitionExists(pipelineId)
             .flatMap(exists -> {
@@ -223,9 +247,14 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                     return Uni.createFrom().item(ValidationResultFactory.failure("Pipeline definition '" + pipelineId + "' not found"));
                 }
                 
-                // Validate the pipeline configuration
-                ValidationResult validationResult = validator.validate(definition);
-                if (!validationResult.valid()) {
+                // Validate the pipeline configuration with the specified mode
+                ValidationResult validationResult = pipelineValidator.validate(definition, validationMode);
+                // Check validation results based on mode
+                if (validationMode == ValidationMode.PRODUCTION && !validationResult.valid()) {
+                    // Production mode requires no errors
+                    return Uni.createFrom().item(validationResult);
+                } else if ((validationMode == ValidationMode.DESIGN || validationMode == ValidationMode.TESTING) && validationResult.hasErrors()) {
+                    // Design and Testing modes only fail on errors, allow warnings
                     return Uni.createFrom().item(validationResult);
                 }
                 
@@ -240,30 +269,36 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
                                 return Uni.createFrom().item(ValidationResultFactory.failure("Failed to update pipeline definition in Consul"));
                             }
                             
-                            // Update metadata
-                            Map<String, String> metadata = getMetadata(pipelineId).await().indefinitely();
-                            metadata.put("modifiedAt", Instant.now().toString());
-                            metadata.put("modifiedBy", "system"); // TODO: Add user context
-                            
-                            try {
-                                String metadataKey = kvPrefix + "/pipelines/definitions/" + pipelineId + PIPELINE_METADATA_SUFFIX;
-                                String metadataJson = objectMapper.writeValueAsString(metadata);
-                                
-                                return UniHelper.toUni(getConsulClient().putValue(metadataKey, metadataJson))
-                                    .map(metaSuccess -> {
-                                        if (metaSuccess) {
-                                            LOG.info("Updated pipeline definition '{}' in Consul", pipelineId);
-                                            return ValidationResultFactory.success();
-                                        } else {
-                                            return ValidationResultFactory.failure("Failed to update metadata");
-                                        }
-                                    });
-                            } catch (JsonProcessingException e) {
-                                LOG.error("Failed to serialize metadata", e);
-                                return Uni.createFrom().item(ValidationResultFactory.failure("Failed to serialize metadata: " + e.getMessage()));
-                            }
+                            // Update metadata reactively
+                            return getMetadata(pipelineId)
+                                .onItem().transformToUni(metadata -> {
+                                    metadata.put("modifiedAt", Instant.now().toString());
+                                    metadata.put("modifiedBy", "system"); // TODO: Add user context
+                                    metadata.put("validationMode", validationMode.toString());
+                                    metadata.put("hasWarnings", String.valueOf(validationResult.hasWarnings()));
+                                    
+                                    try {
+                                        String metadataKey = kvPrefix + "/pipelines/definitions/" + pipelineId + PIPELINE_METADATA_SUFFIX;
+                                        String metadataJson = objectMapper.writeValueAsString(metadata);
+                                        
+                                        return UniHelper.toUni(getConsulClient().putValue(metadataKey, metadataJson))
+                                            .map(metaSuccess -> {
+                                                if (metaSuccess) {
+                                                    LOG.info("Updated pipeline definition '{}' in Consul", pipelineId);
+                                                    // Preserve warnings from original validation
+                                                    return validationResult.hasWarnings() ? 
+                                                        ValidationResultFactory.successWithWarnings(validationResult.warnings()) :
+                                                        ValidationResultFactory.success();
+                                                } else {
+                                                    return ValidationResultFactory.failure("Failed to update metadata");
+                                                }
+                                            });
+                                    } catch (JsonProcessingException e) {
+                                        LOG.error("Failed to serialize metadata", e);
+                                        return Uni.createFrom().item(ValidationResultFactory.failure("Failed to serialize metadata: " + e.getMessage()));
+                                    }
+                                });
                         });
-                    
                 } catch (JsonProcessingException e) {
                     LOG.error("Failed to serialize pipeline definition", e);
                     return Uni.createFrom().item(ValidationResultFactory.failure("Failed to serialize pipeline definition: " + e.getMessage()));

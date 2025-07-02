@@ -6,7 +6,7 @@ plugins {
 dependencies {
     implementation("io.quarkiverse.docker:quarkus-docker-client:0.0.4")
     // Import the rokkon BOM which includes Quarkus BOM
-    implementation(platform(project(":rokkon-bom")))
+    implementation(platform(project(":bom:base")))
     
     // Testing framework dependencies
     testImplementation("io.quarkus:quarkus-junit5")
@@ -19,9 +19,13 @@ dependencies {
     
     // Testing utilities from our testing/util module
     testImplementation(project(":testing:util"))
+    testImplementation(project(":testing:server-util")) // For ProtobufTestDataHelper
     
     // Protocol buffer definitions
     testImplementation(project(":commons:protobuf"))
+    
+    // Interface module for pipeline configuration models
+    testImplementation(project(":commons:interface"))
     
     // gRPC dependencies for client connections
     testImplementation("io.grpc:grpc-stub")

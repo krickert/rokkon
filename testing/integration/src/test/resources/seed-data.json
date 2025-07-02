@@ -1,0 +1,31 @@
+{
+  "rokkon": {
+    "cluster": {
+      "name": "test-cluster"
+    },
+    "engine": {
+      "name": "test-engine",
+      "grpc-port": 48082,
+      "rest-port": 38082
+    },
+    "modules": {
+      "whitelist": [
+        "echo",
+        "test",
+        "chunker",
+        "parser",
+        "embedder"
+      ]
+    }
+  },
+  "quarkus": {
+    "http": {
+      "port": 38082
+    },
+    "grpc": {
+      "server": {
+        "port": 48082
+      }
+    }
+  }
+}

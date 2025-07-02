@@ -1,5 +1,7 @@
 package com.rokkon.pipeline.validation;
 
+import java.util.Set;
+
 /**
  * Base interface for all configuration validators in the Rokkon pipeline system.
  * 
@@ -32,5 +34,15 @@ public interface ConfigValidator<T extends ConfigValidatable> {
      */
     default int getPriority() {
         return 100;
+    }
+
+    /**
+     * Returns the set of validation modes this validator supports.
+     * Defaults to all modes (PRODUCTION, DESIGN, TESTING) for backward compatibility.
+     * 
+     * @return Set of ValidationMode enums this validator should run for
+     */
+    default Set<ValidationMode> supportedModes() {
+        return Set.of(ValidationMode.PRODUCTION, ValidationMode.DESIGN, ValidationMode.TESTING);
     }
 }

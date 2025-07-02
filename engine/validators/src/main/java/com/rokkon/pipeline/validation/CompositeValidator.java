@@ -45,13 +45,40 @@ public class CompositeValidator<T extends ConfigValidatable> implements ConfigVa
 
     @Override
     public ValidationResult validate(T object) {
-        LOG.debugf("CompositeValidator.validate called with %d validators", validators.size());
+        // Default to PRODUCTION mode for backward compatibility
+        return validate(object, ValidationMode.PRODUCTION);
+    }
+    
+    /**
+     * Validates an object using the specified validation mode.
+     * Only runs validators that support the given mode.
+     * 
+     * @param object The object to validate
+     * @param mode The validation mode to use
+     * @return The combined validation result
+     */
+    public ValidationResult validate(T object, ValidationMode mode) {
+        LOG.debugf("CompositeValidator.validate called with %d validators in %s mode", validators.size(), mode);
         ValidationResult result = ValidationResult.empty();
         
         for (ConfigValidator<T> validator : validators) {
+            // Check if this validator supports the current mode
+            if (!validator.supportedModes().contains(mode)) {
+                LOG.debugf("Skipping validator %s - does not support %s mode", validator.getValidatorName(), mode);
+                continue;
+            }
+            
             try {
                 LOG.debugf("Running validator: %s", validator.getValidatorName());
-                ValidationResult validatorResult = validator.validate(object);
+                ValidationResult validatorResult;
+                
+                // Check if validator is mode-aware
+                if (validator instanceof ModeAwareValidator) {
+                    validatorResult = ((ModeAwareValidator<T>) validator).validate(object, mode);
+                } else {
+                    validatorResult = validator.validate(object);
+                }
+                
                 LOG.debugf("Validator %s returned: valid=%s, errors=%s, warnings=%s", 
                     validator.getValidatorName(), validatorResult.valid(), 
                     validatorResult.errors(), validatorResult.warnings());

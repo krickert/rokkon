@@ -1,10 +1,10 @@
-# Rokkon Engine: Operations and Management
+# Pipeline Engine: Operations and Management
 
-Operating and managing the Rokkon Engine and its pipelines involves a combination of a user-facing frontend (Web UI), command-line interfaces (CLIs), and leveraging the underlying capabilities of its components like Quarkus and Consul. The goal is to provide visibility, control, and security over the data processing workflows.
+Operating and managing the Pipeline Engine and its pipelines involves a combination of a user-facing frontend (Web UI), command-line interfaces (CLIs), and leveraging the underlying capabilities of its components like Quarkus and Consul. The goal is to provide visibility, control, and security over the data processing workflows.
 
 ## Frontend (Web UI) Features
 
-A web-based frontend will serve as the primary interface for designers, operators, and administrators to interact with the Rokkon Engine.
+A web-based frontend will serve as the primary interface for designers, operators, and administrators to interact with the Pipeline Engine.
 
 1.  **Pipeline Design and Visualization:**
     *   **Visual Editor:** Allow users to drag and drop modules, connect them to define data flows, and configure individual pipeline steps.
@@ -49,7 +49,7 @@ graph TD
         Admin[Administrator]
     end
 
-    subgraph "Rokkon Frontend (Web UI)"
+    subgraph "Pipeline Frontend (Web UI)"
         direction LR
         PipelineDesigner[Pipeline Visual Designer]
         PipelineController["Pipeline Controls <br>(Deploy, Start, Stop, Pause)"]
@@ -59,7 +59,7 @@ graph TD
         TestInterface["Test & Debug Interface"]
     end
 
-    FrontendAPI[Frontend REST/WebSocket API on Rokkon Engine]
+    FrontendAPI[Frontend REST/WebSocket API on Pipeline Engine]
 
     Designer -- Uses --> PipelineDesigner
     Operator -- Uses --> PipelineController
@@ -79,11 +79,11 @@ graph TD
     ServerMgmt -- "Issues Commands" --> FrontendAPI
     TestInterface -- "Sends Test Data/Gets Results" --> FrontendAPI
 
-    FrontendAPI -- "Interacts with" --> RokkonEngineCore[Rokkon Engine Core Logic]
-    RokkonEngineCore -- "Interacts with" --> Consul
-    RokkonEngineCore -- "Interacts with" --> Kafka
-    RokkonEngineCore -- "Interacts with" --> PipelineModules[Pipeline Modules]
-    RokkonEngineCore -- "Reports to / Fetches from" --> MonitoringSystem["Monitoring System (Prometheus/Grafana)"]
+    FrontendAPI -- "Interacts with" --> PipelineEngineCore[Pipeline Engine Core Logic]
+    PipelineEngineCore -- "Interacts with" --> Consul
+    PipelineEngineCore -- "Interacts with" --> Kafka
+    PipelineEngineCore -- "Interacts with" --> PipelineModules[Pipeline Modules]
+    PipelineEngineCore -- "Reports to / Fetches from" --> MonitoringSystem["Monitoring System (Prometheus/Grafana)"]
 
 
     classDef role fill:#c9f,stroke:#333,stroke-width:2px;
@@ -92,7 +92,7 @@ graph TD
 
     class Designer,Operator,Admin role;
     class PipelineDesigner,PipelineController,MonitoringDashboard,ModuleMgmt,ServerMgmt,TestInterface uiComponent;
-    class FrontendAPI,RokkonEngineCore backend;
+    class FrontendAPI,PipelineEngineCore backend;
 ```
 
 ## Security Features in Quarkus (Role-Based Access Control)
@@ -119,7 +119,7 @@ As mentioned in `Initialization.md`, Quarkus provides robust security features. 
     *   Quarkus security annotations (`@RolesAllowed`, `@Authenticated`) will protect the JAX-RS (REST) endpoints that the frontend communicates with.
     *   Example:
         ```java
-        // In Rokkon Engine's REST API layer
+        // In Pipeline Engine's REST API layer
         @Path("/api/v1/pipelines/{pipelineId}/deploy")
         public class PipelineDeploymentResource {
             @POST
@@ -149,7 +149,7 @@ As mentioned in `Initialization.md`, Quarkus provides robust security features. 
 
 While the frontend provides a user-friendly interface, a Command Line Interface (CLI) is essential for automation, scripting, and advanced users.
 
-*   **`rokkon-cli` (Extended):** The existing `rokkon-cli.jar` used for module registration could be extended or complemented by another CLI tool focused on operational tasks.
+*   **`pipeline-cli` (Extended):** The existing `pipeline-cli.jar` used for module registration could be extended or complemented by another CLI tool focused on operational tasks.
 *   **Capabilities:**
     *   Listing pipelines and their statuses.
     *   Deploying/starting/stopping/pausing pipelines from a configuration file.
@@ -158,7 +158,7 @@ While the frontend provides a user-friendly interface, a Command Line Interface 
     *   Streaming logs.
     *   Interacting with the `test-module`.
     *   Performing administrative tasks (e.g., managing users or whitelists, if applicable).
-*   **Authentication:** The CLI would also need to authenticate with the Rokkon Engine's API, likely using API keys or OAuth2 client credentials flow.
+*   **Authentication:** The CLI would also need to authenticate with the Pipeline Engine's API, likely using API keys or OAuth2 client credentials flow.
 
 ## Further Reading
 
@@ -168,4 +168,4 @@ While the frontend provides a user-friendly interface, a Command Line Interface 
 *   **Quarkus Security Guides:** For implementing authentication and authorization.
 *   **Consul Documentation:** For understanding service health and how it's reflected.
 
-By providing a comprehensive frontend and powerful CLI tools, backed by robust security and clear role definitions, the Rokkon Engine can be effectively operated and managed throughout its lifecycle.
+By providing a comprehensive frontend and powerful CLI tools, backed by robust security and clear role definitions, the Pipeline Engine can be effectively operated and managed throughout its lifecycle.

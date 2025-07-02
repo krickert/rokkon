@@ -3,6 +3,7 @@ package com.rokkon.engine.api;
 import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.model.PipelineDefinitionSummary;
 import com.rokkon.pipeline.config.service.PipelineDefinitionService;
+import com.rokkon.pipeline.validation.ValidationMode;
 import io.quarkus.runtime.LaunchMode;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
@@ -63,7 +64,9 @@ public class PipelineDefinitionResource {
             @APIResponse(responseCode = "400", description = "Invalid request payload or validation failed"),
             @APIResponse(responseCode = "500", description = "Internal server error during transformation or module lookup")
     })
-    public Uni<Response> createDefinitionFromDTO(PipelineDefinitionRequestDTO pipelineRequest) {
+    public Uni<Response> createDefinitionFromDTO(
+            PipelineDefinitionRequestDTO pipelineRequest,
+            @QueryParam("validationMode") @DefaultValue("PRODUCTION") ValidationMode validationMode) {
         if (pipelineRequest == null || pipelineRequest.name() == null || pipelineRequest.name().isBlank()) {
             return Uni.createFrom().item(Response.status(Status.BAD_REQUEST)
                     .entity(new ApiResponse(false, "Pipeline name is required in the request.", null, null))
@@ -149,12 +152,13 @@ public class PipelineDefinitionResource {
         }
         
         return pipelineConfigUni.onItem().transformToUni(pipelineConfig -> {
-                LOG.info("Successfully transformed DTO to PipelineConfig for '{}'. Calling service.", pipelineConfig.name());
-                return pipelineDefinitionService.createDefinition(pipelineConfig.name(), pipelineConfig)
+                LOG.info("Successfully transformed DTO to PipelineConfig for '{}' with validation mode: {}. Calling service.", 
+                        pipelineConfig.name(), validationMode);
+                return pipelineDefinitionService.createDefinition(pipelineConfig.name(), pipelineConfig, validationMode)
                     .map(result -> {
                         if (result.valid()) {
                             return Response.status(Status.CREATED)
-                                    .entity(new ApiResponse(true, "Pipeline definition created successfully.", null, null))
+                                    .entity(new ApiResponse(true, "Pipeline definition created successfully.", null, result.warnings()))
                                     .build();
                         } else {
                             Status status = result.errors().stream()
@@ -302,15 +306,17 @@ public class PipelineDefinitionResource {
             @PathParam("pipelineId") String pipelineId,
 
             @Parameter(description = "Pipeline definition", required = true)
-            PipelineConfig definition) {
+            PipelineConfig definition,
+            
+            @QueryParam("validationMode") @DefaultValue("PRODUCTION") ValidationMode validationMode) {
 
-        LOG.info("Creating pipeline definition '{}'", pipelineId);
+        LOG.info("Creating pipeline definition '{}' with validation mode: {}", pipelineId, validationMode);
 
-        return pipelineDefinitionService.createDefinition(pipelineId, definition)
+        return pipelineDefinitionService.createDefinition(pipelineId, definition, validationMode)
             .map(result -> {
                 if (result.valid()) {
                     return Response.status(Status.CREATED)
-                        .entity(new ApiResponse(true, "Pipeline definition created successfully", null, null))
+                        .entity(new ApiResponse(true, "Pipeline definition created successfully", null, result.warnings()))
                         .build();
                 } else {
                     Status status = result.errors().stream()
@@ -346,14 +352,15 @@ public class PipelineDefinitionResource {
     })
     public Uni<Response> updateDefinition(
             @PathParam("pipelineId") String pipelineId,
-            PipelineConfig definition) {
+            PipelineConfig definition,
+            @QueryParam("validationMode") @DefaultValue("PRODUCTION") ValidationMode validationMode) {
 
-        LOG.info("Updating pipeline definition '{}'", pipelineId);
+        LOG.info("Updating pipeline definition '{}' with validation mode: {}", pipelineId, validationMode);
 
-        return pipelineDefinitionService.updateDefinition(pipelineId, definition)
+        return pipelineDefinitionService.updateDefinition(pipelineId, definition, validationMode)
             .map(result -> {
                 if (result.valid()) {
-                    return Response.ok(new ApiResponse(true, "Pipeline definition updated successfully", null, null))
+                    return Response.ok(new ApiResponse(true, "Pipeline definition updated successfully", null, result.warnings()))
                         .build();
                 } else {
                     Status status = result.errors().stream()

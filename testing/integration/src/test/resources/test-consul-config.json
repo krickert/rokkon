@@ -1,0 +1,20 @@
+{
+  "rokkon": {
+    "cluster": {
+      "name": "test-cluster"
+    },
+    "engine": {
+      "name": "test-engine"
+    },
+    "modules": {
+      "whitelist": ["echo", "test", "chunker", "parser", "embedder"],
+      "registration": {
+        "retry": {
+          "max-attempts": 5,
+          "initial-delay": 1000,
+          "max-delay": 10000
+        }
+      }
+    }
+  }
+}

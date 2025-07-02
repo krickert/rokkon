@@ -1,8 +1,8 @@
-# Rokkon Engine: Kafka Integration
+# Pipeline Engine: Kafka Integration
 
-Apache Kafka plays a vital role in the Rokkon Engine ecosystem, primarily as a high-throughput, fault-tolerant, and scalable messaging system for asynchronous communication between pipeline steps. This allows for decoupling of services, buffering of data, and enabling complex data flow patterns.
+Apache Kafka plays a vital role in the Pipeline Engine ecosystem, primarily as a high-throughput, fault-tolerant, and scalable messaging system for asynchronous communication between pipeline steps. This allows for decoupling of services, buffering of data, and enabling complex data flow patterns.
 
-## Role of Kafka in Rokkon Pipelines
+## Role of Kafka in Application Pipelines
 
 1.  **Asynchronous Communication:** Pipeline steps can produce data to Kafka topics and other steps can consume from these topics independently. This decouples the producer from the consumer, meaning they don't need to be available at the same time or process data at the same rate.
 2.  **Buffering and Durability:** Kafka topics act as persistent buffers. If a consumer module is slow, down for maintenance, or experiences a temporary load spike, messages remain in Kafka until they can be processed. This prevents data loss and improves overall pipeline resilience.
@@ -34,10 +34,10 @@ graph TD
         ConsumerStepC1 -- "Processed Data" --> Archive["Data Archive"]
     end
 
-    RokkonEngine["Rokkon Engine"] -- "Manages/Monitors" --> ProducerStep
-    RokkonEngine -- "Manages/Monitors" --> ConsumerStepB1
-    RokkonEngine -- "Manages/Monitors" --> ConsumerStepB2
-    RokkonEngine -- "Manages/Monitors" --> ConsumerStepC1
+    PipelineEngine["Pipeline Engine"] -- "Manages/Monitors" --> ProducerStep
+    PipelineEngine -- "Manages/Monitors" --> ConsumerStepB1
+    PipelineEngine -- "Manages/Monitors" --> ConsumerStepB2
+    PipelineEngine -- "Manages/Monitors" --> ConsumerStepC1
 
     classDef kafka fill:#f9f,stroke:#333,stroke-width:2px;
     classDef module fill:#ccf,stroke:#333,stroke-width:2px;
@@ -45,15 +45,15 @@ graph TD
 
     class KafkaTopic kafka;
     class ProducerStep,ConsumerStepB1,ConsumerStepB2,ConsumerStepC1,DownstreamStepX,Archive module;
-    class RokkonEngine engine;
+    class PipelineEngine engine;
 ```
 
 ## Dynamic Listeners and Topic Management
 
-The Rokkon Engine aims to manage Kafka listeners and topics dynamically based on pipeline configurations.
+The Pipeline Engine aims to manage Kafka listeners and topics dynamically based on pipeline configurations.
 
 1.  **Dynamic Listener Creation:**
-    *   When a pipeline is defined or updated with a step that consumes from a Kafka topic, the Rokkon Engine (or the module itself, if it's designed to be self-configuring based on engine directives) needs to start a Kafka consumer listening to the specified topic(s).
+    *   When a pipeline is defined or updated with a step that consumes from a Kafka topic, the Pipeline Engine (or the module itself, if it's designed to be self-configuring based on engine directives) needs to start a Kafka consumer listening to the specified topic(s).
     *   Quarkus provides robust support for Apache Kafka client integration (`quarkus-kafka-client`), including reactive messaging connectors (`quarkus-smallrye-reactive-messaging-kafka`) that facilitate dynamic consumer management.
     *   The engine can create and manage these listeners at runtime, associating them with the correct pipeline step logic and consumer group.
 
@@ -64,7 +64,7 @@ The Rokkon Engine aims to manage Kafka listeners and topics dynamically based on
 
 3.  **Topic Auto-Creation (Optional):**
     *   Kafka brokers can be configured to auto-create topics when a producer first tries to send to a non-existent topic, or when a consumer tries to subscribe.
-    *   While convenient for development, in production, it's often preferred to manage topic creation explicitly (e.g., via administrative tools or scripts) to control partitioning, replication factor, and other settings. Rokkon might provide utilities or integrate with tools for this.
+    *   While convenient for development, in production, it's often preferred to manage topic creation explicitly (e.g., via administrative tools or scripts) to control partitioning, replication factor, and other settings. Pipeline might provide utilities or integrate with tools for this.
 
 4.  **Pushing to Any Allowed Kafka Topic:**
     *   A producing pipeline step, based on its configuration or runtime logic, can be directed to publish messages to any Kafka topic it has permissions to write to. This flexibility is crucial for dynamic routing, A/B testing (sending data to different topics for different processing paths), or conditional data forwarding.
@@ -74,7 +74,7 @@ The Rokkon Engine aims to manage Kafka listeners and topics dynamically based on
 Effective pipeline management requires control over Kafka message consumption.
 
 1.  **Pause/Resume Processing:**
-    *   Kafka consumers can be paused and resumed. The Rokkon Engine can expose controls (e.g., via API or UI) to pause consumption for a specific pipeline step or an entire pipeline that uses Kafka.
+    *   Kafka consumers can be paused and resumed. The Pipeline Engine can expose controls (e.g., via API or UI) to pause consumption for a specific pipeline step or an entire pipeline that uses Kafka.
     *   This is useful for:
         *   Performing maintenance on downstream systems.
         *   Investigating issues without new data flowing in.
@@ -88,45 +88,45 @@ Effective pipeline management requires control over Kafka message consumption.
 3.  **Rewind Processing (Offset Management):**
     *   To reprocess data, a consumer group's current offset for a topic/partition needs to be reset to an earlier position.
     *   This can be done using Kafka's administrative tools (`kafka-consumer-groups.sh --reset-offsets`) or programmatically via the `KafkaConsumer.seek()` method or similar functionalities in Kafka client libraries.
-    *   The Rokkon Engine could provide an interface to trigger offset resets for specific consumer groups associated with pipeline steps, potentially based on timestamps or specific offset values.
+    *   The Pipeline Engine could provide an interface to trigger offset resets for specific consumer groups associated with pipeline steps, potentially based on timestamps or specific offset values.
     *   Care must be taken when rewinding, especially with stateful processing or side effects, to ensure idempotency or handle duplicates appropriately.
 
 ```mermaid
 sequenceDiagram
     participant AdminUI as Admin UI/API
-    participant RokkonEngine as Rokkon Engine
+    participant PipelineEngine as Pipeline Engine
     participant KafkaConsumerControl as Kafka Consumer Control (within Engine/Module)
     participant Kafka as Kafka Cluster
 
-    AdminUI ->> RokkonEngine: Request to Pause Pipeline Step X (Consumer Group G)
-    RokkonEngine ->> KafkaConsumerControl: Instruct: Pause Consumer Group G for Topic T
+    AdminUI ->> PipelineEngine: Request to Pause Pipeline Step X (Consumer Group G)
+    PipelineEngine ->> KafkaConsumerControl: Instruct: Pause Consumer Group G for Topic T
     KafkaConsumerControl ->> Kafka: Call consumer.pause(partitions)
     Kafka -->> KafkaConsumerControl: Paused
-    KafkaConsumerControl -->> RokkonEngine: Ack: Paused
-    RokkonEngine -->> AdminUI: Ack: Step X Paused
+    KafkaConsumerControl -->> PipelineEngine: Ack: Paused
+    PipelineEngine -->> AdminUI: Ack: Step X Paused
 
     %% Later %%
-    AdminUI ->> RokkonEngine: Request to Resume Pipeline Step X
-    RokkonEngine ->> KafkaConsumerControl: Instruct: Resume Consumer Group G for Topic T
+    AdminUI ->> PipelineEngine: Request to Resume Pipeline Step X
+    PipelineEngine ->> KafkaConsumerControl: Instruct: Resume Consumer Group G for Topic T
     KafkaConsumerControl ->> Kafka: Call consumer.resume(partitions)
     Kafka -->> KafkaConsumerControl: Resumed
-    KafkaConsumerControl -->> RokkonEngine: Ack: Resumed
-    RokkonEngine -->> AdminUI: Ack: Step X Resumed
+    KafkaConsumerControl -->> PipelineEngine: Ack: Resumed
+    PipelineEngine -->> AdminUI: Ack: Step X Resumed
 
     %% Rewind Example %%
-    AdminUI ->> RokkonEngine: Request to Rewind Step X to Timestamp Y
-    RokkonEngine ->> KafkaConsumerControl: Instruct: Reset Offsets for Group G (Topic T) to Timestamp Y
+    AdminUI ->> PipelineEngine: Request to Rewind Step X to Timestamp Y
+    PipelineEngine ->> KafkaConsumerControl: Instruct: Reset Offsets for Group G (Topic T) to Timestamp Y
     KafkaConsumerControl ->> Kafka: Call consumer.offsetsForTimes() then consumer.seek()
     Kafka -->> KafkaConsumerControl: Offsets Reset
-    KafkaConsumerControl -->> RokkonEngine: Ack: Rewound
-    RokkonEngine -->> AdminUI: Ack: Step X Rewound
+    KafkaConsumerControl -->> PipelineEngine: Ack: Rewound
+    PipelineEngine -->> AdminUI: Ack: Step X Rewound
 ```
 
 ## Overcoming Message Size Limits with Cloud Storage
 
 Many cloud-based Kafka implementations (e.g., Amazon MSK with default configurations, Confluent Cloud with certain tiers) and even self-managed Kafka clusters have practical limits on message size (e.g., default 1MB, often configurable up to around 8-10MB after compression, but larger messages can strain brokers). Large documents, images, or complex `PipeDoc` objects can exceed these limits.
 
-Rokkon plans to address this using the **Claim Check pattern**:
+Pipeline plans to address this using the **Claim Check pattern**:
 
 1.  **The Problem:** A `PipeDoc` containing a large binary (e.g., a PDF, a high-resolution image, a large text corpus) might be too big for a Kafka message.
 2.  **The Solution (Claim Check Pattern):**
@@ -145,7 +145,7 @@ graph TD
     end
 
     UploadToStorage -- Object URL/ID --> CreateReference
-    CloudStorage[(Cloud Storage <br> e.g., S3, GCS, Azure Blob)]
+    CloudStorage["Cloud Storage (S3, GCS, Azure Blob)"]
     ClaimCheckLogic -- Payload --> CloudStorage
 
     CreateReference -- 4. Small Kafka Message (with Reference) --> KafkaTopic[Kafka Topic]
@@ -178,13 +178,13 @@ graph TD
 *   **Complexity:** The system needs to manage access to cloud storage (credentials, permissions) and handle potential failures in uploading or downloading data.
 *   **Lifecycle Management:** Policies for deleting data from cloud storage once it's no longer needed by any consumer must be implemented to avoid orphaned data and control costs. This could be time-based or acknowledgement-based.
 
-The Rokkon Engine will need to provide clear conventions or helper libraries/SDKs for modules to implement the claim check pattern easily, including configuration for storage endpoints and credentials.
+The Pipeline Engine will need to provide clear conventions or helper libraries/SDKs for modules to implement the claim check pattern easily, including configuration for storage endpoints and credentials.
 
 ## Further Reading
 
 *   **Pipeline Design (`Pipeline_design.md`):** For how Kafka topics are specified in pipeline configurations.
 *   **Module Deployment (`Module_deployment.md`):** Modules acting as Kafka consumers/producers are deployed as part of the pipeline.
-*   **Quarkus Kafka Client Guide:** For details on how Kafka integration is implemented in Quarkus-based components of Rokkon.
+*   **Quarkus Kafka Client Guide:** For details on how Kafka integration is implemented in Quarkus-based components of Pipeline.
 *   **SmallRye Reactive Messaging Kafka Documentation:** For advanced reactive Kafka integration patterns.
 *   **Apache Kafka Documentation:** For core Kafka concepts like topics, partitions, consumer groups, and offset management.
 *   **Enterprise Integration Patterns (Claim Check):** For more on the Claim Check pattern.

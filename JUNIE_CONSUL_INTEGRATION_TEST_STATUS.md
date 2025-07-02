@@ -41,7 +41,7 @@ The latest test run shows **15 failing tests** and **17 skipped tests** out of *
 5. **ClusterServiceIT** - Initialization error (Fixed)
 6. **ModuleWhitelistServiceSimpleIT** - Initialization error (Fixed)
 7. **PipelineConfigServiceIT** - Test execution failed
-8. **PipelineConfigServiceTest** - Initialization error
+8. **PipelineConfigServiceTest** - Initialization error (Fixed)
 9. **MethodicalBuildUpIT** - Initialization error
 10. **ModuleWhitelistServiceIT** - Initialization error (Fixed)
 11. **ModuleWhitelistServiceContainerIT** - Initialization error

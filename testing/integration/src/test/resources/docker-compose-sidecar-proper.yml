@@ -1,0 +1,199 @@
+version: '3.8'
+
+services:
+  # Consul server for service discovery and configuration
+  consul-server:
+    image: hashicorp/consul:latest
+    command: >
+      agent -server -ui 
+      -node=consul-server
+      -bootstrap-expect=1
+      -client=0.0.0.0
+      -bind=0.0.0.0
+      -datacenter=dc1
+      -config-dir=/consul/config
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    volumes:
+      - ./consul-server-config.json:/consul/config/consul-server-config.json:ro
+    networks:
+      - service-mesh
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Seed application config
+  consul-seeder-app:
+    image: rokkon/seed-engine-consul-config:latest
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    networks:
+      - service-mesh
+    volumes:
+      - ./seed-data.json:/seed-data.json:ro
+    command: [
+      "-h", "consul-server",
+      "-p", "8500",
+      "--key", "config/application",
+      "--import", "/seed-data.json",
+      "--force"
+    ]
+
+  # Seed cluster config
+  consul-seeder-cluster:
+    image: rokkon/seed-engine-consul-config:latest
+    depends_on:
+      consul-seeder-app:
+        condition: service_completed_successfully
+    networks:
+      - service-mesh
+    volumes:
+      - ./test-consul-config.properties:/config.properties:ro
+    command: [
+      "-h", "consul-server",
+      "-p", "8500",
+      "--key", "pipeline/test-cluster/config",
+      "--config", "/config.properties",
+      "--force"
+    ]
+
+  # Pipeline Engine
+  pipeline-engine:
+    image: rokkon/engine:latest
+    environment:
+      - QUARKUS_HTTP_PORT=38082
+      - QUARKUS_GRPC_SERVER_PORT=48082
+      - QUARKUS_CONSUL_HOST=127.0.0.1  # Connect to sidecar
+      - QUARKUS_CONSUL_PORT=8500
+      - QUARKUS_CONSUL_CONFIG_ENABLED=true
+      - QUARKUS_PROFILE=test
+      - CLUSTER_NAME=test-cluster
+      - ROKKON_CLUSTER_NAME=test-cluster
+      - ROKKON_ENGINE_NAME=test-engine
+      # Enable debug mode
+      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5005
+    ports:
+      - "38082:38082"  # HTTP port
+      - "48082:48082"  # gRPC port  
+      - "5005:5005"    # Debug port
+    depends_on:
+      consul-seeder-cluster:
+        condition: service_completed_successfully
+    networks:
+      - service-mesh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:38082/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  # Engine's Consul sidecar (for consul agent and connect proxy)
+  engine-consul-sidecar:
+    image: hashicorp/consul:latest
+    network_mode: "service:pipeline-engine"
+    depends_on:
+      pipeline-engine:
+        condition: service_started
+    command: >
+      consul agent
+      -retry-join=consul-server
+      -config-dir=/consul/config
+    volumes:
+      - ./engine-consul-config.json:/consul/config/engine-consul-config.json:ro
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+
+  # Echo Module  
+  echo-module:
+    image: rokkon/echo-module:1.0.0-SNAPSHOT
+    environment:
+      - QUARKUS_HTTP_PORT=39091
+      - QUARKUS_GRPC_SERVER_PORT=49091
+      - MODULE_NAME=echo
+      - MODULE_VERSION=1.0.0
+      - ENGINE_HOST=127.0.0.1  # Connect via sidecar
+      - ENGINE_GRPC_PORT=48082
+      # Enable debug mode
+      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5006
+    ports:
+      - "39091:39091"  # HTTP
+      - "49091:49091"  # gRPC
+      - "5006:5006"    # Debug port
+    depends_on:
+      pipeline-engine:
+        condition: service_healthy
+    networks:
+      - service-mesh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:39091/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Echo module's Consul sidecar
+  echo-consul-sidecar:
+    image: hashicorp/consul:latest
+    network_mode: "service:echo-module"
+    depends_on:
+      echo-module:
+        condition: service_started
+    command: >
+      consul agent
+      -retry-join=consul-server
+      -config-dir=/consul/config
+    volumes:
+      - ./echo-consul-config.json:/consul/config/echo-consul-config.json:ro
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+
+  # Test Module
+  test-module:
+    image: rokkon/test-module:1.0.0-SNAPSHOT
+    environment:
+      - QUARKUS_HTTP_PORT=39092
+      - QUARKUS_GRPC_SERVER_PORT=49092
+      - MODULE_NAME=test
+      - MODULE_VERSION=1.0.0
+      - ENGINE_HOST=127.0.0.1  # Connect via sidecar
+      - ENGINE_GRPC_PORT=48082
+      # Enable debug mode
+      - JAVA_TOOL_OPTIONS=-agentlib:jdwp=transport=dt_socket,server=y,suspend=n,address=*:5007
+    ports:
+      - "39092:39092"  # HTTP
+      - "49092:49092"  # gRPC
+      - "5007:5007"    # Debug port
+    depends_on:
+      pipeline-engine:
+        condition: service_healthy
+    networks:
+      - service-mesh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:39092/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Test module's Consul sidecar
+  test-consul-sidecar:
+    image: hashicorp/consul:latest
+    network_mode: "service:test-module"
+    depends_on:
+      test-module:
+        condition: service_started
+    command: >
+      consul agent
+      -retry-join=consul-server
+      -config-dir=/consul/config
+    volumes:
+      - ./test-consul-config.json:/consul/config/test-consul-config.json:ro
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+
+networks:
+  service-mesh:
+    name: consul-service-mesh
+    driver: bridge

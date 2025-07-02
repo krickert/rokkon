@@ -31,7 +31,7 @@ quarkus:
   consul-config:
     # Enabled by default for proper engine registration
     enabled: true
-    fail-on-missing-key: false  # Don't fail if config doesn't exist in Consul
+    fail-on-missing-key: true  # Fail if required config doesn't exist - use CLI to seed first
     agent:
       host-port: ${consul.host:localhost}:${consul.port:8500}
     properties-value-keys: pipeline/${CLUSTER_NAME:default}/config

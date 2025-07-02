@@ -17,6 +17,9 @@ dependencies {
     implementation("io.vertx:vertx-consul-client")
     implementation("com.fasterxml.jackson.core:jackson-databind") 
     implementation("com.fasterxml.jackson.dataformat:jackson-dataformat-yaml")
+    
+    // Container image building
+    implementation("io.quarkus:quarkus-container-image-docker")
 
     // Testing dependencies (all from CLI BOM)
     testImplementation("org.junit.jupiter:junit-jupiter")

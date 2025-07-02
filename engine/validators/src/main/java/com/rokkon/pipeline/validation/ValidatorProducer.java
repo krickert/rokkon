@@ -2,10 +2,12 @@ package com.rokkon.pipeline.validation;
 
 import com.rokkon.pipeline.config.model.PipelineConfig;
 import com.rokkon.pipeline.config.model.PipelineClusterConfig;
+import com.rokkon.pipeline.validation.validators.*;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.inject.Instance;
 import jakarta.enterprise.inject.Produces;
 import jakarta.inject.Inject;
+import jakarta.inject.Named;
 import org.jboss.logging.Logger;
 
 import java.util.ArrayList;
@@ -28,8 +30,8 @@ public class ValidatorProducer {
     Instance<ConfigValidator<PipelineClusterConfig>> clusterValidators;
     
     /**
-     * Produces a CompositeValidator for PipelineConfig validation.
-     * Automatically discovers and includes all available PipelineConfig validators.
+     * Produces the default CompositeValidator for PipelineConfig validation.
+     * This validator respects the supportedModes() method of each validator.
      */
     @Produces
     @ApplicationScoped
@@ -41,7 +43,8 @@ public class ValidatorProducer {
             // Skip the composite validator itself to avoid circular dependency
             if (!(validator instanceof CompositeValidator)) {
                 validators.add(validator);
-                LOG.debugf("Added pipeline validator: %s", validator.getValidatorName());
+                LOG.debugf("Added pipeline validator: %s (supports modes: %s)", 
+                    validator.getValidatorName(), validator.supportedModes());
             }
         }
         

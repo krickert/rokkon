@@ -1,0 +1,89 @@
+version: '3.8'
+
+services:
+  # Step 1: Just Consul server and engine with sidecar
+  # Let's get this working first!
+  
+  consul-server:
+    image: hashicorp/consul:latest
+    command: >
+      agent -server -ui 
+      -node=consul-server
+      -bootstrap-expect=1
+      -client=0.0.0.0
+      -bind=0.0.0.0
+      -datacenter=dc1
+    ports:
+      - "8500:8500"
+      - "8600:8600/udp"
+    networks:
+      - service-mesh
+    healthcheck:
+      test: ["CMD", "consul", "members"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Seed the required config
+  consul-seeder:
+    image: rokkon/seed-engine-consul-config:latest
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    networks:
+      - service-mesh
+    volumes:
+      - ./seed-data.json:/seed-data.json:ro
+    command: [
+      "-h", "consul-server",
+      "-p", "8500",
+      "--key", "config/application",
+      "--import", "/seed-data.json",
+      "--force"
+    ]
+
+  # Pipeline Engine
+  pipeline-engine:
+    image: rokkon/engine:latest
+    environment:
+      - QUARKUS_HTTP_PORT=38082
+      - QUARKUS_GRPC_SERVER_PORT=48082
+      - QUARKUS_CONSUL_HOST=127.0.0.1  # Connect to sidecar
+      - QUARKUS_CONSUL_PORT=8500
+      - QUARKUS_CONSUL_CONFIG_ENABLED=true
+      - QUARKUS_PROFILE=test
+      - CLUSTER_NAME=test-cluster
+      - ROKKON_CLUSTER_NAME=test-cluster
+      - ROKKON_ENGINE_NAME=test-engine
+    ports:
+      - "38082:38082"
+      - "48082:48082"
+    depends_on:
+      consul-seeder:
+        condition: service_completed_successfully
+    networks:
+      - service-mesh
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:38082/q/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+
+  # Engine's Consul sidecar - simple agent only
+  engine-consul-sidecar:
+    image: hashicorp/consul:latest
+    network_mode: "service:pipeline-engine"
+    depends_on:
+      pipeline-engine:
+        condition: service_started
+    command: >
+      consul agent
+      -retry-join=consul-server
+      -bind=127.0.0.1
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+
+networks:
+  service-mesh:
+    name: consul-service-mesh
+    driver: bridge

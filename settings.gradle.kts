@@ -33,6 +33,7 @@ include("commons:util")
 include("commons:data-util")
 include("testing:util")
 include("testing:server-util")
+include("testing:integration")
 include("engine:pipestream")
 
 // Engine submodules
