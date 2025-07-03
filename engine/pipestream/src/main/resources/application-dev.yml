@@ -60,3 +60,15 @@ engine:
         "com.rokkon": DEBUG
         "io.quarkus.consul": DEBUG
         "io.smallrye.stork": DEBUG
+  
+  # Development mode orchestration
+  rokkon:
+    dev:
+      # Automatically start Docker Compose infrastructure
+      auto-start-infrastructure: false  # Set to true to auto-start
+      # Path to docker-compose file (relative to working directory)
+      docker-compose-file: docker/development/docker-compose.dev.yml
+      # Use minimal modules (just echo and test)
+      minimal-modules: true
+      # Show dev mode status in console
+      show-status-on-startup: true

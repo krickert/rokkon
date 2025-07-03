@@ -59,33 +59,39 @@ This starts only echo and test modules (skips chunker/embedder for faster startu
 - **Module Dashboard**: http://localhost:39000/api/v1/modules/dashboard
 
 ### Testing Pipeline Creation
+
+### Quick Pipeline Creation (Dev Mode)
 ```bash
-# 1. Check modules are registered
+# 1. Check dev status
+curl http://localhost:39000/api/v1/dev/status | jq
+
+# 2. See available sample pipelines
+curl http://localhost:39000/api/v1/dev/sample-pipelines | jq
+
+# 3. Create a simple echo pipeline
+curl -X POST http://localhost:39000/api/v1/dev/quick-pipeline \
+  -H "Content-Type: application/json" \
+  -d '{"name":"echo-test","modules":["echo"]}'
+
+# 4. Create a multi-step pipeline
+curl -X POST http://localhost:39000/api/v1/dev/quick-pipeline \
+  -H "Content-Type: application/json" \
+  -d '{"name":"echo-parser","modules":["echo","parser"]}'
+
+# 5. Test the pipeline with data
+curl -X POST http://localhost:39000/api/v1/dev/test-pipeline/echo-test \
+  -H "Content-Type: application/json" \
+  -d '{"message":"Hello from dev mode!"}'
+```
+
+### Traditional Pipeline Creation
+For more control, use the standard APIs:
+```bash
+# Check modules are registered
 curl http://localhost:39000/api/v1/modules/dashboard | jq
 
-# 2. Create a simple pipeline definition
-curl -X POST http://localhost:39000/api/v1/pipeline-definitions \
-  -H "Content-Type: application/json" \
-  -d '{
-    "id": "echo-test",
-    "name": "Echo Test Pipeline",
-    "description": "Simple echo pipeline for testing",
-    "steps": [{
-      "stepId": "echo-1",
-      "name": "Echo Step",
-      "processorInfo": {
-        "moduleName": "echo",
-        "fullyQualifiedGrpcServiceName": "com.rokkon.EchoService"
-      },
-      "stepType": "PIPELINE",
-      "outputRouting": {
-        "routingType": "BROADCAST"
-      }
-    }]
-  }'
-
-# 3. Deploy the pipeline
-curl -X POST http://localhost:39000/api/v1/clusters/dev-cluster/pipelines/echo-test
+# Create pipeline definition (see /api/v1/pipeline-definitions docs)
+# Deploy pipeline (see /api/v1/clusters/{cluster}/pipelines docs)
 ```
 
 ## Troubleshooting
