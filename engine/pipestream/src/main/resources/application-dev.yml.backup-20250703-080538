@@ -1,0 +1,74 @@
+# Development profile - manual Consul setup required
+application:
+  name: rokkon-engine
+  version: 1.0.0
+  description: Rokkon Engine for local development
+
+quarkus:
+  # HTTP configuration
+  http:
+    port: 8080
+    host: 0.0.0.0
+  
+  # gRPC configuration  
+  grpc:
+    server:
+      port: 49000
+      host: 0.0.0.0
+  
+  # Consul config - disabled for dev mode
+  # Start Consul manually with: docker run -d -p 8500:8500 consul:latest agent -dev -ui -client=0.0.0.0
+  consul-config:
+    enabled: false
+    properties-value-keys: 
+      - config/application
+      - config/dev
+    format: yaml
+    fail-on-missing-key: false
+
+# Rokkon configuration
+rokkon:
+  engine:
+    grpc-port: 49000
+    rest-port: 8080
+    debug: true
+      
+  # Tell the engine to register itself with Consul
+  consul:
+    host: localhost
+    port: 8500
+
+# Consul configuration for engine registration
+consul:
+  host: localhost
+  port: 8500
+
+# Engine host configuration for Consul registration
+engine:
+  host: host.docker.internal  # Allow Docker containers to reach the host
+
+# Dev mode specific settings
+"%dev":
+  quarkus:
+    # Live reload
+    live-reload:
+      instrumentation: true
+      
+    # Logging
+    log:
+      category:
+        "com.rokkon": DEBUG
+        "io.quarkus.consul": DEBUG
+        "io.smallrye.stork": DEBUG
+  
+  # Development mode orchestration
+  rokkon:
+    dev:
+      # Automatically start Docker Compose infrastructure
+      auto-start-infrastructure: false  # Set to true to auto-start
+      # Path to docker-compose file (relative to working directory)
+      docker-compose-file: docker/development/docker-compose.dev.yml
+      # Use minimal modules (just echo and test)
+      minimal-modules: true
+      # Show dev mode status in console
+      show-status-on-startup: true

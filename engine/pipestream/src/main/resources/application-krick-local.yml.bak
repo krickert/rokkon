@@ -1,0 +1,21 @@
+# Custom development settings for krick.rokkon.com
+# This file is gitignored and contains local-specific configuration
+
+# Engine configuration
+engine:
+  host: host.docker.internal  # Allow Docker containers to reach the host
+
+# Consul configuration for local development
+consul:
+  host: localhost
+  port: 8501
+
+# Quarkus server configuration for local development
+quarkus:
+  http:
+    host: 0.0.0.0  # Listen on all interfaces for dev
+  grpc:
+    server:
+      host: 0.0.0.0  # Listen on all interfaces for dev
+
+# Any other local dev overrides can go here

@@ -216,6 +216,10 @@ smallrye:
           level: INFO
         "io.quarkus.devservices":
           level: DEBUG
+        "jdk.event.security":
+          level: WARN
+        "jd.ev.security":
+          level: WARN
 
     # HTTP configuration for dev mode
     http:
@@ -249,8 +253,8 @@ smallrye:
 
   # Consul configuration for dev mode
   consul:
-    host: ${CONSUL_HOST:consul-dev}  # Use container name in dev
-    port: ${CONSUL_PORT:8500}
+    host: ${CONSUL_HOST:localhost}  # Use localhost in dev
+    port: ${CONSUL_PORT:8501}
     enabled: true
 
   # Enable auto-start of Consul container in dev mode

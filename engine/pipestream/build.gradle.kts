@@ -1,3 +1,19 @@
+import org.testcontainers.consul.ConsulContainer
+import org.testcontainers.utility.DockerImageName
+import org.testcontainers.containers.Network
+import org.testcontainers.containers.GenericContainer
+import java.net.ServerSocket
+
+buildscript {
+    repositories {
+        mavenCentral()
+    }
+    dependencies {
+        classpath("org.testcontainers:consul:1.21.3")
+        classpath("org.testcontainers:testcontainers:1.21.3")
+    }
+}
+
 plugins {
     java
     id("io.quarkus")
@@ -6,6 +22,16 @@ plugins {
 dependencies {
     // Server BOM provides all standard server dependencies
     implementation(platform(project(":bom:server")))
+    
+    // Docker Client for Dev Mode only
+    quarkusDev("io.quarkiverse.docker:quarkus-docker-client:0.0.4")
+    
+    // Testcontainers for Dev Mode Consul startup
+    implementation("org.testcontainers:testcontainers:1.21.3")
+    implementation("org.testcontainers:consul:1.21.3")
+    
+    // Quarkus deployment for accessing DevModeMain
+    quarkusDev("io.quarkus:quarkus-core-deployment")
 
     // --- gRPC Services ---
     implementation("io.grpc:grpc-services")
@@ -29,7 +55,7 @@ dependencies {
     
     // --- Caching for gRPC channels ---
     implementation("io.quarkus:quarkus-cache")
-
+    
     // --- Engine Modules ---
     implementation(project(":engine:consul")) // Now includes gRPC registration service
     implementation(project(":engine:validators"))
@@ -42,7 +68,7 @@ dependencies {
     testImplementation("io.quarkus:quarkus-junit5-mockito")
     testImplementation("org.assertj:assertj-core:3.26.3")
     testImplementation("org.awaitility:awaitility:4.3.0")
-    testImplementation("org.testcontainers:consul:1.19.3")
+    testImplementation("org.testcontainers:consul:1.21.3")
     testImplementation(project(":testing:util"))
     testImplementation(project(":testing:server-util"))
     
@@ -51,7 +77,7 @@ dependencies {
     integrationTestImplementation("io.quarkus:quarkus-junit5-mockito")
     integrationTestImplementation("org.assertj:assertj-core:3.26.3")
     integrationTestImplementation("org.awaitility:awaitility:4.3.0")
-    integrationTestImplementation("org.testcontainers:consul:1.19.3")
+    integrationTestImplementation("org.testcontainers:consul:1.21.3")
     integrationTestImplementation(project(":testing:util"))
     integrationTestImplementation(project(":engine:dynamic-grpc"))
     integrationTestImplementation("io.vertx:vertx-consul-client")
@@ -114,3 +140,119 @@ tasks.register("devWithConsul") {
         System.setProperty("quarkus.consul-config.enabled", "true")
     }
 }
+
+
+// Task to start Consul before dev mode
+tasks.register("startConsulDev") {
+    doLast {
+        // Check if port 8501 is available
+        try {
+            ServerSocket(8501).close()
+        } catch (e: Exception) {
+            throw GradleException("Port 8501 is already in use! Please stop any existing Consul processes.")
+        }
+
+        // Create a bridge network
+        val network = Network.newNetwork()
+
+        // 1. Start Consul server (exactly like docker-compose)
+        val consulServer = ConsulContainer(DockerImageName.parse("hashicorp/consul:1.21"))
+            .withCommand(
+                "agent", "-server", "-ui",
+                "-client=0.0.0.0",
+                "-bind=0.0.0.0",
+                "-bootstrap-expect=1",
+                "-dev"
+            )
+            .withNetwork(network)
+            .withNetworkAliases("consul-server")
+            .withEnv("CONSUL_BIND_INTERFACE", "eth0")
+
+        consulServer.start()
+        logger.lifecycle("Consul server started")
+
+        // 2. Seed configuration (replaces seeder service)
+        Thread.sleep(2000) // Wait for server to be ready
+        
+        // Seed with proper YAML format that Quarkus expects
+        val applicationConfig = """
+pipeline:
+  engine:
+    name: pipeline-engine-dev
+    version: 1.0.0-DEV
+""".trimIndent()
+
+        val devConfig = """
+quarkus:
+  http:
+    port: 39001
+  grpc:
+    server:
+      port: 49001
+pipeline:
+  engine:
+    dev-mode: true
+""".trimIndent()
+
+        consulServer.execInContainer("consul", "kv", "put", "config/application", applicationConfig)
+        consulServer.execInContainer("consul", "kv", "put", "config/dev", devConfig)
+        consulServer.execInContainer("consul", "kv", "put", "config/krick-local", devConfig)
+        logger.lifecycle("Configuration seeded")
+
+        // 3. Start Consul agent (engine sidecar equivalent)
+        // This is the critical part - agent must bridge Docker network and host
+        val consulAgent = GenericContainer(DockerImageName.parse("hashicorp/consul:1.21"))
+            .withCommand(
+                "agent",
+                "-node=engine-sidecar-dev",
+                "-client=0.0.0.0",
+                "-bind=0.0.0.0",
+                "-retry-join=consul-server",
+                "-log-level=info"
+            )
+            .withNetwork(network)
+            .withNetworkAliases("consul-agent-engine")
+            .withEnv("CONSUL_BIND_INTERFACE", "eth0")
+            .withExposedPorts(8500)
+            // This is the magic - allows agent to reach host
+            .withExtraHost("host.docker.internal", "host-gateway")
+
+        // Map to port 8501 on host (engine sidecar port)
+        consulAgent.setPortBindings(listOf("8501:8500"))
+        consulAgent.start()
+
+        logger.lifecycle("Consul agent available at localhost:8501")
+        logger.lifecycle("Dev mode ready - run your Quarkus application")
+
+        // Store references to prevent GC
+        project.extensions.extraProperties["consulServer"] = consulServer
+        project.extensions.extraProperties["consulAgent"] = consulAgent
+        project.extensions.extraProperties["network"] = network
+    }
+}
+
+// Make quarkusDev depend on our Consul starter
+tasks.named<io.quarkus.gradle.tasks.QuarkusDev>("quarkusDev") {
+    dependsOn("startConsulDev")
+}
+
+// Optional: Stop containers after dev mode
+tasks.register("stopConsulDev") {
+    doLast {
+        try {
+            (project.extensions.extraProperties["consulAgent"] as? GenericContainer<*>)?.stop()
+            (project.extensions.extraProperties["consulServer"] as? ConsulContainer)?.stop()
+            (project.extensions.extraProperties["network"] as? Network)?.close()
+        } catch (e: Exception) {
+            logger.debug("Error stopping containers: ${e.message}")
+        }
+    }
+}
+
+// Alternative dev task with better naming
+tasks.register("dev") {
+    group = "development"
+    description = "Start Quarkus dev mode with Consul"
+    dependsOn("quarkusDev")
+}
+

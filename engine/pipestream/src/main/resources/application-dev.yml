@@ -1,51 +1,55 @@
-# Development profile - manual Consul setup required
+# Development profile - Zero-setup dev environment
 application:
-  name: rokkon-engine
+  name: pipeline-engine
   version: 1.0.0
-  description: Rokkon Engine for local development
+  description: Pipeline Engine for local development with auto-infrastructure
 
 quarkus:
-  # HTTP configuration
+  # HTTP configuration - Using different ports to avoid conflicts
   http:
-    port: 8080
+    port: 39001  # Different from production 39000
     host: 0.0.0.0
   
   # gRPC configuration  
   grpc:
     server:
-      port: 49000
+      port: 49001  # Different from production 49000
       host: 0.0.0.0
   
-  # Consul config - disabled for dev mode
-  # Start Consul manually with: docker run -d -p 8500:8500 consul:latest agent -dev -ui -client=0.0.0.0
+  # Consul config - will connect to sidecar
   consul-config:
-    enabled: false
+    enabled: true
+    agent:
+      host: localhost
+      port: 8501  # Engine's Consul sidecar port
     properties-value-keys: 
       - config/application
       - config/dev
     format: yaml
     fail-on-missing-key: false
 
-# Rokkon configuration
-rokkon:
+# Pipeline configuration
+pipeline:
   engine:
-    grpc-port: 49000
-    rest-port: 8080
+    grpc-port: 49001
+    rest-port: 39001
     debug: true
+    cluster-name: docker-dev-cluster  # Different from production
+    engine-name: engine-dev
       
-  # Tell the engine to register itself with Consul
+  # Tell the engine to register itself with Consul via sidecar
   consul:
     host: localhost
-    port: 8500
+    port: 8501  # Sidecar port
 
 # Consul configuration for engine registration
 consul:
   host: localhost
-  port: 8500
+  port: 8501  # Sidecar port
 
 # Engine host configuration for Consul registration
 engine:
-  host: host.docker.internal  # Allow Docker containers to reach the host
+  host: ${ENGINE_HOST_IP:host.docker.internal}  # Will be detected at runtime
 
 # Dev mode specific settings
 "%dev":
@@ -57,18 +61,28 @@ engine:
     # Logging
     log:
       category:
-        "com.rokkon": DEBUG
+        "com.rokkon.pipeline": DEBUG
         "io.quarkus.consul": DEBUG
         "io.smallrye.stork": DEBUG
+        "com.github.dockerjava": INFO
   
   # Development mode orchestration
-  rokkon:
+  pipeline:
     dev:
       # Automatically start Docker Compose infrastructure
-      auto-start-infrastructure: false  # Set to true to auto-start
-      # Path to docker-compose file (relative to working directory)
-      docker-compose-file: docker/development/docker-compose.dev.yml
-      # Use minimal modules (just echo and test)
-      minimal-modules: true
+      auto-start: true
+      # Default modules to start (ECHO, TEST)
+      default-modules: ECHO,TEST
+      # Docker compose project name
+      compose-project-name: pipeline-dev
       # Show dev mode status in console
       show-status-on-startup: true
+      # Docker compose file for infrastructure
+      compose-file: docker/development/docker-compose.dev-with-sidecar.yml
+  
+  # Docker client configuration for dev mode
+  docker:
+    enabled: true
+    health-check: true
+    connect-timeout: 10s
+    read-timeout: 30s

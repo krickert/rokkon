@@ -11,6 +11,7 @@ import org.jboss.logging.Logger;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.OptionalInt;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 
@@ -21,6 +22,11 @@ import java.util.concurrent.TimeUnit;
 public class ConsulConfigSourceFactory implements ConfigSourceFactory {
     
     private static final Logger LOG = Logger.getLogger(ConsulConfigSourceFactory.class);
+    
+    @Override
+    public OptionalInt getPriority() {
+        return OptionalInt.of(250); // Higher than default (100) but lower than dev mode (500)
+    }
     
     @Override
     public Iterable<ConfigSource> getConfigSources(ConfigSourceContext context) {
