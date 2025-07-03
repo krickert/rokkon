@@ -28,7 +28,7 @@ public class PipelineDevModeInfrastructure {
     private static final String LABEL_PROJECT = "com.docker.compose.project";
     
     @Inject
-    DockerClient dockerClient;
+    DevModeDockerClientManager dockerClientManager;
     
     @Inject
     HostIPDetector hostIPDetector;
@@ -66,7 +66,13 @@ public class PipelineDevModeInfrastructure {
      */
     public boolean isContainerRunning(String containerName) {
         try {
-            List<Container> containers = dockerClient.listContainersCmd()
+            // Ensure Docker is available before attempting operations
+            if (!dockerChecker.isDockerAvailable()) {
+                LOG.debug("Docker not available, cannot check container status");
+                return false;
+            }
+            
+            List<Container> containers = dockerClientManager.getDockerClient().listContainersCmd()
                 .withShowAll(false) // Only running containers
                 .exec();
                 
@@ -81,8 +87,41 @@ public class PipelineDevModeInfrastructure {
                     }
                     return false;
                 });
+        } catch (IllegalStateException e) {
+            if (e.getMessage() != null && e.getMessage().contains("Connection pool shut down")) {
+                // Try to reconnect and retry once
+                LOG.debug("Connection pool shut down, attempting reconnect...");
+                dockerChecker.reconnect();
+                if (dockerChecker.isDockerAvailable()) {
+                    return retryContainerCheck(containerName);
+                }
+            }
+            LOG.error("Docker connection error: " + e.getMessage());
+            return false;
         } catch (Exception e) {
             LOG.error("Failed to check container status", e);
+            return false;
+        }
+    }
+    
+    private boolean retryContainerCheck(String containerName) {
+        try {
+            List<Container> containers = dockerClientManager.getDockerClient().listContainersCmd()
+                .withShowAll(false)
+                .exec();
+                
+            return containers.stream()
+                .anyMatch(c -> {
+                    String[] names = c.getNames();
+                    for (String name : names) {
+                        if (name.contains(containerName)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                });
+        } catch (Exception e) {
+            LOG.error("Retry failed to check container status", e);
             return false;
         }
     }
@@ -92,7 +131,7 @@ public class PipelineDevModeInfrastructure {
      */
     public List<Container> getProjectContainers() {
         try {
-            return dockerClient.listContainersCmd()
+            return dockerClientManager.getDockerClient().listContainersCmd()
                 .withShowAll(true)
                 .withLabelFilter(Map.of(LABEL_PROJECT, composeProjectName))
                 .exec();
@@ -115,6 +154,7 @@ public class PipelineDevModeInfrastructure {
      */
     public Optional<String> getContainerHealth(String containerName) {
         try {
+            var dockerClient = dockerClientManager.getDockerClient();
             List<Container> containers = dockerClient.listContainersCmd()
                 .withShowAll(false)
                 .exec();
@@ -152,6 +192,7 @@ public class PipelineDevModeInfrastructure {
      */
     public Optional<MemoryStats> getContainerMemoryStats(String containerName) {
         try {
+            var dockerClient = dockerClientManager.getDockerClient();
             List<Container> containers = dockerClient.listContainersCmd()
                 .withShowAll(false)
                 .exec();

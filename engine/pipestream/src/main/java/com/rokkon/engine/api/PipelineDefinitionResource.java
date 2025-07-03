@@ -433,7 +433,7 @@ public class PipelineDefinitionResource {
         @Schema(description = "Response message", examples = {"Pipeline definition created successfully"})
         String message,
 
-        @Schema(description = "Error messages if any", examples = {"['Pipeline with ID document-processing already exists']"})
+        @Schema(description = "Error messages if any", example = "[\"Pipeline with ID document-processing already exists\"]")
         List<String> errors,
 
         @Schema(description = "Warning messages if any", examples = {"[]"})

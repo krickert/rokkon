@@ -391,10 +391,10 @@ public class PipelineInstanceResource {
         @Schema(description = "Created instance ID", examples = {"prod-pipeline-1"})
         String instanceId,
 
-        @Schema(description = "Error messages if any", examples = {"['Instance ID already exists']"})
+        @Schema(description = "Error messages if any", example = "[\"Instance ID already exists\"]")
         List<String> errors,
 
-        @Schema(description = "Warning messages if any", examples = {"['Configuration may need tuning for production use']"})
+        @Schema(description = "Warning messages if any", example = "[\"Configuration may need tuning for production use\"]")
         List<String> warnings
     ) {}
 }

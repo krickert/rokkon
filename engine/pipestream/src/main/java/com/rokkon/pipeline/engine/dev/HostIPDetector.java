@@ -29,7 +29,7 @@ public class HostIPDetector {
     private static final String DEFAULT_DOCKER_BRIDGE = "172.17.0.1";
     
     @Inject
-    DockerClient dockerClient;
+    DevModeDockerClientManager dockerClientManager;
     
     private String detectedHostIP;
     
@@ -80,7 +80,7 @@ public class HostIPDetector {
      */
     private Optional<String> getDockerBridgeGatewayIP() {
         try {
-            List<Network> networks = dockerClient.listNetworksCmd().exec();
+            List<Network> networks = dockerClientManager.getDockerClient().listNetworksCmd().exec();
             
             // Look for the default bridge network
             for (Network network : networks) {

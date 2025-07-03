@@ -2,7 +2,11 @@ import org.testcontainers.consul.ConsulContainer
 import org.testcontainers.utility.DockerImageName
 import org.testcontainers.containers.Network
 import org.testcontainers.containers.GenericContainer
+import org.testcontainers.DockerClientFactory
 import java.net.ServerSocket
+import java.net.URL
+import java.net.URI
+import java.net.HttpURLConnection
 
 buildscript {
     repositories {
@@ -145,44 +149,144 @@ tasks.register("devWithConsul") {
 // Task to start Consul before dev mode
 tasks.register("startConsulDev") {
     doLast {
-        // Check if port 8501 is available
-        try {
-            ServerSocket(8501).close()
-        } catch (e: Exception) {
-            throw GradleException("Port 8501 is already in use! Please stop any existing Consul processes.")
-        }
-
-        // Create a bridge network
-        val network = Network.newNetwork()
-
-        // 1. Start Consul server (exactly like docker-compose)
-        val consulServer = ConsulContainer(DockerImageName.parse("hashicorp/consul:1.21"))
-            .withCommand(
-                "agent", "-server", "-ui",
-                "-client=0.0.0.0",
-                "-bind=0.0.0.0",
-                "-bootstrap-expect=1",
-                "-dev"
-            )
-            .withNetwork(network)
-            .withNetworkAliases("consul-server")
-            .withEnv("CONSUL_BIND_INTERFACE", "eth0")
-
-        consulServer.start()
-        logger.lifecycle("Consul server started")
-
-        // 2. Seed configuration (replaces seeder service)
-        Thread.sleep(2000) // Wait for server to be ready
+        var consulServerContainer: ConsulContainer? = null
+        var consulAgentContainer: GenericContainer<*>? = null
+        var network: Network? = null
         
-        // Seed with proper YAML format that Quarkus expects
-        val applicationConfig = """
+        // Check if Consul agent is already running on port 8501
+        val isConsulAgentRunning = try {
+            val url = URI("http://localhost:8501/v1/agent/self").toURL()
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 1000
+            connection.readTimeout = 1000
+            val responseCode = connection.responseCode
+            connection.disconnect()
+            responseCode == 200
+        } catch (e: Exception) {
+            false
+        }
+        
+        if (isConsulAgentRunning) {
+            logger.lifecycle("✓ Consul agent already running on port 8501, reusing existing instance")
+            
+            // Check if configuration exists
+            val configExists = try {
+                val checkUrl = URI("http://localhost:8501/v1/kv/config/application").toURL()
+                val conn = checkUrl.openConnection() as HttpURLConnection
+                conn.requestMethod = "GET"
+                conn.connectTimeout = 1000
+                val exists = conn.responseCode == 200
+                conn.disconnect()
+                exists
+            } catch (e: Exception) {
+                false
+            }
+            
+            if (!configExists) {
+                logger.lifecycle("⚠ Configuration missing, attempting to seed...")
+                // Try to find server container to seed config
+                val docker = DockerClientFactory.instance().client()
+                val consulContainers = docker.listContainersCmd()
+                    .withShowAll(false)
+                    .exec()
+                    .filter { it.image?.contains("consul") == true && it.state == "running" }
+                
+                val serverContainer = consulContainers.find { 
+                    it.command?.contains("-server") == true 
+                }
+                
+                if (serverContainer != null) {
+                    // Seed using docker exec
+                    val applicationConfig = """
 pipeline:
   engine:
     name: pipeline-engine-dev
     version: 1.0.0-DEV
 """.trimIndent()
 
-        val devConfig = """
+                    val devConfig = """
+quarkus:
+  http:
+    port: 39001
+  grpc:
+    server:
+      port: 49001
+pipeline:
+  engine:
+    dev-mode: true
+""".trimIndent()
+                    
+                    docker.execCreateCmd(serverContainer.id)
+                        .withCmd("consul", "kv", "put", "config/application", applicationConfig)
+                        .exec()
+                    docker.execCreateCmd(serverContainer.id)
+                        .withCmd("consul", "kv", "put", "config/dev", devConfig)
+                        .exec()
+                    logger.lifecycle("✓ Configuration seeded successfully")
+                }
+            } else {
+                logger.lifecycle("✓ Configuration already exists")
+            }
+        } else {
+            // No agent running, need to start Consul infrastructure
+            logger.lifecycle("Starting Consul infrastructure...")
+            
+            // Check if we can find existing Consul server container
+            val docker = DockerClientFactory.instance().client()
+            val consulContainers = docker.listContainersCmd()
+                .withShowAll(false)
+                .exec()
+                .filter { container -> 
+                    container.image?.contains("consul") == true && 
+                    container.state == "running"
+                }
+            
+            val existingServer = consulContainers.find { container ->
+                container.command?.contains("-server") == true
+            }
+            
+            if (existingServer != null) {
+                logger.lifecycle("✓ Found existing Consul server container: ${existingServer.id.take(12)}")
+                // Get the network from existing server
+                val networkId = existingServer.networkSettings?.networks?.keys?.firstOrNull()
+                if (networkId != null) {
+                    // Just reuse the existing network by creating a new one
+                    // Testcontainers will handle joining the right network
+                    network = Network.newNetwork()
+                }
+            } else {
+                // Create new network and server
+                logger.lifecycle("→ Starting new Consul server...")
+                network = Network.newNetwork()
+                
+                consulServerContainer = ConsulContainer(DockerImageName.parse("hashicorp/consul:1.21"))
+                    .withCommand(
+                        "agent", "-server", "-ui",
+                        "-client=0.0.0.0",
+                        "-bind=0.0.0.0",
+                        "-bootstrap-expect=1",
+                        "-dev"
+                    )
+                    .withNetwork(network)
+                    .withNetworkAliases("consul-server")
+                    .withEnv("CONSUL_BIND_INTERFACE", "eth0")
+                
+                consulServerContainer.start()
+                logger.lifecycle("✓ Consul server started")
+                
+                // Seed configuration
+                logger.lifecycle("→ Seeding configuration...")
+                Thread.sleep(2000) // Wait for server to be ready
+                
+                val applicationConfig = """
+pipeline:
+  engine:
+    name: pipeline-engine-dev
+    version: 1.0.0-DEV
+""".trimIndent()
+
+                val devConfig = """
 quarkus:
   http:
     port: 39001
@@ -194,40 +298,45 @@ pipeline:
     dev-mode: true
 """.trimIndent()
 
-        consulServer.execInContainer("consul", "kv", "put", "config/application", applicationConfig)
-        consulServer.execInContainer("consul", "kv", "put", "config/dev", devConfig)
-        consulServer.execInContainer("consul", "kv", "put", "config/krick-local", devConfig)
-        logger.lifecycle("Configuration seeded")
-
-        // 3. Start Consul agent (engine sidecar equivalent)
-        // This is the critical part - agent must bridge Docker network and host
-        val consulAgent = GenericContainer(DockerImageName.parse("hashicorp/consul:1.21"))
-            .withCommand(
-                "agent",
-                "-node=engine-sidecar-dev",
-                "-client=0.0.0.0",
-                "-bind=0.0.0.0",
-                "-retry-join=consul-server",
-                "-log-level=info"
-            )
-            .withNetwork(network)
-            .withNetworkAliases("consul-agent-engine")
-            .withEnv("CONSUL_BIND_INTERFACE", "eth0")
-            .withExposedPorts(8500)
-            // This is the magic - allows agent to reach host
-            .withExtraHost("host.docker.internal", "host-gateway")
-
-        // Map to port 8501 on host (engine sidecar port)
-        consulAgent.setPortBindings(listOf("8501:8500"))
-        consulAgent.start()
-
-        logger.lifecycle("Consul agent available at localhost:8501")
-        logger.lifecycle("Dev mode ready - run your Quarkus application")
-
-        // Store references to prevent GC
-        project.extensions.extraProperties["consulServer"] = consulServer
-        project.extensions.extraProperties["consulAgent"] = consulAgent
-        project.extensions.extraProperties["network"] = network
+                consulServerContainer.execInContainer("consul", "kv", "put", "config/application", applicationConfig)
+                consulServerContainer.execInContainer("consul", "kv", "put", "config/dev", devConfig)
+                logger.lifecycle("✓ Configuration seeded")
+            }
+            
+            // Start agent
+            logger.lifecycle("→ Starting Consul agent on port 8501...")
+            consulAgentContainer = GenericContainer(DockerImageName.parse("hashicorp/consul:1.21"))
+                .withCommand(
+                    "agent",
+                    "-node=engine-sidecar-dev",
+                    "-client=0.0.0.0",
+                    "-bind=0.0.0.0",
+                    "-retry-join=consul-server",
+                    "-log-level=info"
+                )
+                .withNetwork(network!!)
+                .withNetworkAliases("consul-agent-engine")
+                .withEnv("CONSUL_BIND_INTERFACE", "eth0")
+                .withExposedPorts(8500)
+                .withExtraHost("host.docker.internal", "host-gateway")
+            
+            consulAgentContainer.setPortBindings(listOf("8501:8500"))
+            consulAgentContainer.start()
+            logger.lifecycle("✓ Consul agent available at localhost:8501")
+        }
+        
+        logger.lifecycle("✓ Dev mode ready - starting Quarkus application")
+        
+        // Store references if we created new containers
+        consulServerContainer?.let { 
+            project.extensions.extraProperties["consulServer"] = it 
+        }
+        consulAgentContainer?.let { 
+            project.extensions.extraProperties["consulAgent"] = it 
+        }
+        network?.let { 
+            project.extensions.extraProperties["network"] = it 
+        }
     }
 }
 

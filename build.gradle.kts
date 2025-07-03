@@ -10,6 +10,13 @@ allprojects {
     version = "1.0.0-SNAPSHOT"
 }
 
+// Convenience task for dev mode
+tasks.register("dev") {
+    dependsOn(":engine:pipestream:quarkusDev")
+    description = "Start the engine in dev mode with Consul"
+    group = "development"
+}
+
 // Fix Quarkus task dependencies for all subprojects
 subprojects {
     plugins.withId("io.quarkus") {

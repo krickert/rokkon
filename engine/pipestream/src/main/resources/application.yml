@@ -17,7 +17,7 @@ quarkus:
       host: ${ENGINE_HOST:0.0.0.0}
       enable-reflection-service: true
       max-inbound-message-size: 419430400
-      use-separate-server: true  # Use separate gRPC server (default mode)
+      use-separate-server: true  # Use separate gRPC server (required for different ports)
       health:
         enabled: true
 
@@ -79,6 +79,10 @@ pipeline:
     rokkon-commons:
       group-id: com.rokkon.pipeline
       artifact-id: rokkon-commons
+    # Add interface module for OpenAPI models
+    commons-interface:
+      group-id: com.rokkon.pipeline
+      artifact-id: interface
 
   # Health check configuration
   health:
@@ -211,14 +215,39 @@ smallrye:
         enable: true
       category:
         "com.rokkon.pipeline":
-          level: DEBUG
-        "org.testcontainers":
           level: INFO
+        "org.testcontainers":
+          level: WARN
         "io.quarkus.devservices":
-          level: DEBUG
+          level: INFO
         "jdk.event.security":
           level: WARN
         "jd.ev.security":
+          level: WARN
+        "io.quarkus":
+          level: INFO
+        "io.smallrye":
+          level: INFO
+        "io.vertx":
+          level: WARN
+        # Silence Apache HTTP client debug logs
+        "org.apache.hc":
+          level: WARN
+        "org.apache.http":
+          level: WARN
+        "org.apache.hc.client5.http.wire":
+          level: ERROR
+        # Silence Netty debug logs
+        "io.netty":
+          level: WARN
+        # Silence terminal/TTY warnings
+        "org.aesh":
+          level: ERROR
+        # Silence JSON provider logs
+        "jakarta.json.spi":
+          level: WARN
+        # Silence Docker client debug logs
+        "com.github.dockerjava":
           level: WARN
 
     # HTTP configuration for dev mode
@@ -246,6 +275,15 @@ smallrye:
     # Dev mode configuration
     dev:
       instrumentation: true
+    
+    # Docker client configuration for dev mode
+    docker-client:
+      # Use the default Docker socket
+      docker-host: "unix:///var/run/docker.sock"
+      # Connection timeout
+      connection-timeout: 30s
+      # Read timeout  
+      read-timeout: 30s
 
     # In dev mode, enable Consul features if consul.host is configured
     consul-config:
