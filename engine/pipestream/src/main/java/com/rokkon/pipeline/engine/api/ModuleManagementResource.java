@@ -17,6 +17,7 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
 import com.rokkon.pipeline.engine.dev.ModuleDeploymentService;
+import com.rokkon.pipeline.engine.dev.ModuleDeploymentService.OrphanedModule;
 import com.rokkon.pipeline.engine.dev.PipelineModule;
 import com.rokkon.pipeline.engine.dev.PipelineDevModeInfrastructure;
 import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
@@ -716,6 +717,112 @@ public class ModuleManagementResource {
                 return Response.status(Response.Status.NOT_FOUND)
                     .entity(new ModuleOperationResponse(false, 
                         "Module not found: " + moduleName, null))
+                    .build();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+    }
+    
+    @GET
+    @Path("/orphaned")
+    @Operation(
+        summary = "Find orphaned module containers",
+        description = "Finds module containers that are running but not registered (dev mode only)"
+    )
+    @APIResponses({
+        @APIResponse(
+            responseCode = "200",
+            description = "Orphaned modules retrieved successfully",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON,
+                schema = @Schema(implementation = List.class)
+            )
+        ),
+        @APIResponse(
+            responseCode = "503",
+            description = "Service not available (not in dev mode)"
+        )
+    })
+    public Uni<Response> findOrphanedModules() {
+        LOG.info("Request to find orphaned module containers");
+        
+        // Check if deployment service is available (only in dev mode)
+        if (!deploymentService.isResolvable()) {
+            return Uni.createFrom().item(
+                Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity(Map.of("error", "Orphaned module detection is only available in dev mode"))
+                    .build()
+            );
+        }
+        
+        return Uni.createFrom().item(() -> {
+            List<OrphanedModule> orphanedModules = deploymentService.get().findOrphanedModules();
+            return Response.ok(orphanedModules).build();
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+    }
+    
+    @POST
+    @Path("/orphaned/{containerId}/register")
+    @Operation(
+        summary = "Register an orphaned module",
+        description = "Attempts to register an orphaned module container with the pipeline (dev mode only)"
+    )
+    @APIResponses({
+        @APIResponse(
+            responseCode = "202",
+            description = "Registration initiated",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON,
+                schema = @Schema(implementation = ModuleOperationResponse.class)
+            )
+        ),
+        @APIResponse(
+            responseCode = "404",
+            description = "Container not found"
+        ),
+        @APIResponse(
+            responseCode = "503",
+            description = "Service not available (not in dev mode)"
+        )
+    })
+    public Uni<Response> registerOrphanedModule(
+            @Parameter(description = "Container ID", required = true)
+            @PathParam("containerId") String containerId) {
+        
+        LOG.infof("Request to register orphaned module container: %s", containerId);
+        
+        // Check if deployment service is available (only in dev mode)
+        if (!deploymentService.isResolvable()) {
+            return Uni.createFrom().item(
+                Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Orphaned module registration is only available in dev mode", null))
+                    .build()
+            );
+        }
+        
+        return Uni.createFrom().item(() -> {
+            try {
+                boolean success = deploymentService.get().registerOrphanedModule(containerId);
+                
+                if (success) {
+                    return Response.status(Response.Status.ACCEPTED)
+                        .entity(new ModuleOperationResponse(true, 
+                            "Registration initiated for container: " + containerId, 
+                            Map.of("containerId", containerId)))
+                        .build();
+                } else {
+                    return Response.status(Response.Status.NOT_FOUND)
+                        .entity(new ModuleOperationResponse(false, 
+                            "Container not found or not a module: " + containerId, null))
+                        .build();
+                }
+            } catch (Exception e) {
+                LOG.errorf("Failed to register orphaned module: %s", e.getMessage(), e);
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Failed to register module: " + e.getMessage(), null))
                     .build();
             }
         })

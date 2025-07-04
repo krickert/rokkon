@@ -13,7 +13,8 @@ export class DashboardGrid extends LitElement {
     deployedModules: { type: Array },
     deployingModules: { type: Array },
     undeployingModules: { type: Array },
-    healthCheckingModules: { type: Array }
+    healthCheckingModules: { type: Array },
+    cleaningZombies: { type: Boolean }
   };
 
   static styles = css`
@@ -404,6 +405,7 @@ export class DashboardGrid extends LitElement {
     this.deploymentStatuses = new Map(); // Track deployment status messages
     this.undeployingModules = [];
     this.healthCheckingModules = [];
+    this.cleaningZombies = false;
   }
 
   connectedCallback() {
@@ -606,11 +608,17 @@ export class DashboardGrid extends LitElement {
   }
 
   cleanupZombies() {
+    this.cleaningZombies = true;
     const event = new CustomEvent('cleanup-zombies', {
       bubbles: true,
       composed: true
     });
     this.dispatchEvent(event);
+    
+    // Reset button state after 2 seconds
+    setTimeout(() => {
+      this.cleaningZombies = false;
+    }, 2000);
   }
 
   refreshData() {
@@ -658,11 +666,12 @@ export class DashboardGrid extends LitElement {
           Register Module
         </button>
         ${hasZombies ? html`
-          <button class="action-button danger" @click=${this.cleanupZombies}>
-            <svg class="button-icon" fill="currentColor" viewBox="0 0 20 20">
-              <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm4 0a1 1 0 012 0v6a1 1 0 11-2 0V8z" clip-rule="evenodd"/>
-            </svg>
-            Cleanup Zombies
+          <button class="action-button danger" @click=${this.cleanupZombies} style="padding: 0; border: none; background: none;">
+            <img 
+              src="${this.cleaningZombies ? '/clean-zombies-pressed.svg' : '/clean-zombies-unpressed.svg'}" 
+              alt="Cleanup Zombies"
+              style="height: 40px; cursor: pointer;"
+            >
           </button>
         ` : ''}
       </div>
@@ -783,30 +792,7 @@ export class DashboardGrid extends LitElement {
           ${this.undeployingModules.map(moduleName => html`
             <div class="undeploying-card">
               <div class="undeploying-header">
-                <svg class="gravestone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                  <style>
-                    .tombstone {
-                      animation: fade 2s ease-in-out infinite;
-                    }
-                    .rip-text {
-                      animation: fade 2s ease-in-out infinite;
-                      animation-delay: -0.3s;
-                    }
-                    @keyframes fade {
-                      0% { opacity: 1; }
-                      50% { opacity: 0.3; }
-                      100% { opacity: 1; }
-                    }
-                  </style>
-                  <!-- Tombstone shape -->
-                  <path d="M6 22h12v-8c0-3.3-2.7-6-6-6s-6 2.7-6 6v8z" class="tombstone"/>
-                  <!-- Ground line -->
-                  <path d="M3 22h18" class="tombstone"/>
-                  <!-- RIP text -->
-                  <path d="M9 13h2m-2 3h2" class="rip-text" stroke-width="1.5"/>
-                  <path d="M11 13v3" class="rip-text" stroke-width="1.5"/>
-                  <path d="M13 13h2c.5 0 1 .5 1 1s-.5 1-1 1h-2v1" class="rip-text" stroke-width="1.5"/>
-                </svg>
+                <img class="gravestone-icon" src="/tombstone.svg" alt="Tombstone" style="width: 48px; height: 48px; opacity: 0.7;">
                 <div>
                   <div class="undeploying-title">Undeploying ${moduleName}...</div>
                   <div class="undeploying-subtitle">${this.deploymentStatuses.get(moduleName) || 'Removing module and containers'}</div>
