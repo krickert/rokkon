@@ -6,7 +6,8 @@ export class ServiceBox extends LitElement {
     instance: { type: Object },
     expanded: { type: Boolean },
     instanceCount: { type: Number },
-    allInstances: { type: Array }
+    allInstances: { type: Array },
+    isDevMode: { type: Boolean }
   };
 
   static styles = css`
@@ -316,7 +317,7 @@ export class ServiceBox extends LitElement {
 
   handleModuleAction(action, instance) {
     const event = new CustomEvent('module-action', {
-      detail: { action, instance },
+      detail: { action, instance, service: this.service },
       bubbles: true,
       composed: true
     });
@@ -444,6 +445,13 @@ export class ServiceBox extends LitElement {
                 @click=${() => this.handleModuleAction('deregister', instance)}>
                 Deregister
               </button>
+              ${this.isDevMode ? html`
+                <button 
+                  class="module-action danger"
+                  @click=${() => this.handleModuleAction('undeploy', instance)}>
+                  Undeploy
+                </button>
+              ` : ''}
             ` : html`
               ${isHealthy ? html`
                 <button 

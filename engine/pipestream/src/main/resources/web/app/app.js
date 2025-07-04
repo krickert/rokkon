@@ -184,6 +184,9 @@ class PipelineDashboard extends LitElement {
     this.refreshInterval = parseInt(localStorage.getItem('refreshInterval') || '30000');
     this.menuOpen = false;
     this.isDevMode = false;
+    this.availableModules = [];
+    this.deployedModules = [];
+    this.deployingModules = [];
   }
 
   connectedCallback() {
@@ -229,8 +232,61 @@ class PipelineDashboard extends LitElement {
     }
   }
 
+  async handleDeployModule(event) {
+    const { module } = event.detail;
+    
+    try {
+      // WebSocket will handle the deploying state updates
+      this.showToast(`Deploying ${module.name} module...`, 'info');
+      
+      const response = await fetch(`/api/v1/module-management/${module.name}/deploy`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      });
+      
+      // Check for both 200 OK and 202 Accepted
+      if (!response.ok && response.status !== 202) {
+        let errorMessage = `Failed to deploy ${module.name}`;
+        try {
+          const error = await response.json();
+          errorMessage = error.message || errorMessage;
+        } catch (e) {
+          // If JSON parsing fails, use status text
+          errorMessage = response.statusText || errorMessage;
+        }
+        throw new Error(errorMessage);
+      }
+      
+      const result = await response.json();
+      // WebSocket will notify about deployment success
+      
+      // Immediate refresh to show deployment status
+      this.fetchDeployedModules();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  extractModuleName(instance, service) {
+    // Try to extract module name from various sources
+    if (instance.module_id && instance.module_id.includes('-module-')) {
+      // Extract from module_id like "echo-module-d6d9605b"
+      return instance.module_id.split('-module-')[0];
+    } else if (service && service.name && service.name.includes('-module')) {
+      // Extract from service name like "echo-module"
+      return service.name.split('-module')[0];
+    } else if (instance.metadata && instance.metadata.moduleName) {
+      // Extract from metadata if available
+      return instance.metadata.moduleName.replace('-module', '');
+    }
+    // Default fallback
+    return instance.module_id || instance.id || 'unknown';
+  }
+
   async handleModuleAction(event) {
-    const { action, instance } = event.detail;
+    const { action, instance, service } = event.detail;
     try {
       let endpoint = '';
       let method = 'POST';
@@ -240,13 +296,23 @@ class PipelineDashboard extends LitElement {
           endpoint = `/api/v1/modules/${instance.id}/register`;
           break;
         case 'deregister':
-          endpoint = `/api/v1/modules/${instance.id}/deregister`;
+          endpoint = `/api/v1/modules/${instance.module_id || instance.id}`;
+          method = 'DELETE';
           break;
         case 'enable':
-          endpoint = `/api/v1/modules/${instance.id}/enable`;
+          endpoint = `/api/v1/modules/${instance.module_id || instance.id}/enable`;
+          method = 'PUT';
           break;
         case 'disable':
-          endpoint = `/api/v1/modules/${instance.id}/disable`;
+          endpoint = `/api/v1/modules/${instance.module_id || instance.id}/disable`;
+          method = 'PUT';
+          break;
+        case 'undeploy':
+          // For dev mode - undeploy the Docker container
+          // Extract module name from service name or module_id
+          let moduleNameForUndeploy = this.extractModuleName(instance, service);
+          endpoint = `/api/v1/module-management/${moduleNameForUndeploy}/undeploy`;
+          method = 'DELETE';
           break;
       }
       
@@ -255,6 +321,15 @@ class PipelineDashboard extends LitElement {
       
       this.showToast(`Module ${action} successful`, 'success');
       this.fetchDashboardData();
+      
+      // For dev mode actions that affect deployment status, refresh module lists
+      if (this.isDevMode && (action === 'undeploy' || action === 'deploy')) {
+        // Add a small delay for undeploy to complete
+        setTimeout(() => {
+          this.fetchDeployedModules();
+          this.fetchAvailableModules();
+        }, 500);
+      }
     } catch (err) {
       this.showToast(err.message, 'error');
     }
@@ -298,9 +373,41 @@ class PipelineDashboard extends LitElement {
       if (response.ok) {
         this.engineInfo = await response.json();
         this.isDevMode = this.engineInfo?.profile === 'dev';
+        
+        // Fetch available modules in dev mode
+        if (this.isDevMode) {
+          this.fetchAvailableModules();
+          this.fetchDeployedModules();
+        }
       }
     } catch (err) {
       console.error('Failed to fetch engine info:', err);
+    }
+  }
+
+  async fetchAvailableModules() {
+    try {
+      const response = await fetch('/api/v1/module-management/available');
+      if (response.ok) {
+        this.availableModules = await response.json();
+        console.log('Available modules:', this.availableModules);
+      }
+    } catch (err) {
+      console.error('Failed to fetch available modules:', err);
+    }
+  }
+
+  async fetchDeployedModules() {
+    try {
+      const response = await fetch('/api/v1/module-management/deployed');
+      if (response.ok) {
+        this.deployedModules = await response.json();
+        console.log('Deployed modules updated:', this.deployedModules);
+        // Force update of child components
+        this.requestUpdate();
+      }
+    } catch (err) {
+      console.error('Failed to fetch deployed modules:', err);
     }
   }
 
@@ -315,6 +422,11 @@ class PipelineDashboard extends LitElement {
       this.services = data;
       this.loading = false;
       this.error = null;
+      
+      // Also refresh module deployment status in dev mode
+      if (this.isDevMode) {
+        this.fetchDeployedModules();
+      }
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
       this.error = err.message;
@@ -385,9 +497,22 @@ class PipelineDashboard extends LitElement {
             .baseServices=${this.services.base_services}
             .moduleServices=${this.services.module_services}
             .statistics=${this.services.statistics}
+            .isDevMode=${this.isDevMode}
+            .availableModules=${this.availableModules}
+            .deployedModules=${this.deployedModules}
+            .deployingModules=${this.deployingModules}
             @register-module=${this.handleRegisterModule}
             @cleanup-zombies=${this.handleCleanupZombies}
-            @module-action=${this.handleModuleAction}>
+            @module-action=${this.handleModuleAction}
+            @deploy-module=${this.handleDeployModule}
+            @refresh-data=${() => {
+              this.showToast('Refreshing...', 'info');
+              this.fetchDashboardData();
+              if (this.isDevMode) {
+                this.fetchDeployedModules();
+                this.fetchAvailableModules();
+              }
+            }}>
           </dashboard-grid>
         ` : ''}
 

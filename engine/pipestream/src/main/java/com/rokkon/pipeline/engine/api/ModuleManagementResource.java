@@ -19,6 +19,7 @@ import org.jboss.logging.Logger;
 import com.rokkon.pipeline.engine.dev.ModuleDeploymentService;
 import com.rokkon.pipeline.engine.dev.PipelineModule;
 import com.rokkon.pipeline.engine.dev.PipelineDevModeInfrastructure;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
 
 import java.util.List;
 import java.util.Map;
@@ -43,6 +44,9 @@ public class ModuleManagementResource {
     
     @Inject
     Instance<PipelineDevModeInfrastructure> infrastructure;
+    
+    @Inject
+    GlobalModuleRegistryService moduleRegistry;
 
     /**
      * Response for module operations
@@ -391,6 +395,99 @@ public class ModuleManagementResource {
                         "Module not found: " + moduleName, null))
                     .build();
             }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+    }
+
+    @DELETE
+    @Path("/{moduleName}/undeploy")
+    @Operation(
+        summary = "Undeploy a module (dev mode)",
+        description = "Stops a deployed module, deregisters it, and removes all containers (dev mode only)"
+    )
+    @APIResponses({
+        @APIResponse(
+            responseCode = "200",
+            description = "Module undeployed successfully",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON,
+                schema = @Schema(implementation = ModuleOperationResponse.class)
+            )
+        ),
+        @APIResponse(
+            responseCode = "404",
+            description = "Module not found"
+        ),
+        @APIResponse(
+            responseCode = "503",
+            description = "Service not available (not in dev mode)"
+        )
+    })
+    public Uni<Response> undeployModule(
+            @Parameter(description = "Module name", required = true, example = "echo")
+            @PathParam("moduleName") String moduleName) {
+        
+        LOG.infof("Request to undeploy module: %s", moduleName);
+        
+        // Check if deployment service is available (only in dev mode)
+        if (!deploymentService.isResolvable() || !infrastructure.isResolvable()) {
+            return Uni.createFrom().item(
+                Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Module undeployment is only available in dev mode", null))
+                    .build()
+            );
+        }
+        
+        return Uni.createFrom().item(() -> {
+            try {
+                PipelineModule module = PipelineModule.fromName(moduleName);
+                
+                // Stop the module containers first
+                deploymentService.get().stopModule(module);
+                
+                return Response.ok(new ModuleOperationResponse(true, 
+                    "Module undeployed successfully", 
+                    Map.of("module", moduleName)))
+                    .build();
+            } catch (IllegalArgumentException e) {
+                return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Module not found: " + moduleName, null))
+                    .build();
+            }
+        })
+        .flatMap(response -> {
+            // After stopping containers, deregister all instances of this module
+            return moduleRegistry.listRegisteredModules()
+                .flatMap(registrations -> {
+                    // Find all registrations for this module
+                    List<String> moduleIds = registrations.stream()
+                        .filter(reg -> reg.moduleName() != null && 
+                                reg.moduleName().toLowerCase().contains(moduleName.toLowerCase()))
+                        .map(GlobalModuleRegistryService.ModuleRegistration::moduleId)
+                        .collect(Collectors.toList());
+                    
+                    if (moduleIds.isEmpty()) {
+                        return Uni.createFrom().item(response);
+                    }
+                    
+                    // Deregister all found module IDs
+                    List<Uni<Boolean>> deregisterUnis = moduleIds.stream()
+                        .map(moduleId -> moduleRegistry.deregisterModule(moduleId)
+                            .onFailure().recoverWithItem(false))
+                        .collect(Collectors.toList());
+                    
+                    return Uni.combine().all().unis(deregisterUnis)
+                        .combinedWith(results -> {
+                            long deregistered = results.stream()
+                                .filter(result -> (Boolean) result)
+                                .count();
+                            LOG.infof("Deregistered %d instances of module %s", deregistered, moduleName);
+                            return response;
+                        });
+                })
+                .onFailure().recoverWithItem(response);
         })
         .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }

@@ -3,6 +3,7 @@ package com.rokkon.pipeline.engine.dev;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.command.CreateContainerResponse;
 import com.github.dockerjava.api.command.CreateNetworkResponse;
+import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.exception.ConflictException;
 import com.github.dockerjava.api.model.*;
 import io.quarkus.arc.profile.IfBuildProfile;
@@ -10,9 +11,14 @@ import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
 import org.eclipse.microprofile.config.inject.ConfigProperty;
 import org.jboss.logging.Logger;
+import io.smallrye.mutiny.Uni;
+import java.time.Duration;
+import com.rokkon.pipeline.engine.api.ModuleDeploymentSSE;
+import io.quarkus.arc.Arc;
 
 import java.util.*;
 import java.util.Arrays;
+import java.util.stream.Collectors;
 
 /**
  * Service responsible for deploying pipeline modules with their sidecars in dev mode.
@@ -58,35 +64,53 @@ public class ModuleDeploymentService {
     public ModuleDeploymentResult deployModule(PipelineModule module) {
         LOG.infof("Starting deployment of module: %s", module.getModuleName());
         
+        // Notify via SSE
+        notifyDeploymentStarted(module.getModuleName());
+        
         if (!dockerChecker.isDockerAvailable()) {
+            notifyDeploymentFailed(module.getModuleName(), "Docker is not available");
             return new ModuleDeploymentResult(false, "Docker is not available");
         }
         
+        // Clean up any existing containers first
+        LOG.infof("Cleaning up any existing containers for module: %s", module.getModuleName());
+        notifyDeploymentProgress(module.getModuleName(), "cleaning", "Cleaning up existing containers...");
+        cleanupModule(module);
+        
         try {
-            // 1. Create dedicated network for the module
-            String networkName = createModuleNetwork(module);
+            // 1. Use bridge network instead of creating custom network
+            String networkName = "bridge";  // Use default Docker bridge network
+            LOG.infof("Using default bridge network for module %s", module.getModuleName());
             
             // 2. Start Consul agent sidecar
+            notifyDeploymentProgress(module.getModuleName(), "consul", "Starting Consul agent sidecar...");
             String consulAgentId = startConsulAgent(module, networkName);
             
             // 3. Skip OTEL collector sidecar - modules will send directly to LGTM stack
             // String otelCollectorId = startOTELCollector(module, networkName);
             
             // 4. Start the module container
+            notifyDeploymentProgress(module.getModuleName(), "module", "Starting module container...");
             String moduleId = startModuleContainer(module, networkName);
             
-            LOG.infof("Successfully deployed module %s with Consul sidecar", module.getModuleName());
+            // 5. Start registration sidecar
+            notifyDeploymentProgress(module.getModuleName(), "registration", "Starting registration sidecar...");
+            String registrationId = startRegistrationSidecar(module, networkName);
+            
+            LOG.infof("Successfully deployed module %s with sidecars", module.getModuleName());
+            notifyDeploymentCompleted(module.getModuleName(), true, "Module deployed successfully");
             return new ModuleDeploymentResult(true, 
                 "Module deployed successfully", 
                 moduleId, 
                 consulAgentId, 
-                null,  // No OTEL sidecar
+                registrationId,  // Registration sidecar ID
                 networkName);
                 
         } catch (Exception e) {
-            LOG.errorf("Failed to deploy module %s", module.getModuleName(), e);
+            LOG.errorf("Failed to deploy module %s: %s", module.getModuleName(), e.getMessage(), e);
             // Cleanup on failure
             cleanupModule(module);
+            notifyDeploymentFailed(module.getModuleName(), "Deployment failed: " + e.getMessage());
             return new ModuleDeploymentResult(false, "Deployment failed: " + e.getMessage());
         }
     }
@@ -100,11 +124,12 @@ public class ModuleDeploymentService {
         try {
             // Check if network already exists
             List<Network> networks = dockerClient.listNetworksCmd()
-                .withNameFilter(networkName)
-                .exec();
+                .exec().stream()
+                .filter(n -> networkName.equals(n.getName()))
+                .collect(Collectors.toList());
                 
             if (!networks.isEmpty()) {
-                LOG.infof("Network %s already exists", networkName);
+                LOG.infof("Network %s already exists, reusing it", networkName);
                 return networkName;
             }
             
@@ -119,12 +144,19 @@ public class ModuleDeploymentService {
                 .exec();
                 
             LOG.infof("Created network %s with id %s", networkName, response.getId());
+            
+            // Wait a moment for network to be fully created
+            Thread.sleep(500);
+            
             return networkName;
             
         } catch (ConflictException e) {
             // Network already exists
-            LOG.infof("Network %s already exists", networkName);
+            LOG.infof("Network %s already exists (conflict)", networkName);
             return networkName;
+        } catch (Exception e) {
+            LOG.errorf("Failed to create network %s: %s", networkName, e.getMessage());
+            throw new RuntimeException("Failed to create network: " + e.getMessage(), e);
         }
     }
     
@@ -137,6 +169,8 @@ public class ModuleDeploymentService {
         
         // Remove existing container if it exists
         removeContainerIfExists(containerName);
+        
+        // No need to verify bridge network - it always exists
         
         // Create the Consul agent container with port bindings for the module
         ExposedPort modulePort = ExposedPort.tcp(module.getUnifiedPort());
@@ -167,6 +201,11 @@ public class ModuleDeploymentService {
         // Start the container
         dockerClient.startContainerCmd(container.getId()).exec();
         LOG.infof("Started Consul agent sidecar: %s", containerName);
+        
+        // Wait for container to be running
+        if (!waitForContainerRunning(container.getId(), containerName, Duration.ofSeconds(5))) {
+            throw new RuntimeException("Consul container failed to start within timeout");
+        }
         
         return container.getId();
     }
@@ -251,12 +290,14 @@ public class ModuleDeploymentService {
                 "ENGINE_PORT=39001",  // Engine unified port
                 "CONSUL_HOST=localhost",  // Via shared network namespace
                 "CONSUL_PORT=8500",  // Consul HTTP API port
+                "REGISTRATION_HOST=" + hostIP,  // What the engine should use to reach this module
+                "REGISTRATION_PORT=" + module.getUnifiedPort(),  // Module's exposed port
                 "QUARKUS_HTTP_PORT=" + module.getUnifiedPort(),
                 "QUARKUS_PROFILE=dev",
                 "OTEL_EXPORTER_OTLP_ENDPOINT=" + otelEndpoint.orElse("http://" + hostIP + ":4317"),
                 "OTEL_SERVICE_NAME=" + module.getModuleName() + "-module",
                 "JAVA_OPTS=-Xmx" + memory + " -Xms" + (parseMemoryString(memory) / 4 / 1024 / 1024) + "m",
-                "AUTO_REGISTER=false",  // Disable auto registration in entrypoint
+                "AUTO_REGISTER=false",  // Disable auto registration - use sidecar instead
                 "SHUTDOWN_ON_REGISTRATION_FAILURE=false"  // Keep module running even if registration fails
             ))
             .withLabels(Map.of(
@@ -268,6 +309,69 @@ public class ModuleDeploymentService {
         // Start the container
         dockerClient.startContainerCmd(container.getId()).exec();
         LOG.infof("Started module container: %s on port %d", containerName, module.getUnifiedPort());
+        
+        return container.getId();
+    }
+    
+    /**
+     * Starts the registration sidecar
+     */
+    private String startRegistrationSidecar(PipelineModule module, String networkName) {
+        String containerName = module.getModuleName() + "-registrar";
+        String hostIP = hostIPDetector.detectHostIP();
+        
+        // Remove existing container if it exists
+        removeContainerIfExists(containerName);
+        
+        // Create a registration script
+        String registrationScript = String.format("""
+            #!/bin/sh
+            echo 'Waiting for module to be ready...'
+            sleep 15
+            
+            echo 'Attempting to register module %s with engine...'
+            
+            # Try to register the module
+            if java -jar /deployments/pipeline-cli.jar register \
+                --module-host=localhost \
+                --module-port=%d \
+                --engine-host=%s \
+                --engine-port=39001 \
+                --registration-host=%s \
+                --registration-port=%d; then
+                echo 'Module registered successfully!'
+            else
+                echo 'Registration failed, but continuing...'
+            fi
+            
+            # Keep container alive for monitoring
+            echo 'Registration sidecar complete. Sleeping...'
+            sleep infinity
+            """,
+            module.getModuleName(),
+            module.getUnifiedPort(),
+            hostIP,
+            hostIP,
+            module.getUnifiedPort()
+        );
+        
+        // Create the registration sidecar using the same image as the module (it has the CLI)
+        CreateContainerResponse container = dockerClient.createContainerCmd(module.getDockerImage())
+            .withName(containerName)
+            .withHostConfig(HostConfig.newHostConfig()
+                .withNetworkMode("container:" + module.getSidecarName())  // Share network with Consul sidecar
+            )
+            .withEntrypoint("/bin/sh")  // Override the default entrypoint
+            .withCmd("-c", registrationScript)
+            .withLabels(Map.of(
+                "pipeline.module", module.getModuleName(),
+                "pipeline.type", "registration-sidecar"
+            ))
+            .exec();
+            
+        // Start the container
+        dockerClient.startContainerCmd(container.getId()).exec();
+        LOG.infof("Started registration sidecar: %s", containerName);
         
         return container.getId();
     }
@@ -316,6 +420,16 @@ public class ModuleDeploymentService {
     public void stopModule(PipelineModule module) {
         LOG.infof("Stopping module: %s", module.getModuleName());
         cleanupModule(module);
+        
+        // Notify via SSE
+        try {
+            var sseInstance = Arc.container().instance(ModuleDeploymentSSE.class);
+            if (sseInstance.isAvailable()) {
+                sseInstance.get().notifyModuleUndeployed(module.getModuleName());
+            }
+        } catch (Exception e) {
+            LOG.debugf("Failed to send SSE notification: %s", e.getMessage());
+        }
     }
     
     /**
@@ -325,16 +439,57 @@ public class ModuleDeploymentService {
         // Stop and remove containers
         removeContainerIfExists(module.getContainerName());
         removeContainerIfExists(module.getSidecarName());
-        // No OTEL collector to remove
+        removeContainerIfExists(module.getModuleName() + "-registrar");  // Registration sidecar
         
-        // Remove network
+        // Remove network only if it's a module-specific network
+        String networkName = module.getModuleName() + "-network";
         try {
-            String networkName = module.getModuleName() + "-network";
-            dockerClient.removeNetworkCmd(networkName).exec();
-            LOG.infof("Removed network: %s", networkName);
+            // Check if this is a module-specific network we created
+            List<Network> networks = dockerClient.listNetworksCmd()
+                .exec().stream()
+                .filter(n -> networkName.equals(n.getName()))
+                .collect(Collectors.toList());
+                
+            if (!networks.isEmpty()) {
+                Network network = networks.get(0);
+                // Only remove if it has our labels
+                if (network.getLabels() != null && 
+                    "module-network".equals(network.getLabels().get("pipeline.type"))) {
+                    dockerClient.removeNetworkCmd(networkName).exec();
+                    LOG.infof("Removed module-specific network: %s", networkName);
+                } else {
+                    LOG.debugf("Network %s is not a module-specific network, skipping removal", networkName);
+                }
+            }
         } catch (Exception e) {
             LOG.debugf("Failed to remove network: %s", e.getMessage());
         }
+    }
+    
+    /**
+     * Wait for a container to be in running state
+     */
+    private boolean waitForContainerRunning(String containerId, String containerName, Duration timeout) {
+        long startTime = System.currentTimeMillis();
+        long timeoutMillis = timeout.toMillis();
+        
+        while (System.currentTimeMillis() - startTime < timeoutMillis) {
+            try {
+                InspectContainerResponse containerInfo = dockerClient.inspectContainerCmd(containerId).exec();
+                if (containerInfo.getState() != null && Boolean.TRUE.equals(containerInfo.getState().getRunning())) {
+                    LOG.infof("Container %s is running", containerName);
+                    return true;
+                }
+                
+                // Use LockSupport for more efficient waiting
+                java.util.concurrent.locks.LockSupport.parkNanos(Duration.ofMillis(100).toNanos());
+            } catch (Exception e) {
+                LOG.debugf("Waiting for container to start: %s", e.getMessage());
+            }
+        }
+        
+        LOG.errorf("Container %s failed to start within %s", containerName, timeout);
+        return false;
     }
     
     /**
@@ -391,5 +546,43 @@ public class ModuleDeploymentService {
         RUNNING,
         PARTIAL,
         STOPPED
+    }
+    
+    // SSE notification helpers
+    private void notifyDeploymentStarted(String moduleName) {
+        try {
+            var sseInstance = Arc.container().instance(ModuleDeploymentSSE.class);
+            if (sseInstance.isAvailable()) {
+                sseInstance.get().notifyDeploymentStarted(moduleName);
+            }
+        } catch (Exception e) {
+            LOG.debugf("Failed to send SSE notification: %s", e.getMessage());
+        }
+    }
+    
+    private void notifyDeploymentProgress(String moduleName, String status, String message) {
+        try {
+            var sseInstance = Arc.container().instance(ModuleDeploymentSSE.class);
+            if (sseInstance.isAvailable()) {
+                sseInstance.get().notifyDeploymentProgress(moduleName, status, message);
+            }
+        } catch (Exception e) {
+            LOG.debugf("Failed to send SSE notification: %s", e.getMessage());
+        }
+    }
+    
+    private void notifyDeploymentCompleted(String moduleName, boolean success, String message) {
+        try {
+            var sseInstance = Arc.container().instance(ModuleDeploymentSSE.class);
+            if (sseInstance.isAvailable()) {
+                sseInstance.get().notifyDeploymentCompleted(moduleName, success, message);
+            }
+        } catch (Exception e) {
+            LOG.debugf("Failed to send SSE notification: %s", e.getMessage());
+        }
+    }
+    
+    private void notifyDeploymentFailed(String moduleName, String message) {
+        notifyDeploymentCompleted(moduleName, false, message);
     }
 }

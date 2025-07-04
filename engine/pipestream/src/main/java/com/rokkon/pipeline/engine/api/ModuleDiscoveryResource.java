@@ -247,10 +247,19 @@ public class ModuleDiscoveryResource {
 
         return Uni.combine().all().unis(allServicesUni, registeredModulesUni)
             .with((allServices, registeredModules) -> {
-                // Create a map of registered modules by name for quick lookup
-                Map<String, List<GlobalModuleRegistryService.ModuleRegistration>> registeredByName = 
+                // Create maps for quick lookup of registered modules
+                Map<String, List<GlobalModuleRegistryService.ModuleRegistration>> registeredByModuleName = 
                     registeredModules.stream()
                         .collect(Collectors.groupingBy(m -> m.moduleName()));
+                
+                // Also create a map by host:port for matching with service instances
+                Map<String, GlobalModuleRegistryService.ModuleRegistration> registeredByEndpoint = 
+                    registeredModules.stream()
+                        .collect(Collectors.toMap(
+                            m -> m.host() + ":" + m.port(),
+                            m -> m,
+                            (m1, m2) -> m1 // In case of duplicates, keep first
+                        ));
 
                 // Separate base services from module services
                 List<BaseServiceInfo> baseServices = new ArrayList<>();
@@ -285,16 +294,19 @@ public class ModuleDiscoveryResource {
                     
                     if (isModule) {
                         // This is a module service
-                        List<GlobalModuleRegistryService.ModuleRegistration> registered = 
-                            registeredByName.getOrDefault(moduleName, List.of());
-
+                        String actualModuleName = null;
+                        Set<String> moduleNames = new HashSet<>();
+                        
                         List<ModuleInstanceInfo> moduleInstances = instances.stream()
                             .map(instance -> {
-                                // Find matching registration
-                                GlobalModuleRegistryService.ModuleRegistration reg = registered.stream()
-                                    .filter(r -> r.host().equals(instance.address()) && r.port() == instance.port())
-                                    .findFirst()
-                                    .orElse(null);
+                                // Find matching registration by endpoint
+                                String endpoint = instance.address() + ":" + instance.port();
+                                GlobalModuleRegistryService.ModuleRegistration reg = registeredByEndpoint.get(endpoint);
+
+                                // Collect module names from registrations
+                                if (reg != null && reg.moduleName() != null) {
+                                    moduleNames.add(reg.moduleName());
+                                }
 
                                 return new ModuleInstanceInfo(
                                     reg != null ? reg.moduleId() : null,
@@ -310,8 +322,23 @@ public class ModuleDiscoveryResource {
                             })
                             .toList();
 
+                        // Determine the actual module name
+                        if (!moduleNames.isEmpty()) {
+                            // Use the first module name found (they should all be the same for a service)
+                            actualModuleName = moduleNames.iterator().next();
+                        } else {
+                            // Fall back to extracting from service metadata
+                            if (!instances.isEmpty() && instances.get(0).metadata() != null) {
+                                actualModuleName = instances.get(0).metadata().get("module-name");
+                            }
+                            if (actualModuleName == null) {
+                                // Extract from service name if it contains module name pattern
+                                actualModuleName = extractModuleNameFromService(serviceName);
+                            }
+                        }
+
                         moduleServices.add(new ModuleServiceInfo(
-                            moduleName,
+                            actualModuleName,
                             serviceName,
                             moduleInstances,
                             instances.get(0).tags() // Use tags from first instance
@@ -461,6 +488,21 @@ public class ModuleDiscoveryResource {
         }
         // For services without explicit ID, use address:port as identifier
         return service.address() + ":" + service.port() + "-" + service.hashCode();
+    }
+    
+    private String extractModuleNameFromService(String serviceName) {
+        // Common patterns for module service names:
+        // "echo-module-d6d9605b" -> "echo"
+        // "parser-module" -> "parser"
+        // "test-module-xyz" -> "test"
+        
+        if (serviceName.contains("-module")) {
+            // Extract everything before "-module"
+            return serviceName.substring(0, serviceName.indexOf("-module"));
+        }
+        
+        // Default to the service name
+        return serviceName;
     }
 
     // New record types for dashboard data

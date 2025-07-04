@@ -1,11 +1,17 @@
 import { LitElement, html, css } from 'lit';
 import '../service-box/service-box.js';
+import '../module-deploy-dropdown/module-deploy-dropdown.js';
+import { deploymentSSE } from '../../services/deployment-sse.js';
 
 export class DashboardGrid extends LitElement {
   static properties = {
     baseServices: { type: Array },
     moduleServices: { type: Array },
-    statistics: { type: Object }
+    statistics: { type: Object },
+    isDevMode: { type: Boolean },
+    availableModules: { type: Array },
+    deployedModules: { type: Array },
+    deployingModules: { type: Array }
   };
 
   static styles = css`
@@ -143,6 +149,8 @@ export class DashboardGrid extends LitElement {
       display: flex;
       gap: 12px;
       margin-bottom: 20px;
+      flex-wrap: wrap;
+      align-items: center;
     }
 
     .action-button {
@@ -205,7 +213,196 @@ export class DashboardGrid extends LitElement {
       width: 18px;
       height: 18px;
     }
+
+    .deploying-card {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+      color: white;
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
+      animation: pulse-glow 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse-glow {
+      0%, 100% {
+        box-shadow: 0 8px 24px rgba(102, 126, 234, 0.2);
+      }
+      50% {
+        box-shadow: 0 12px 32px rgba(102, 126, 234, 0.4);
+      }
+    }
+
+    .deploying-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+
+    .rocket-icon {
+      width: 48px;
+      height: 48px;
+      animation: rocket-bounce 1s ease-in-out infinite;
+    }
+
+    @keyframes rocket-bounce {
+      0%, 100% {
+        transform: translateY(0);
+      }
+      50% {
+        transform: translateY(-8px);
+      }
+    }
+
+    .deploying-title {
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .deploying-subtitle {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-top: 4px;
+    }
+
+    .deploying-progress {
+      margin-top: 16px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.3);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+
+    .deploying-progress-bar {
+      height: 100%;
+      background: white;
+      border-radius: 2px;
+      animation: progress-slide 2s ease-in-out infinite;
+    }
+
+    @keyframes progress-slide {
+      0% {
+        width: 0;
+        transform: translateX(0);
+      }
+      50% {
+        width: 100%;
+        transform: translateX(0);
+      }
+      100% {
+        width: 100%;
+        transform: translateX(100%);
+      }
+    }
+
+    .deployment-status {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.8);
+      margin-top: 8px;
+      font-style: italic;
+    }
   `;
+
+  constructor() {
+    super();
+    this.deploymentStatuses = new Map(); // Track deployment status messages
+  }
+
+  connectedCallback() {
+    super.connectedCallback();
+    
+    // Connect to SSE if in dev mode
+    if (this.isDevMode) {
+      this.connectSSE();
+    }
+  }
+
+  disconnectedCallback() {
+    super.disconnectedCallback();
+    
+    // Remove SSE listener
+    if (this.isDevMode) {
+      deploymentSSE.removeListener('dashboard-grid');
+    }
+  }
+
+  async connectSSE() {
+    try {
+      await deploymentSSE.connect();
+      
+      // Add listener for deployment events
+      deploymentSSE.addListener('dashboard-grid', (event) => {
+        this.handleDeploymentEvent(event);
+      });
+    } catch (error) {
+      console.error('Failed to connect to deployment SSE:', error);
+    }
+  }
+
+  handleDeploymentEvent(event) {
+    console.log('Deployment event:', event);
+    
+    switch (event.type) {
+      case 'deployment_started':
+        this.deployingModules = [...(this.deployingModules || []), event.module];
+        this.deploymentStatuses.set(event.module, event.message);
+        this.requestUpdate();
+        break;
+        
+      case 'deployment_progress':
+        this.deploymentStatuses.set(event.module, event.message);
+        this.requestUpdate();
+        break;
+        
+      case 'deployment_success':
+        // Keep showing for a bit longer
+        this.deploymentStatuses.set(event.module, event.message);
+        this.requestUpdate();
+        
+        // Remove after 3 seconds
+        setTimeout(() => {
+          this.deployingModules = this.deployingModules.filter(m => m !== event.module);
+          this.deploymentStatuses.delete(event.module);
+          this.requestUpdate();
+          
+          // Fire refresh event to update module list
+          this.dispatchEvent(new CustomEvent('refresh-data', {
+            bubbles: true,
+            composed: true
+          }));
+        }, 3000);
+        break;
+        
+      case 'deployment_failed':
+        this.deployingModules = this.deployingModules.filter(m => m !== event.module);
+        this.deploymentStatuses.delete(event.module);
+        this.requestUpdate();
+        
+        // Show error toast
+        this.dispatchEvent(new CustomEvent('show-toast', {
+          detail: { message: event.message, type: 'error' },
+          bubbles: true,
+          composed: true
+        }));
+        break;
+        
+      case 'module_registered':
+        // Show success toast
+        this.dispatchEvent(new CustomEvent('show-toast', {
+          detail: { message: `${event.module} registered successfully!`, type: 'success' },
+          bubbles: true,
+          composed: true
+        }));
+        
+        // Refresh data
+        this.dispatchEvent(new CustomEvent('refresh-data', {
+          bubbles: true,
+          composed: true
+        }));
+        break;
+    }
+  }
 
   renderGroupedInstances(services) {
     // Group instances by service name only (for Consul services)
@@ -232,7 +429,8 @@ export class DashboardGrid extends LitElement {
         return html`
           <service-box 
             .service=${group.service} 
-            .instance=${group.primaryInstance}>
+            .instance=${group.primaryInstance}
+            .isDevMode=${this.isDevMode}>
           </service-box>
         `;
       } else {
@@ -242,7 +440,8 @@ export class DashboardGrid extends LitElement {
             .service=${group.service} 
             .instance=${group.primaryInstance}
             .instanceCount=${count}
-            .allInstances=${group.instances}>
+            .allInstances=${group.instances}
+            .isDevMode=${this.isDevMode}>
           </service-box>
         `;
       }
@@ -265,6 +464,23 @@ export class DashboardGrid extends LitElement {
     this.dispatchEvent(event);
   }
 
+  refreshData() {
+    const event = new CustomEvent('refresh-data', {
+      bubbles: true,
+      composed: true
+    });
+    this.dispatchEvent(event);
+  }
+
+  handleDeployModule(event) {
+    // Forward the event to parent
+    this.dispatchEvent(new CustomEvent('deploy-module', {
+      detail: event.detail,
+      bubbles: true,
+      composed: true
+    }));
+  }
+
   render() {
     const { baseServices = [], moduleServices = [], statistics = {} } = this;
     const hasZombies = (statistics.zombie_count || 0) > 0;
@@ -280,6 +496,12 @@ export class DashboardGrid extends LitElement {
       ` : ''}
 
       <div class="actions-section">
+        <button class="action-button" @click=${this.refreshData}>
+          <svg class="button-icon" fill="currentColor" viewBox="0 0 20 20">
+            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd"/>
+          </svg>
+          Refresh
+        </button>
         <button class="action-button primary" @click=${this.registerModule}>
           <svg class="button-icon" fill="currentColor" viewBox="0 0 20 20">
             <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
@@ -332,16 +554,47 @@ export class DashboardGrid extends LitElement {
 
       <div class="service-section">
         <div class="section-header">
-          <h2 class="section-title">Module Services</h2>
-          <span class="section-count">${moduleServices.length}</span>
+          <div style="display: flex; align-items: center; gap: 12px;">
+            <h2 class="section-title">Module Services</h2>
+            <span class="section-count">${moduleServices.length}</span>
+          </div>
+          ${this.isDevMode ? html`
+            <module-deploy-dropdown
+              .availableModules=${this.availableModules || []}
+              .deployedModules=${this.deployedModules || []}
+              @deploy-module=${this.handleDeployModule}>
+            </module-deploy-dropdown>
+          ` : ''}
         </div>
 
-        ${moduleServices.length === 0 ? html`
+        ${this.deployingModules && this.deployingModules.length > 0 ? html`
+          ${this.deployingModules.map(moduleName => html`
+            <div class="deploying-card">
+              <div class="deploying-header">
+                <svg class="rocket-icon" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M9.19 6.35c-2.04 2.29-3.44 5.58-3.57 5.89L2 10.69l4.05-4.05c.47-.47 1.15-.68 1.81-.55zM11.17 17c0 .7-.28 1.38-.78 1.88l-2.33 2.33-1.55-3.62c.31-.13 3.6-1.53 5.89-3.57.13.66-.08 1.33-.55 1.8zM17 7c2.76 0 5-2.24 5-5 0-1.11-.9-2-2-2-2.76 0-5 2.24-5 5 0 .38.04.74.12 1.08L9.91 11.3c-.32.32-.59.66-.82 1.02l-.86-.35c-.47-.19-1.01-.14-1.44.13L2 17l4.89 4.89 4.89-4.89c.27-.42.32-.97.13-1.44l-.35-.86c.36-.23.7-.5 1.02-.82l5.21-5.21C17.26 6.96 17.62 7 18 7c1.11 0 2-.9 2-2 0-.38-.04-.74-.12-1.08.74.08 1.46.12 1.84.12z"/>
+                </svg>
+                <div>
+                  <div class="deploying-title">Deploying ${moduleName}...</div>
+                  <div class="deploying-subtitle">Starting module with Consul sidecar</div>
+                </div>
+              </div>
+              <div class="deploying-progress">
+                <div class="deploying-progress-bar"></div>
+              </div>
+              ${this.deploymentStatuses.has(moduleName) ? html`
+                <div class="deployment-status">${this.deploymentStatuses.get(moduleName)}</div>
+              ` : ''}
+            </div>
+          `)}
+        ` : ''}
+
+        ${moduleServices.length === 0 && (!this.deployingModules || this.deployingModules.length === 0) ? html`
           <div class="empty-state">No module services found</div>
         ` : moduleServices.map(module => html`
           <div class="module-service">
             <div class="module-header">
-              <div class="module-name">${module.moduleName}</div>
+              <div class="module-name">${module.module_name}</div>
               ${module.registered ? html`
                 <div class="module-registered">
                   <svg class="check-icon" fill="currentColor" viewBox="0 0 20 20">
@@ -354,8 +607,9 @@ export class DashboardGrid extends LitElement {
             <div class="instances-grid">
               ${module.instances.map(instance => html`
                 <service-box 
-                  .service=${{ name: module.serviceName, type: 'module' }} 
-                  .instance=${instance}>
+                  .service=${{ name: module.service_name, type: 'module' }} 
+                  .instance=${instance}
+                  .isDevMode=${this.isDevMode}>
                 </service-box>
               `)}
             </div>

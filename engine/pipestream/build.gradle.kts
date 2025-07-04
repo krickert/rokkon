@@ -42,7 +42,7 @@ dependencies {
     implementation("io.quarkiverse.web-bundler:quarkus-web-bundler:1.8.1")
 
     // Modern UI libraries via mvnpm
-    compileOnly("org.mvnpm:lit") // Use version from Quarkus BOM (3.2.1)
+    implementation("org.mvnpm:lit") // Use version from Quarkus BOM (3.2.1)
 
     // Testcontainers for Dev Mode Consul startup
     implementation("org.testcontainers:testcontainers:1.21.3")
@@ -102,6 +102,10 @@ dependencies {
     testImplementation("org.testcontainers:consul:1.21.3")
     testImplementation(project(":testing:util"))
     testImplementation(project(":testing:server-util"))
+    
+    // Playwright for UI testing
+    testImplementation("io.quarkiverse.playwright:quarkus-playwright:2.1.3")
+    testImplementation("com.microsoft.playwright:playwright:1.53.0")
 
     // --- Integration Testing ---
     integrationTestImplementation("com.orbitz.consul:consul-client:1.5.3")
@@ -123,6 +127,13 @@ java {
 tasks.withType<Test> {
     systemProperty("java.util.logging.manager", "org.jboss.logmanager.LogManager")
     useJUnitPlatform()
+    
+    // Pass system properties from command line to tests
+    System.getProperties().forEach { key, value ->
+        if (key.toString().startsWith("test.")) {
+            systemProperty(key.toString(), value.toString())
+        }
+    }
 }
 
 

@@ -29,18 +29,24 @@ register_module() {
     # Build CLI command with all options (unified server uses same port for both)
     local cli_cmd="pipeline register --module-host=${MODULE_HOST} --module-port=${MODULE_PORT} --engine-host=${ENGINE_HOST} --engine-port=${ENGINE_PORT}"
     
-    # Add optional parameters if provided
-    if [ -n "$CONSUL_HOST" ]; then
-      cli_cmd="$cli_cmd --consul-host=${CONSUL_HOST}"
+    # Use registration host/port if provided (for when module is behind NAT/Docker)
+    if [ -n "$REGISTRATION_HOST" ]; then
+      cli_cmd="$cli_cmd --registration-host=${REGISTRATION_HOST}"
     fi
     
-    if [ "$CONSUL_PORT" != "-1" ]; then
-      cli_cmd="$cli_cmd --consul-port=${CONSUL_PORT}"
+    if [ -n "$REGISTRATION_PORT" ]; then
+      cli_cmd="$cli_cmd --registration-port=${REGISTRATION_PORT}"
     fi
+    
+    # Note: The CLI doesn't support consul-host/port options
+    # Consul registration happens via the engine
     
     if [ "$HEALTH_CHECK" = false ]; then
       cli_cmd="$cli_cmd --skip-health-check"
     fi
+    
+    # Log the command for debugging
+    echo "Executing: $cli_cmd"
     
     # Execute registration command
     if $cli_cmd; then
