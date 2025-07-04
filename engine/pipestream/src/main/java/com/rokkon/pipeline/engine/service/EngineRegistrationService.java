@@ -102,7 +102,10 @@ public class EngineRegistrationService {
                     }
                     
                     // Not registered, proceed with registration
-                    serviceId = applicationName + "-" + java.util.UUID.randomUUID().toString().substring(0, 8);
+                    // Create deterministic ID based on name, host, port, and version
+                    String uniqueKey = applicationName + "-" + hostAddress + "-" + httpPort + "-" + version;
+                    int hash = uniqueKey.hashCode();
+                    serviceId = applicationName + "-" + Integer.toHexString(Math.abs(hash)).substring(0, 8);
                     
                     // Dynamically discover all gRPC services
                     String providedServices = discoverGrpcServices();
@@ -111,14 +114,17 @@ public class EngineRegistrationService {
             java.util.Map<String, String> meta = new java.util.HashMap<>();
             meta.put("service-type", "ENGINE");
             meta.put("provides", providedServices);
-            meta.put("grpc-port", String.valueOf(grpcPort));
-            meta.put("http-port", String.valueOf(httpPort));
+            meta.put("port", String.valueOf(httpPort));  // Single port for unified server
+            meta.put("unified-server", "true");  // Indicate we're using unified server mode
             meta.put("version", version);
+            // Keep old ports for backwards compatibility
+            meta.put("grpc-port", String.valueOf(httpPort));
+            meta.put("http-port", String.valueOf(httpPort));
             
             // Create health check options using gRPC
             CheckOptions checkOptions = new CheckOptions()
                 .setName("Engine gRPC Health Check")
-                .setGrpc(hostAddress + ":" + grpcPort)
+                .setGrpc(hostAddress + ":" + httpPort)  // Use HTTP port for unified server
                 .setGrpcTls(false)
                 .setInterval("10s")
                 .setDeregisterAfter("30s");
@@ -127,7 +133,7 @@ public class EngineRegistrationService {
             ServiceOptions serviceOptions = new ServiceOptions()
                 .setId(serviceId)
                 .setName(applicationName)
-                .setPort(grpcPort)  // Register on gRPC port
+                .setPort(httpPort)  // Register on HTTP port (handles both REST and gRPC)
                 .setAddress(hostAddress)
                 .setTags(java.util.Arrays.asList("pipeline", "engine", "grpc", "version:" + version))
                 .setMeta(meta)

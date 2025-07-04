@@ -19,7 +19,7 @@ public class DockerAvailabilityChecker {
     private static final Logger LOG = Logger.getLogger(DockerAvailabilityChecker.class);
     
     @Inject
-    DevModeDockerClientManager dockerClientManager;
+    DockerClient dockerClient;
     
     private boolean dockerAvailable = false;
     
@@ -29,9 +29,6 @@ public class DockerAvailabilityChecker {
     
     private void validateDockerAvailable() {
         try {
-            // Get Docker client from our manager which handles reconnection
-            var dockerClient = dockerClientManager.getDockerClient();
-            
             // Ping Docker daemon
             dockerClient.pingCmd().exec();
             dockerAvailable = true;
@@ -47,6 +44,15 @@ public class DockerAvailabilityChecker {
             LOG.infof("Docker: %d containers, %d images", 
                 info.getContainers(), info.getImages());
             
+        } catch (IllegalStateException e) {
+            // Connection pool shutdown is expected during dev reload
+            if (e.getMessage() != null && e.getMessage().contains("Connection pool shut down")) {
+                dockerAvailable = false;
+                LOG.info("Docker connection pool shut down (normal during dev reload)");
+            } else {
+                dockerAvailable = false;
+                LOG.warn("⚠️ Docker client error: " + e.getMessage());
+            }
         } catch (Exception e) {
             dockerAvailable = false;
             // Don't fail startup, just warn

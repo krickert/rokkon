@@ -1,72 +1,67 @@
-// /home/krickert/IdeaProjects/rokkon/rokkon-engine/rokkon-engine-fix-structure-branch/settings.gradle.kts
-
+// Configure plugin management - MUST BE FIRST
 pluginManagement {
-    val quarkusPluginVersion: String by settings
     repositories {
         mavenLocal()
         mavenCentral()
         gradlePluginPortal()
     }
+    
+    // Configure Quarkus plugin version
+    val quarkusPluginVersion: String by settings
     plugins {
         id("io.quarkus") version quarkusPluginVersion
     }
 }
 
-// Set the root project name for THIS multi-project build
 rootProject.name = "rokkon-pristine"
 
-// Include only the modules we've migrated
-// include("rokkon-bom") // Original BOM - removed as all projects migrated
+// Enable build cache
+buildCache {
+    local {
+        isEnabled = true
+        directory = file("${rootDir}/.gradle/build-cache")
+        removeUnusedEntriesAfterDays = 30
+    }
+}
 
-// New BOMs
-include("bom:base")
-include("bom:cli")
-include("bom:module")
-include("bom:library")
-include("bom:server")
+// Include all subprojects
+include(
+    ":bom:base",
+    ":bom:library", 
+    ":bom:server",
+    ":bom:cli",
+    ":bom:module",
+    ":rokkon-bom",
+    ":commons:protobuf",
+    ":commons:util",
+    ":commons:interface",
+    ":commons:data-util",
+    ":engine:consul",
+    ":engine:dynamic-grpc",
+    ":engine:validators",
+    ":engine:pipestream",
+    ":modules:echo",
+    ":modules:chunker",
+    ":modules:parser",
+    ":modules:embedder",
+    ":modules:test-module",
+    ":modules:proxy-module",
+    ":modules:connectors:filesystem-crawler",
+    ":cli:register-module",
+    ":cli:seed-engine-consul-config",
+    ":testing:util",
+    ":testing:server-util",
+    ":testing:integration"
+)
 
-include("cli:register-module")
-include("cli:seed-engine-consul-config")
-include("commons:protobuf")
-include("commons:interface")
-include("commons:util")
-include("commons:data-util")
-include("testing:util")
-include("testing:server-util")
-include("testing:integration")
-include("engine:pipestream")
+// Enable Gradle features for better performance
+enableFeaturePreview("STABLE_CONFIGURATION_CACHE")
+enableFeaturePreview("TYPESAFE_PROJECT_ACCESSORS")
 
-// Engine submodules
-include("engine:consul")
-include("engine:validators")
-include("engine:dynamic-grpc")
-// include("engine:seed-config") - Moved to cli:seed-engine-consul-config
-// include("engine:registration") - Merged into engine:consul
-
-// Module subprojects
-include("modules:test-module")
-// include("modules:proxy-module") // Excluded from build as per requirements
-include("modules:chunker")
-include("modules:echo")
-include("modules:parser")
-include("modules:embedder")
-include("modules:connectors:filesystem-crawler")
-
-// New Architecture - Mock Engine
-//include("rokkon-engine-new:pipestream-mock")
-
-
-// Ensure dependencyResolutionManagement is present, especially if you plan to use version catalogs later.
-// For now, let's assume it's here to prevent potential future issues.
+// Dependency resolution management
 dependencyResolutionManagement {
     repositories {
         mavenCentral()
         mavenLocal()
     }
-////     If you plan to use libs.versions.toml here, this is where you'd define it
-//     versionCatalogs {
-//         create("libs") {
-//             from(files("gradle/libs.versions.toml"))
-//         }
-//     }
 }

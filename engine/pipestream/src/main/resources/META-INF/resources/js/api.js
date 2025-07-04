@@ -6,9 +6,9 @@ const API = {
     endpoints: {
         ping: '/ping',
         consulStatus: '/api/consul/status',
-        dashboard: '/api/v1/modules/dashboard',
+        dashboard: '/api/v1/module-discovery/dashboard',
         modules: '/api/v1/modules',
-        allServices: '/api/v1/modules/all-services',
+        allServices: '/api/v1/module-discovery/all-services',
         cleanupZombies: '/api/v1/modules/cleanup-zombies',
         pipelines: '/api/v1/pipelines/definitions',
         clusters: '/api/v1/clusters'

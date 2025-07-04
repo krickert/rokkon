@@ -18,9 +18,9 @@ import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
 import java.util.*;
 import java.util.stream.Collectors;
 
-@Path("/api/v1/modules")
+@Path("/api/v1/module-discovery")
 @Produces(MediaType.APPLICATION_JSON)
-@Tag(name = "Module Discovery", description = "Module discovery operations")
+@Tag(name = "Module Discovery", description = "Module discovery and cluster operations")
 public class ModuleDiscoveryResource {
 
     private static final Logger LOG = Logger.getLogger(ModuleDiscoveryResource.class);
@@ -172,13 +172,17 @@ public class ModuleDiscoveryResource {
                                                 serviceName, svc.getAddress(), svc.getPort());
                                         }
 
+                                        Map<String, String> meta = svc.getMeta() != null ? new HashMap<>(svc.getMeta()) : new HashMap<>();
+                                        // Add service ID to metadata
+                                        meta.put("service-id", svc.getId());
+                                        
                                         return new ServiceInfo(
                                             serviceName, 
                                             healthy, 
                                             svc.getAddress(), 
                                             svc.getPort(), 
                                             svc.getTags(),
-                                            svc.getMeta() != null ? svc.getMeta() : Map.of()
+                                            meta
                                         );
                                     })
                                     .toList();
@@ -272,7 +276,12 @@ public class ModuleDiscoveryResource {
                         isModule = instances.get(0).tags().contains("module");
                     }
                     
-                    // No longer using module- prefix convention
+                    // Detect duplicates (same address:port but different service IDs)
+                    Map<String, List<ServiceInfo>> instancesByEndpoint = instances.stream()
+                        .collect(Collectors.groupingBy(si -> si.address() + ":" + si.port()));
+                    
+                    boolean hasDuplicates = instancesByEndpoint.values().stream()
+                        .anyMatch(list -> list.size() > 1);
                     
                     if (isModule) {
                         // This is a module service
@@ -313,18 +322,23 @@ public class ModuleDiscoveryResource {
 
                         List<BaseServiceInstanceInfo> baseInstances = instances.stream()
                             .map(instance -> new BaseServiceInstanceInfo(
+                                extractServiceId(instance),
                                 instance.address(),
                                 instance.port(),
                                 instance.healthy(),
                                 extractVersion(instance.tags()),
-                                grpcServices
+                                grpcServices,
+                                instance.metadata()
                             ))
                             .toList();
 
                         baseServices.add(new BaseServiceInfo(
                             serviceName,
                             determineServiceType(serviceName),
-                            baseInstances
+                            baseInstances,
+                            hasDuplicates,
+                            hasDuplicates && "pipeline-engine".equals(serviceName) ? 
+                                "Multiple instances from dev mode reloads - each reload creates a new service registration" : null
                         ));
                     }
                 });
@@ -380,9 +394,12 @@ public class ModuleDiscoveryResource {
                                         entry.getChecks().stream().allMatch(check -> 
                                             check.getStatus() == io.vertx.ext.consul.CheckStatus.PASSING);
 
+                                    Map<String, String> meta = svc.getMeta() != null ? new HashMap<>(svc.getMeta()) : new HashMap<>();
+                                    // Add service ID to metadata
+                                    meta.put("service-id", svc.getId());
+                                    
                                     return new ServiceInfo(serviceName, healthy, svc.getAddress(), 
-                                        svc.getPort(), svc.getTags(), 
-                                        svc.getMeta() != null ? svc.getMeta() : Map.of());
+                                        svc.getPort(), svc.getTags(), meta);
                                 })
                                 .toList()
                             )
@@ -437,6 +454,15 @@ public class ModuleDiscoveryResource {
         };
     }
 
+    private String extractServiceId(ServiceInfo service) {
+        // Try to extract service ID from metadata or generate from address:port
+        if (service.metadata() != null && service.metadata().containsKey("service-id")) {
+            return service.metadata().get("service-id");
+        }
+        // For services without explicit ID, use address:port as identifier
+        return service.address() + ":" + service.port() + "-" + service.hashCode();
+    }
+
     // New record types for dashboard data
     public record DashboardData(
         List<BaseServiceInfo> baseServices,
@@ -447,15 +473,19 @@ public class ModuleDiscoveryResource {
     public record BaseServiceInfo(
         String name,
         String type,
-        List<BaseServiceInstanceInfo> instances
+        List<BaseServiceInstanceInfo> instances,
+        boolean hasDuplicates,
+        String duplicateReason
     ) {}
 
     public record BaseServiceInstanceInfo(
+        String id,
         String address,
         int port,
         boolean healthy,
         String version,
-        List<String> grpcServices
+        List<String> grpcServices,
+        Map<String, String> metadata
     ) {}
 
     public record ModuleServiceInfo(

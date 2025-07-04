@@ -28,7 +28,7 @@ public class PipelineDevModeInfrastructure {
     private static final String LABEL_PROJECT = "com.docker.compose.project";
     
     @Inject
-    DevModeDockerClientManager dockerClientManager;
+    DockerClient dockerClient;
     
     @Inject
     HostIPDetector hostIPDetector;
@@ -72,7 +72,7 @@ public class PipelineDevModeInfrastructure {
                 return false;
             }
             
-            List<Container> containers = dockerClientManager.getDockerClient().listContainersCmd()
+            List<Container> containers = dockerClient.listContainersCmd()
                 .withShowAll(false) // Only running containers
                 .exec();
                 
@@ -106,7 +106,7 @@ public class PipelineDevModeInfrastructure {
     
     private boolean retryContainerCheck(String containerName) {
         try {
-            List<Container> containers = dockerClientManager.getDockerClient().listContainersCmd()
+            List<Container> containers = dockerClient.listContainersCmd()
                 .withShowAll(false)
                 .exec();
                 
@@ -131,7 +131,7 @@ public class PipelineDevModeInfrastructure {
      */
     public List<Container> getProjectContainers() {
         try {
-            return dockerClientManager.getDockerClient().listContainersCmd()
+            return dockerClient.listContainersCmd()
                 .withShowAll(true)
                 .withLabelFilter(Map.of(LABEL_PROJECT, composeProjectName))
                 .exec();
@@ -154,7 +154,6 @@ public class PipelineDevModeInfrastructure {
      */
     public Optional<String> getContainerHealth(String containerName) {
         try {
-            var dockerClient = dockerClientManager.getDockerClient();
             List<Container> containers = dockerClient.listContainersCmd()
                 .withShowAll(false)
                 .exec();
@@ -192,7 +191,6 @@ public class PipelineDevModeInfrastructure {
      */
     public Optional<MemoryStats> getContainerMemoryStats(String containerName) {
         try {
-            var dockerClient = dockerClientManager.getDockerClient();
             List<Container> containers = dockerClient.listContainersCmd()
                 .withShowAll(false)
                 .exec();

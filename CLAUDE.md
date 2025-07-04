@@ -10,13 +10,14 @@
 - Do not disable consul-config during real running of the engine.  Consul is critical for the app to run.
 
 ## Dev Mode Architecture
-- Dev mode uses a two-container Consul setup: server (port 38500) + agent (host network on 8500)
-- This mirrors production sidecar pattern - all components talk to localhost:8500
+- Dev mode uses a two-container Consul setup: server (port 38500) + agent (host network on 8501)
+- This mirrors production sidecar pattern - all components talk to localhost:8501
 - Run with: `./gradlew :engine:pipestream:quarkusDev` - it auto-starts Consul
 - See DEV_MODE_ARCHITECTURE.md for full details
 - Consul UI available at http://localhost:38500 in dev mode
 - Implementation: Gradle task starts Consul server, then agent with host networking, seeds config, then starts Quarkus
-- Current status: Working on two-container implementation in build.gradle.kts
+- Uses unified HTTP/gRPC server on single port (39001 in dev) for simpler architecture
+- Docker client reconnection handled automatically during dev reloads
 
 ## Conversion and Naming Conventions
 - We are slowly converting from using "rokkon" in the code to just "pipeline"

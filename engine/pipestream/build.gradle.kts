@@ -23,12 +23,26 @@ plugins {
     id("io.quarkus")
 }
 
+repositories {
+    mavenCentral()
+    // Add mvnpm repository for NPM packages as Maven dependencies
+    maven {
+        url = uri("https://repo.mvnpm.com/maven2")
+    }
+}
+
 dependencies {
     // Server BOM provides all standard server dependencies
     implementation(platform(project(":bom:server")))
     
     // Docker Client for Dev Mode only
     quarkusDev("io.quarkiverse.docker:quarkus-docker-client:0.0.4")
+    
+    // Web Bundler for modern UI development
+    implementation("io.quarkiverse.web-bundler:quarkus-web-bundler:1.8.1")
+    
+    // Modern UI libraries via mvnpm
+    compileOnly("org.mvnpm:lit") // Use version from Quarkus BOM (3.2.1)
     
     // Testcontainers for Dev Mode Consul startup
     implementation("org.testcontainers:testcontainers:1.21.3")
@@ -104,11 +118,47 @@ tasks.withType<JavaCompile> {
     options.compilerArgs.add("-parameters")
 }
 
+// Optimize protobuf compilation - create a custom skip flag
+val skipProtoGen = project.hasProperty("skipProto") || System.getProperty("grpc.codegen.skip") == "true"
+
+tasks.named("quarkusGenerateCode") {
+    onlyIf { !skipProtoGen }
+    outputs.cacheIf { true }
+}
+
+tasks.named("quarkusGenerateCodeDev") {
+    onlyIf { !skipProtoGen }
+    outputs.cacheIf { true }
+}
+
 // Quarkus configuration
 quarkus {
     buildForkOptions {
         systemProperty("quarkus.grpc.codegen.type", "mutiny")
+        // Reduce the scope of cachingRelevantInput to avoid unnecessary rebuilds
+        systemProperty("quarkus.package.type", "jar")
     }
+}
+
+// Workaround for quarkusGenerateCode always running
+// This creates a marker file to track when proto files actually change
+val protoMarkerFile = layout.buildDirectory.file("proto-marker.txt")
+
+tasks.register("checkProtoChanges") {
+    val protoFiles = fileTree("src/main/proto") {
+        include("**/*.proto")
+    }
+    inputs.files(protoFiles).withPathSensitivity(PathSensitivity.RELATIVE)
+    outputs.file(protoMarkerFile)
+    
+    doLast {
+        protoMarkerFile.get().asFile.writeText("Proto files hash: ${inputs.files.files.hashCode()}")
+    }
+}
+
+// Make quarkusGenerateCode depend on our check
+tasks.named("quarkusGenerateCode") {
+    dependsOn("checkProtoChanges")
 }
 
 // Custom tasks for development
@@ -208,10 +258,10 @@ pipeline:
                     val devConfig = """
 quarkus:
   http:
-    port: 39001
+    port: 39001  # Both REST and gRPC use this port
   grpc:
     server:
-      port: 49001
+      use-separate-server: false
 pipeline:
   engine:
     dev-mode: true
@@ -365,3 +415,23 @@ tasks.register("dev") {
     dependsOn("quarkusDev")
 }
 
+// Fast dev mode that skips proto generation
+tasks.register("fastDev") {
+    group = "development"
+    description = "Start Quarkus dev mode without regenerating protos"
+    doFirst {
+        System.setProperty("grpc.codegen.skip", "true")
+    }
+    finalizedBy("quarkusDev")
+}
+
+
+// Pass version to Quarkus application
+tasks.withType<JavaExec> {
+    systemProperty("project.version", project.version.toString())
+}
+
+// Also set for the quarkusDev task specifically
+tasks.named<io.quarkus.gradle.tasks.QuarkusDev>("quarkusDev") {
+    jvmArgs = jvmArgs.orEmpty() + listOf("-Dproject.version=${project.version}")
+}

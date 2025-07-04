@@ -2,22 +2,24 @@ quarkus:
   application:
     name: pipeline-engine
 
+
   generate-code:
     grpc:
       scan-for-proto: com.rokkon.pipeline:protobuf,com.google.api.grpc:proto-google-common-protos
       codegen:
         type: mutiny
+        # Skip code generation if needed using property
+        # skip: ${grpc.codegen.skip:false}
   http:
     port: ${QUARKUS_HTTP_PORT:38082}
     host: ${ENGINE_HOST:0.0.0.0}
 
   grpc:
     server:
-      port: ${QUARKUS_GRPC_SERVER_PORT:48082}
-      host: ${ENGINE_HOST:0.0.0.0}
+      # With unified server, gRPC uses the same port as HTTP
+      use-separate-server: false  # Use unified HTTP server (recommended)
       enable-reflection-service: true
       max-inbound-message-size: 419430400
-      use-separate-server: true  # Use separate gRPC server (required for different ports)
       health:
         enabled: true
 
@@ -138,13 +140,13 @@ stork:
       type: consul
       consul-host: ${consul.host:localhost}
       consul-port: ${consul.port:8500}
-      # Register with gRPC port as primary
-      instance-port: ${quarkus.grpc.server.port:48082}
+      # Register with HTTP port (handles both REST and gRPC)
+      instance-port: ${quarkus.http.port:38082}
       # Additional metadata
       metadata:
         service-type: ENGINE
-        grpc-port: ${quarkus.grpc.server.port:48082}
-        http-port: ${quarkus.http.port:38082}
+        port: ${quarkus.http.port:38082}  # Single port for both protocols
+        unified-server: true
         version: ${quarkus.application.version:1.0.0}
       # Health check configuration
       check-type: grpc
@@ -253,13 +255,7 @@ smallrye:
     # HTTP configuration for dev mode
     http:
       host: 0.0.0.0  # Listen on all interfaces in container
-      port: 38090
-
-    # gRPC configuration for dev mode  
-    grpc:
-      server:
-        host: 0.0.0.0  # Listen on all interfaces in container
-        port: 49000
+      port: 38090  # Both REST and gRPC will use this port
 
     # Dev Services configuration
     devservices:
@@ -288,6 +284,11 @@ smallrye:
     # In dev mode, enable Consul features if consul.host is configured
     consul-config:
       enabled: false
+    
+    # Web bundler configuration for modern UI
+    web-bundler:
+      bundling:
+        watch: true  # Enable hot reload in dev mode
 
   # Consul configuration for dev mode
   consul:
