@@ -1332,13 +1332,13 @@ public class ModuleDeploymentService {
                 
             // Get registered modules from the global registry
             Set<String> registeredModuleIds = new HashSet<>();
-            globalModuleRegistry.listRegisteredModules()
-                .subscribe().with(
-                    modules -> {
-                        modules.forEach(reg -> registeredModuleIds.add(reg.moduleId()));
-                    },
-                    failure -> LOG.warnf("Failed to get registered modules: %s", failure.getMessage())
-                );
+            try {
+                Set<GlobalModuleRegistryService.ModuleRegistration> registrations = 
+                    moduleRegistry.listRegisteredModules().await().atMost(Duration.ofSeconds(5));
+                registrations.forEach(reg -> registeredModuleIds.add(reg.moduleId()));
+            } catch (Exception e) {
+                LOG.warnf("Failed to get registered modules: %s", e.getMessage());
+            }
             
             // Find orphaned containers
             for (Container container : containers) {
