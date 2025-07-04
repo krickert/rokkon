@@ -9,7 +9,7 @@ quarkus:
       codegen:
         type: mutiny
         # Skip code generation if needed using property
-        # skip: ${grpc.codegen.skip:false}
+        skip: ${grpc.codegen.skip:false}
   http:
     port: ${QUARKUS_HTTP_PORT:38082}
     host: ${ENGINE_HOST:0.0.0.0}
@@ -55,14 +55,14 @@ quarkus:
 pipeline:
   consul:
     kv-prefix: pipeline  # This is the prefix for Consul KV store (default was 'rokkon')
-  
+
   # Cache configuration for gRPC channels
   cache:
     caffeine:
       "grpc-channels":
         expire-after-write: 10m
         maximum-size: 100
-    
+
   # Index external dependencies for CDI discovery
   index-dependency:
     engine-consul:
@@ -117,7 +117,7 @@ pipeline:
   # Dev services configuration
   devservices:
     enabled: true
-  
+
   # Observability configuration
   observability:
     enabled: true
@@ -128,7 +128,7 @@ pipeline:
         port: 3000
       provisioning:
         enabled: true
-  
+
   otel:
     enabled: true
     traces:
@@ -137,7 +137,7 @@ pipeline:
       enabled: true
     logs:
       enabled: true
-  
+
   # Micrometer metrics configuration
   micrometer:
     enabled: true
@@ -186,7 +186,7 @@ stork:
       check-type: grpc
       check-interval: 10s
       deregister-critical-service-after: 30s
-  
+
   # Default service discovery for all services
   default:
     service-discovery:
@@ -305,7 +305,7 @@ smallrye:
     # Dev mode configuration
     dev:
       instrumentation: true
-    
+
     # Docker client configuration for dev mode
     docker-client:
       # Use the default Docker socket
@@ -318,7 +318,7 @@ smallrye:
     # In dev mode, enable Consul features if consul.host is configured
     consul-config:
       enabled: false
-    
+
     # Web bundler configuration for modern UI
     web-bundler:
       bundling:

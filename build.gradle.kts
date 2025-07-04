@@ -12,8 +12,8 @@ allprojects {
 
 // Convenience task for dev mode
 tasks.register("dev") {
-    dependsOn(":engine:pipestream:quarkusDev")
-    description = "Start the engine in dev mode with Consul"
+    dependsOn(":engine:pipestream:fastDev")
+    description = "Start the engine in dev mode with Consul (skips proto generation)"
     group = "development"
 }
 

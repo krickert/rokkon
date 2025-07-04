@@ -3,6 +3,7 @@ package com.rokkon.pipeline.engine.api;
 import io.quarkus.arc.profile.IfBuildProfile;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
+import jakarta.enterprise.inject.Instance;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -15,9 +16,15 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
+import com.rokkon.pipeline.engine.dev.ModuleDeploymentService;
+import com.rokkon.pipeline.engine.dev.PipelineModule;
+import com.rokkon.pipeline.engine.dev.PipelineDevModeInfrastructure;
 
 import java.util.List;
 import java.util.Map;
+import java.util.Arrays;
+import java.util.stream.Collectors;
+import io.smallrye.mutiny.infrastructure.Infrastructure;
 
 /**
  * REST API for module lifecycle management.
@@ -31,12 +38,11 @@ public class ModuleManagementResource {
 
     private static final Logger LOG = Logger.getLogger(ModuleManagementResource.class);
 
-    // TODO: Inject services when implemented
-    // @Inject
-    // ModuleDeploymentService deploymentService;
+    @Inject
+    Instance<ModuleDeploymentService> deploymentService;
     
-    // @Inject
-    // ModuleStatusService statusService;
+    @Inject
+    Instance<PipelineDevModeInfrastructure> infrastructure;
 
     /**
      * Response for module operations
@@ -121,20 +127,19 @@ public class ModuleManagementResource {
     public Uni<List<AvailableModule>> listAvailableModules() {
         LOG.info("Listing available modules");
         
-        // TODO: Implement when service is ready
-        // For now, return static list
-        return Uni.createFrom().item(List.of(
-            new AvailableModule("echo", "PROCESSOR", "rokkon/echo-module:latest", "1G", 
-                Map.of("http", 39090, "grpc", 49090), true),
-            new AvailableModule("test", "PROCESSOR", "rokkon/test-module:latest", "1G", 
-                Map.of("http", 39095, "grpc", 49095), true),
-            new AvailableModule("parser", "PROCESSOR", "rokkon/parser-module:latest", "1G", 
-                Map.of("http", 39093, "grpc", 49093), true),
-            new AvailableModule("chunker", "PROCESSOR", "pipeline/chunker:latest", "4G", 
-                Map.of("http", 39092, "grpc", 49092), true),
-            new AvailableModule("embedder", "PROCESSOR", "pipeline/embedder:latest", "8G", 
-                Map.of("http", 39094, "grpc", 49094), true)
-        ));
+        // Get available modules from PipelineModule enum
+        List<AvailableModule> modules = Arrays.stream(PipelineModule.values())
+            .map(module -> new AvailableModule(
+                module.getModuleName(),
+                "PROCESSOR",
+                module.getDockerImage(),
+                module.getDefaultMemory(),
+                Map.of("unified", module.getUnifiedPort()),  // Unified server port
+                true
+            ))
+            .collect(Collectors.toList());
+            
+        return Uni.createFrom().item(modules);
     }
 
     @GET
@@ -157,8 +162,28 @@ public class ModuleManagementResource {
     public Uni<List<ModuleStatus>> listDeployedModules() {
         LOG.info("Listing deployed modules");
         
-        // TODO: Implement when service is ready
-        return Uni.createFrom().item(List.of());
+        // Check if services are available
+        if (!deploymentService.isResolvable() || !infrastructure.isResolvable()) {
+            return Uni.createFrom().item(List.of());
+        }
+        
+        // Get status of all modules
+        List<ModuleStatus> statuses = Arrays.stream(PipelineModule.values())
+            .filter(module -> infrastructure.get().isModuleRunning(module))
+            .map(module -> {
+                ModuleDeploymentService.ModuleStatus status = deploymentService.get().getModuleStatus(module);
+                return new ModuleStatus(
+                    module.getModuleName(),
+                    status.toString().toLowerCase(),
+                    status == ModuleDeploymentService.ModuleStatus.RUNNING ? "healthy" : "unknown",
+                    module.getContainerName(),
+                    module.getSidecarName(),
+                    Map.of("unified", module.getUnifiedPort())
+                );
+            })
+            .collect(Collectors.toList());
+            
+        return Uni.createFrom().item(statuses);
     }
 
     @GET
@@ -187,12 +212,37 @@ public class ModuleManagementResource {
         
         LOG.infof("Getting status for module: %s", moduleName);
         
-        // TODO: Implement when service is ready
-        return Uni.createFrom().item(
-            Response.status(Response.Status.NOT_FOUND)
-                .entity(Map.of("error", "Module not found: " + moduleName))
-                .build()
-        );
+        try {
+            PipelineModule module = PipelineModule.fromName(moduleName);
+            
+            // Check if services are available
+            if (!deploymentService.isResolvable()) {
+                return Uni.createFrom().item(
+                    Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                        .entity(Map.of("error", "Service not available in current mode"))
+                        .build()
+                );
+            }
+            
+            ModuleDeploymentService.ModuleStatus status = deploymentService.get().getModuleStatus(module);
+            
+            ModuleStatus moduleStatus = new ModuleStatus(
+                module.getModuleName(),
+                status.toString().toLowerCase(),
+                status == ModuleDeploymentService.ModuleStatus.RUNNING ? "healthy" : "unknown",
+                module.getContainerName(),
+                module.getSidecarName(),
+                Map.of("unified", module.getUnifiedPort())
+            );
+            
+            return Uni.createFrom().item(Response.ok(moduleStatus).build());
+        } catch (IllegalArgumentException e) {
+            return Uni.createFrom().item(
+                Response.status(Response.Status.NOT_FOUND)
+                    .entity(Map.of("error", "Module not found: " + moduleName))
+                    .build()
+            );
+        }
     }
 
     @POST
@@ -229,9 +279,8 @@ public class ModuleManagementResource {
         
         LOG.infof("Request to deploy module: %s", moduleName);
         
-        // Check if we're in dev mode
-        String profile = System.getProperty("quarkus.profile", "prod");
-        if (!"dev".equals(profile)) {
+        // Check if deployment service is available (only in dev mode)
+        if (!deploymentService.isResolvable()) {
             return Uni.createFrom().item(
                 Response.status(Response.Status.SERVICE_UNAVAILABLE)
                     .entity(new ModuleOperationResponse(false, 
@@ -240,14 +289,47 @@ public class ModuleManagementResource {
             );
         }
         
-        // TODO: Implement when service is ready
-        return Uni.createFrom().item(
-            Response.status(Response.Status.ACCEPTED)
-                .entity(new ModuleOperationResponse(true, 
-                    "Module deployment initiated", 
-                    Map.of("module", moduleName, "status", "deploying")))
-                .build()
-        );
+        // Deploy the module
+        return Uni.createFrom().item(() -> {
+            try {
+                PipelineModule module = PipelineModule.fromName(moduleName);
+                
+                // Check if already deployed
+                if (infrastructure.get().isModuleRunning(module)) {
+                    return Response.status(Response.Status.CONFLICT)
+                        .entity(new ModuleOperationResponse(false, 
+                            "Module already deployed: " + moduleName, null))
+                        .build();
+                }
+                
+                // Deploy module with sidecars
+                ModuleDeploymentService.ModuleDeploymentResult result = deploymentService.get().deployModule(module);
+                
+                if (result.success()) {
+                    return Response.status(Response.Status.ACCEPTED)
+                        .entity(new ModuleOperationResponse(true, 
+                            result.message(), 
+                            Map.of(
+                                "module", moduleName,
+                                "status", "deployed",
+                                "port", module.getUnifiedPort(),
+                                "containerId", result.moduleContainerId()
+                            )))
+                        .build();
+                } else {
+                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                        .entity(new ModuleOperationResponse(false, 
+                            result.message(), null))
+                        .build();
+                }
+            } catch (IllegalArgumentException e) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Invalid module: " + moduleName, null))
+                    .build();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 
     @DELETE
@@ -276,13 +358,41 @@ public class ModuleManagementResource {
         
         LOG.infof("Request to stop module: %s", moduleName);
         
-        // TODO: Implement when service is ready
-        return Uni.createFrom().item(
-            Response.status(Response.Status.NOT_FOUND)
-                .entity(new ModuleOperationResponse(false, 
-                    "Module not found: " + moduleName, null))
-                .build()
-        );
+        return Uni.createFrom().item(() -> {
+            try {
+                PipelineModule module = PipelineModule.fromName(moduleName);
+                
+                // Check if services are available
+                if (!deploymentService.isResolvable() || !infrastructure.isResolvable()) {
+                    return Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                        .entity(new ModuleOperationResponse(false, 
+                            "Service not available in current mode", null))
+                        .build();
+                }
+                
+                // Check if deployed
+                if (!infrastructure.get().isModuleRunning(module)) {
+                    return Response.status(Response.Status.NOT_FOUND)
+                        .entity(new ModuleOperationResponse(false, 
+                            "Module not deployed: " + moduleName, null))
+                        .build();
+                }
+                
+                // Stop the module
+                deploymentService.get().stopModule(module);
+                
+                return Response.ok(new ModuleOperationResponse(true, 
+                    "Module stopped successfully", 
+                    Map.of("module", moduleName)))
+                    .build();
+            } catch (IllegalArgumentException e) {
+                return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Module not found: " + moduleName, null))
+                    .build();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 
     @POST
@@ -353,9 +463,8 @@ public class ModuleManagementResource {
         
         LOG.infof("Request to get logs for module: %s (last %d lines)", moduleName, lines);
         
-        // Check if we're in dev mode
-        String profile = System.getProperty("quarkus.profile", "prod");
-        if (!"dev".equals(profile)) {
+        // Check if services are available (only in dev mode)
+        if (!deploymentService.isResolvable()) {
             return Uni.createFrom().item(
                 Response.status(Response.Status.SERVICE_UNAVAILABLE)
                     .entity("Log retrieval is only available in dev mode")

@@ -34,20 +34,20 @@ repositories {
 dependencies {
     // Server BOM provides all standard server dependencies
     implementation(platform(project(":bom:server")))
-    
+
     // Docker Client for Dev Mode only
     quarkusDev("io.quarkiverse.docker:quarkus-docker-client:0.0.4")
-    
+
     // Web Bundler for modern UI development
     implementation("io.quarkiverse.web-bundler:quarkus-web-bundler:1.8.1")
-    
+
     // Modern UI libraries via mvnpm
     compileOnly("org.mvnpm:lit") // Use version from Quarkus BOM (3.2.1)
-    
+
     // Testcontainers for Dev Mode Consul startup
     implementation("org.testcontainers:testcontainers:1.21.3")
     implementation("org.testcontainers:consul:1.21.3")
-    
+
     // Quarkus deployment for accessing DevModeMain
     quarkusDev("io.quarkus:quarkus-core-deployment")
 
@@ -70,23 +70,23 @@ dependencies {
 
     // --- Observability & Resilience ---
     implementation("io.quarkus:quarkus-smallrye-fault-tolerance")
-    
+
     // --- Observability DevServices ---
     // Automatically starts Grafana LGTM stack (Loki, Grafana, Tempo, Mimir/Prometheus) in dev mode
     quarkusDev("io.quarkus:quarkus-observability-devservices-lgtm")
-    
+
     // OpenTelemetry for traces, metrics, and logs
     implementation("io.quarkus:quarkus-opentelemetry")
-    
+
     // Micrometer for metrics export to OTLP
     implementation("io.quarkus:quarkus-micrometer")
-    
+
     // Optional: Prometheus registry if you want direct Prometheus scraping too
     implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
-    
+
     // --- Caching for gRPC channels ---
     implementation("io.quarkus:quarkus-cache")
-    
+
     // --- Engine Modules ---
     implementation(project(":engine:consul")) // Now includes gRPC registration service
     implementation(project(":engine:validators"))
@@ -102,7 +102,7 @@ dependencies {
     testImplementation("org.testcontainers:consul:1.21.3")
     testImplementation(project(":testing:util"))
     testImplementation(project(":testing:server-util"))
-    
+
     // --- Integration Testing ---
     integrationTestImplementation("com.orbitz.consul:consul-client:1.5.3")
     integrationTestImplementation("io.quarkus:quarkus-junit5-mockito")
@@ -140,7 +140,23 @@ tasks.named("quarkusGenerateCode") {
 }
 
 tasks.named("quarkusGenerateCodeDev") {
-    onlyIf { !skipProtoGen }
+    onlyIf { 
+        if (skipProtoGen) {
+            return@onlyIf false
+        }
+
+        val protoFiles = fileTree("src/main/proto") {
+            include("**/*.proto")
+        }
+
+        val generatedSourcesDir = layout.buildDirectory.dir("classes/java/quarkus-generated-sources").get().asFile
+
+        val hasProtoChanges = protoFiles.any { file ->
+            file.lastModified() > (if (generatedSourcesDir.exists()) generatedSourcesDir.lastModified() else 0)
+        }
+
+        hasProtoChanges || !generatedSourcesDir.exists()
+    }
     outputs.cacheIf { true }
 }
 
@@ -163,7 +179,7 @@ tasks.register("checkProtoChanges") {
     }
     inputs.files(protoFiles).withPathSensitivity(PathSensitivity.RELATIVE)
     outputs.file(protoMarkerFile)
-    
+
     doLast {
         protoMarkerFile.get().asFile.writeText("Proto files hash: ${inputs.files.files.hashCode()}")
     }
@@ -171,6 +187,11 @@ tasks.register("checkProtoChanges") {
 
 // Make quarkusGenerateCode depend on our check
 tasks.named("quarkusGenerateCode") {
+    dependsOn("checkProtoChanges")
+}
+
+// Also make quarkusGenerateCodeDev depend on our check
+tasks.named("quarkusGenerateCodeDev") {
     dependsOn("checkProtoChanges")
 }
 
@@ -215,7 +236,7 @@ tasks.register("startConsulDev") {
         var consulServerContainer: ConsulContainer? = null
         var consulAgentContainer: GenericContainer<*>? = null
         var network: Network? = null
-        
+
         // Check if Consul agent is already running on port 8501
         val isConsulAgentRunning = try {
             val url = URI("http://localhost:8501/v1/agent/self").toURL()
@@ -229,10 +250,10 @@ tasks.register("startConsulDev") {
         } catch (e: Exception) {
             false
         }
-        
+
         if (isConsulAgentRunning) {
             logger.lifecycle("✓ Consul agent already running on port 8501, reusing existing instance")
-            
+
             // Check if configuration exists
             val configExists = try {
                 val checkUrl = URI("http://localhost:8501/v1/kv/config/application").toURL()
@@ -245,7 +266,7 @@ tasks.register("startConsulDev") {
             } catch (e: Exception) {
                 false
             }
-            
+
             if (!configExists) {
                 logger.lifecycle("⚠ Configuration missing, attempting to seed...")
                 // Try to find server container to seed config
@@ -254,11 +275,11 @@ tasks.register("startConsulDev") {
                     .withShowAll(false)
                     .exec()
                     .filter { it.image?.contains("consul") == true && it.state == "running" }
-                
+
                 val serverContainer = consulContainers.find { 
                     it.command?.contains("-server") == true 
                 }
-                
+
                 if (serverContainer != null) {
                     // Seed using docker exec
                     val applicationConfig = """
@@ -279,7 +300,7 @@ pipeline:
   engine:
     dev-mode: true
 """.trimIndent()
-                    
+
                     docker.execCreateCmd(serverContainer.id)
                         .withCmd("consul", "kv", "put", "config/application", applicationConfig)
                         .exec()
@@ -294,7 +315,7 @@ pipeline:
         } else {
             // No agent running, need to start Consul infrastructure
             logger.lifecycle("Starting Consul infrastructure...")
-            
+
             // Check if we can find existing Consul server container
             val docker = DockerClientFactory.instance().client()
             val consulContainers = docker.listContainersCmd()
@@ -304,11 +325,11 @@ pipeline:
                     container.image?.contains("consul") == true && 
                     container.state == "running"
                 }
-            
+
             val existingServer = consulContainers.find { container ->
                 container.command?.contains("-server") == true
             }
-            
+
             if (existingServer != null) {
                 logger.lifecycle("✓ Found existing Consul server container: ${existingServer.id.take(12)}")
                 // Get the network from existing server
@@ -322,7 +343,7 @@ pipeline:
                 // Create new network and server
                 logger.lifecycle("→ Starting new Consul server...")
                 network = Network.newNetwork()
-                
+
                 consulServerContainer = ConsulContainer(DockerImageName.parse("hashicorp/consul:1.21"))
                     .withCommand(
                         "agent", "-server", "-ui",
@@ -334,14 +355,14 @@ pipeline:
                     .withNetwork(network)
                     .withNetworkAliases("consul-server")
                     .withEnv("CONSUL_BIND_INTERFACE", "eth0")
-                
+
                 consulServerContainer.start()
                 logger.lifecycle("✓ Consul server started")
-                
+
                 // Seed configuration
                 logger.lifecycle("→ Seeding configuration...")
                 Thread.sleep(2000) // Wait for server to be ready
-                
+
                 val applicationConfig = """
 pipeline:
   engine:
@@ -365,7 +386,7 @@ pipeline:
                 consulServerContainer.execInContainer("consul", "kv", "put", "config/dev", devConfig)
                 logger.lifecycle("✓ Configuration seeded")
             }
-            
+
             // Start agent
             logger.lifecycle("→ Starting Consul agent on port 8501...")
             consulAgentContainer = GenericContainer(DockerImageName.parse("hashicorp/consul:1.21"))
@@ -382,14 +403,14 @@ pipeline:
                 .withEnv("CONSUL_BIND_INTERFACE", "eth0")
                 .withExposedPorts(8500)
                 .withExtraHost("host.docker.internal", "host-gateway")
-            
+
             consulAgentContainer.setPortBindings(listOf("8501:8500"))
             consulAgentContainer.start()
             logger.lifecycle("✓ Consul agent available at localhost:8501")
         }
-        
+
         logger.lifecycle("✓ Dev mode ready - starting Quarkus application")
-        
+
         // Store references if we created new containers
         consulServerContainer?.let { 
             project.extensions.extraProperties["consulServer"] = it 
@@ -433,7 +454,9 @@ tasks.register("fastDev") {
     group = "development"
     description = "Start Quarkus dev mode without regenerating protos"
     doFirst {
+        // Set the property to skip proto generation
         System.setProperty("grpc.codegen.skip", "true")
+        logger.lifecycle("✓ Proto generation will be skipped (grpc.codegen.skip=true)")
     }
     finalizedBy("quarkusDev")
 }

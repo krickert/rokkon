@@ -16,6 +16,7 @@ MAX_RETRIES=${MAX_RETRIES:-3}
 STARTUP_TIMEOUT=${STARTUP_TIMEOUT:-60}
 CHECK_INTERVAL=${CHECK_INTERVAL:-5}
 SHUTDOWN_ON_REGISTRATION_FAILURE=${SHUTDOWN_ON_REGISTRATION_FAILURE:-true}
+AUTO_REGISTER=${AUTO_REGISTER:-true}
 
 # Function to register module with retries
 register_module() {
@@ -69,20 +70,27 @@ MODULE_PID=$!
 # Give the module a moment to start up
 sleep 5
 
-# Register the module (CLI will handle health checks)
-if register_module; then
-  echo "Module registered successfully!"
+# Check if auto-registration is enabled
+if [ "$AUTO_REGISTER" = "false" ]; then
+  echo "Auto-registration disabled (AUTO_REGISTER=false). Module running without registration."
   # Keep the module running in foreground
   wait $MODULE_PID
 else
-  if [ "$SHUTDOWN_ON_REGISTRATION_FAILURE" = "true" ]; then
-    echo "Registration failed. Shutting down module as SHUTDOWN_ON_REGISTRATION_FAILURE=true"
-    kill $MODULE_PID
-    exit 1
-  else
-    echo "Registration failed, but keeping module running as SHUTDOWN_ON_REGISTRATION_FAILURE=false"
-    echo "Module is available for manual registration or debugging"
+  # Register the module (CLI will handle health checks)
+  if register_module; then
+    echo "Module registered successfully!"
     # Keep the module running in foreground
     wait $MODULE_PID
+  else
+    if [ "$SHUTDOWN_ON_REGISTRATION_FAILURE" = "true" ]; then
+      echo "Registration failed. Shutting down module as SHUTDOWN_ON_REGISTRATION_FAILURE=true"
+      kill $MODULE_PID
+      exit 1
+    else
+      echo "Registration failed, but keeping module running as SHUTDOWN_ON_REGISTRATION_FAILURE=false"
+      echo "Module is available for manual registration or debugging"
+      # Keep the module running in foreground
+      wait $MODULE_PID
+    fi
   fi
 fi
