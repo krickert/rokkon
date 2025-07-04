@@ -2,7 +2,7 @@ quarkus:
   application:
     name: echo-module
   http:
-    port: 39090
+    port: 39100  # Single port for both HTTP and gRPC (391xx convention for modules)
   generate-code:
     grpc:
       scan-for-proto: com.rokkon.pipeline:protobuf,com.google.api.grpc:proto-google-common-protos
@@ -16,7 +16,8 @@ quarkus:
     path: /q/swagger-ui
   grpc:
     server:
-      port: 49090
+      # Use unified server mode - gRPC shares port with HTTP
+      use-separate-server: false
       host: 0.0.0.0
       enable-reflection-service: true
       max-inbound-message-size: 1073741824  # 1GB
@@ -24,7 +25,7 @@ quarkus:
     clients:
       echoService:
         host: localhost
-        port: 49090
+        port: 39100  # Use unified HTTP port
         max-inbound-message-size: 1073741824  # 1GB
   log:
     level: INFO
@@ -41,6 +42,39 @@ quarkus:
     labels:
       "consul.service": "module-echo"
       "consul.connect": "true"
+  
+  # OpenTelemetry configuration
+  otel:
+    enabled: true
+    traces:
+      enabled: true
+    metrics:
+      enabled: true
+    logs:
+      enabled: true
+    exporter:
+      otlp:
+        # In production, this will be set via environment variable to the sidecar collector
+        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+        protocol: ${OTEL_EXPORTER_OTLP_PROTOCOL:grpc}
+    resource:
+      attributes:
+        service.name: echo-module
+        service.namespace: pipeline
+        deployment.environment: ${quarkus.profile:prod}
+  
+  # Micrometer metrics configuration
+  micrometer:
+    enabled: true
+    export:
+      prometheus:
+        enabled: true
+    binder:
+      jvm: true
+      system: true
+      grpc:
+        server: true
+        client: true
 
 # Test profile configuration
 "%test":
@@ -52,6 +86,11 @@ quarkus:
       clients:
         echoService:
           max-inbound-message-size: 1073741824  # 1GB
+    # Disable OpenTelemetry in tests
+    otel:
+      enabled: false
+      sdk:
+        disabled: true
 
 # Dev profile - easy local Docker builds
 "%dev":

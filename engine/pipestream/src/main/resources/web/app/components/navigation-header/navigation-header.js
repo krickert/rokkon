@@ -5,7 +5,8 @@ export class NavigationHeader extends LitElement {
     engineInfo: { type: Object },
     autoRefresh: { type: Boolean },
     refreshInterval: { type: Number },
-    showInfoPopup: { type: Boolean }
+    showInfoPopup: { type: Boolean },
+    devServicesInfo: { type: Object }
   };
 
   static styles = css`
@@ -202,6 +203,37 @@ export class NavigationHeader extends LitElement {
     .info-popup.show {
       display: block;
     }
+    
+    .observability-links {
+      display: flex;
+      gap: 12px;
+      margin-right: 16px;
+    }
+    
+    .obs-link {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      background: #f5f5f5;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      color: #333;
+      text-decoration: none;
+      font-size: 14px;
+      transition: all 0.2s ease;
+    }
+    
+    .obs-link:hover {
+      background: #e8f5fe;
+      border-color: #1976d2;
+      color: #1976d2;
+    }
+    
+    .obs-link-icon {
+      width: 16px;
+      height: 16px;
+    }
 
     .info-section {
       margin-bottom: 12px;
@@ -243,12 +275,34 @@ export class NavigationHeader extends LitElement {
   constructor() {
     super();
     this.showInfoPopup = false;
+    this.devServicesInfo = null;
   }
 
   connectedCallback() {
     super.connectedCallback();
     this.boundClosePopup = this.closePopup.bind(this);
     document.addEventListener('click', this.boundClosePopup);
+    // Fetch DevServices info if in dev mode
+    if (this.engineInfo?.profile === 'dev') {
+      this.fetchDevServicesInfo();
+    }
+  }
+  
+  updated(changedProperties) {
+    if (changedProperties.has('engineInfo') && this.engineInfo?.profile === 'dev') {
+      this.fetchDevServicesInfo();
+    }
+  }
+  
+  async fetchDevServicesInfo() {
+    try {
+      const response = await fetch('/api/v1/devservices/info');
+      if (response.ok) {
+        this.devServicesInfo = await response.json();
+      }
+    } catch (error) {
+      console.error('Failed to fetch DevServices info:', error);
+    }
   }
 
   disconnectedCallback() {
@@ -407,6 +461,26 @@ export class NavigationHeader extends LitElement {
         </div>
 
         <div class="controls-section">
+          ${engineInfo?.profile === 'dev' && this.devServicesInfo?.enabled ? html`
+            <div class="observability-links">
+              ${this.devServicesInfo.observability?.grafana ? html`
+                <a href="${this.devServicesInfo.observability.grafana}" target="_blank" class="obs-link" title="Grafana Dashboard">
+                  <svg class="obs-link-icon" fill="currentColor" viewBox="0 0 20 20">
+                    <path d="M2 10a8 8 0 018-8v8h8a8 8 0 11-16 0z"/>
+                    <path d="M12 2.252A8.014 8.014 0 0117.748 8H12V2.252z"/>
+                  </svg>
+                  Grafana
+                </a>
+              ` : ''}
+              <a href="/q/metrics" target="_blank" class="obs-link" title="Prometheus Metrics">
+                <svg class="obs-link-icon" fill="currentColor" viewBox="0 0 20 20">
+                  <path d="M9 2a1 1 0 000 2h2a1 1 0 100-2H9z"/>
+                  <path fill-rule="evenodd" d="M4 5a2 2 0 012-2 1 1 0 000 2H6a2 2 0 100 4h2a2 2 0 100 4h2a1 1 0 100 2 2 2 0 11-4 0 1 1 0 00-1-1H4a2 2 0 01-2-2V7a2 2 0 012-2z" clip-rule="evenodd"/>
+                </svg>
+                Metrics
+              </a>
+            </div>
+          ` : ''}
           <div class="refresh-controls">
             <span class="refresh-label">Auto Refresh</span>
             <label class="toggle-switch">

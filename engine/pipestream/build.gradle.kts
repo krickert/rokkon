@@ -71,6 +71,19 @@ dependencies {
     // --- Observability & Resilience ---
     implementation("io.quarkus:quarkus-smallrye-fault-tolerance")
     
+    // --- Observability DevServices ---
+    // Automatically starts Grafana LGTM stack (Loki, Grafana, Tempo, Mimir/Prometheus) in dev mode
+    quarkusDev("io.quarkus:quarkus-observability-devservices-lgtm")
+    
+    // OpenTelemetry for traces, metrics, and logs
+    implementation("io.quarkus:quarkus-opentelemetry")
+    
+    // Micrometer for metrics export to OTLP
+    implementation("io.quarkus:quarkus-micrometer")
+    
+    // Optional: Prometheus registry if you want direct Prometheus scraping too
+    implementation("io.quarkus:quarkus-micrometer-registry-prometheus")
+    
     // --- Caching for gRPC channels ---
     implementation("io.quarkus:quarkus-cache")
     

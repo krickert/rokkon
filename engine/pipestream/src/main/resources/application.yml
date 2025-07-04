@@ -117,6 +117,40 @@ pipeline:
   # Dev services configuration
   devservices:
     enabled: true
+  
+  # Observability configuration
+  observability:
+    enabled: true
+    dev-resources: true
+    # LGTM stack configuration
+    lgtm:
+      grafana:
+        port: 3000
+      provisioning:
+        enabled: true
+  
+  otel:
+    enabled: true
+    traces:
+      enabled: true
+    metrics:
+      enabled: true
+    logs:
+      enabled: true
+  
+  # Micrometer metrics configuration
+  micrometer:
+    enabled: true
+    export:
+      # Also expose metrics endpoint for direct Prometheus scraping
+      prometheus:
+        enabled: true
+    binder:
+      jvm: true
+      system: true
+      grpc:
+        server: true
+        client: true
 
 # Engine-specific configuration
 consul:
