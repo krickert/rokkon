@@ -11,7 +11,9 @@ export class DashboardGrid extends LitElement {
     isDevMode: { type: Boolean },
     availableModules: { type: Array },
     deployedModules: { type: Array },
-    deployingModules: { type: Array }
+    deployingModules: { type: Array },
+    undeployingModules: { type: Array },
+    healthCheckingModules: { type: Array }
   };
 
   static styles = css`
@@ -243,16 +245,6 @@ export class DashboardGrid extends LitElement {
     .rocket-icon {
       width: 48px;
       height: 48px;
-      animation: rocket-bounce 1s ease-in-out infinite;
-    }
-
-    @keyframes rocket-bounce {
-      0%, 100% {
-        transform: translateY(0);
-      }
-      50% {
-        transform: translateY(-8px);
-      }
     }
 
     .deploying-title {
@@ -302,11 +294,103 @@ export class DashboardGrid extends LitElement {
       margin-top: 8px;
       font-style: italic;
     }
+
+    .undeploying-card {
+      background: linear-gradient(135deg, #616161 0%, #424242 100%);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+      color: white;
+      box-shadow: 0 8px 24px rgba(0, 0, 0, 0.2);
+      animation: fade-out 3s ease-in-out forwards;
+      opacity: 0.9;
+    }
+
+    @keyframes fade-out {
+      0% {
+        opacity: 0.9;
+        transform: scale(1);
+      }
+      50% {
+        opacity: 0.6;
+        transform: scale(0.98);
+      }
+      100% {
+        opacity: 0.3;
+        transform: scale(0.95);
+      }
+    }
+
+    .undeploying-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .gravestone-icon {
+      width: 48px;
+      height: 48px;
+    }
+
+    .undeploying-title {
+      font-size: 24px;
+      font-weight: 600;
+      opacity: 0.8;
+    }
+
+    .undeploying-subtitle {
+      font-size: 14px;
+      opacity: 0.6;
+      margin-top: 4px;
+    }
+
+    .health-checking-card {
+      background: linear-gradient(135deg, #4CAF50 0%, #81C784 100%);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 16px;
+      color: white;
+      box-shadow: 0 8px 24px rgba(76, 175, 80, 0.2);
+      animation: health-pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes health-pulse {
+      0%, 100% {
+        box-shadow: 0 8px 24px rgba(76, 175, 80, 0.2);
+      }
+      50% {
+        box-shadow: 0 12px 32px rgba(76, 175, 80, 0.4);
+      }
+    }
+
+    .health-checking-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+    }
+
+    .health-cross-icon {
+      width: 48px;
+      height: 48px;
+    }
+
+    .health-checking-title {
+      font-size: 24px;
+      font-weight: 600;
+    }
+
+    .health-checking-subtitle {
+      font-size: 14px;
+      opacity: 0.9;
+      margin-top: 4px;
+    }
   `;
 
   constructor() {
     super();
     this.deploymentStatuses = new Map(); // Track deployment status messages
+    this.undeployingModules = [];
+    this.healthCheckingModules = [];
   }
 
   connectedCallback() {
@@ -345,7 +429,10 @@ export class DashboardGrid extends LitElement {
     
     switch (event.type) {
       case 'deployment_started':
-        this.deployingModules = [...(this.deployingModules || []), event.module];
+        // Avoid duplicates
+        if (!this.deployingModules?.includes(event.module)) {
+          this.deployingModules = [...(this.deployingModules || []), event.module];
+        }
         this.deploymentStatuses.set(event.module, event.message);
         this.requestUpdate();
         break;
@@ -356,22 +443,40 @@ export class DashboardGrid extends LitElement {
         break;
         
       case 'deployment_success':
-        // Keep showing for a bit longer
-        this.deploymentStatuses.set(event.module, event.message);
+        // Transition to health checking state
+        this.deployingModules = this.deployingModules.filter(m => m !== event.module);
+        this.healthCheckingModules = [...(this.healthCheckingModules || []), event.module];
+        this.deploymentStatuses.set(event.module, 'Waiting for module to be healthy...');
         this.requestUpdate();
         
-        // Remove after 3 seconds
+        // Registration starts after 15 seconds, check at 16 seconds
         setTimeout(() => {
-          this.deployingModules = this.deployingModules.filter(m => m !== event.module);
-          this.deploymentStatuses.delete(event.module);
-          this.requestUpdate();
-          
-          // Fire refresh event to update module list
           this.dispatchEvent(new CustomEvent('refresh-data', {
             bubbles: true,
             composed: true
           }));
-        }, 3000);
+        }, 16000);
+        
+        // Registration usually completes by 20 seconds
+        setTimeout(() => {
+          this.dispatchEvent(new CustomEvent('refresh-data', {
+            bubbles: true,
+            composed: true
+          }));
+        }, 20000);
+        
+        // Keep health checking status visible for 25 seconds total
+        setTimeout(() => {
+          this.healthCheckingModules = this.healthCheckingModules.filter(m => m !== event.module);
+          this.deploymentStatuses.delete(event.module);
+          this.requestUpdate();
+          
+          // Final refresh to ensure we have latest status
+          this.dispatchEvent(new CustomEvent('refresh-data', {
+            bubbles: true,
+            composed: true
+          }));
+        }, 25000);  // Show health checking for 25 seconds
         break;
         
       case 'deployment_failed':
@@ -388,6 +493,10 @@ export class DashboardGrid extends LitElement {
         break;
         
       case 'module_registered':
+        // Clear health checking state if module just registered
+        this.healthCheckingModules = this.healthCheckingModules.filter(m => m !== event.module);
+        this.deploymentStatuses.delete(event.module);
+        
         // Show success toast
         this.dispatchEvent(new CustomEvent('show-toast', {
           detail: { message: `${event.module} registered successfully!`, type: 'success' },
@@ -400,6 +509,32 @@ export class DashboardGrid extends LitElement {
           bubbles: true,
           composed: true
         }));
+        break;
+        
+      case 'module_undeploying':
+        // Add to undeploying list and remove from deployed
+        this.undeployingModules = [...(this.undeployingModules || []), event.module];
+        this.deploymentStatuses.set(event.module, event.message);
+        this.requestUpdate();
+        break;
+        
+      case 'module_undeployed':
+        // Keep showing gravestone for a bit
+        this.deploymentStatuses.set(event.module, 'Module undeployed');
+        this.requestUpdate();
+        
+        // Remove after 5 seconds (give time for the fade animation)
+        setTimeout(() => {
+          this.undeployingModules = this.undeployingModules.filter(m => m !== event.module);
+          this.deploymentStatuses.delete(event.module);
+          this.requestUpdate();
+          
+          // Fire refresh event to update module list
+          this.dispatchEvent(new CustomEvent('refresh-data', {
+            bubbles: true,
+            composed: true
+          }));
+        }, 5000);
         break;
     }
   }
@@ -571,8 +706,45 @@ export class DashboardGrid extends LitElement {
           ${this.deployingModules.map(moduleName => html`
             <div class="deploying-card">
               <div class="deploying-header">
-                <svg class="rocket-icon" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M9.19 6.35c-2.04 2.29-3.44 5.58-3.57 5.89L2 10.69l4.05-4.05c.47-.47 1.15-.68 1.81-.55zM11.17 17c0 .7-.28 1.38-.78 1.88l-2.33 2.33-1.55-3.62c.31-.13 3.6-1.53 5.89-3.57.13.66-.08 1.33-.55 1.8zM17 7c2.76 0 5-2.24 5-5 0-1.11-.9-2-2-2-2.76 0-5 2.24-5 5 0 .38.04.74.12 1.08L9.91 11.3c-.32.32-.59.66-.82 1.02l-.86-.35c-.47-.19-1.01-.14-1.44.13L2 17l4.89 4.89 4.89-4.89c.27-.42.32-.97.13-1.44l-.35-.86c.36-.23.7-.5 1.02-.82l5.21-5.21C17.26 6.96 17.62 7 18 7c1.11 0 2-.9 2-2 0-.38-.04-.74-.12-1.08.74.08 1.46.12 1.84.12z"/>
+                <svg class="rocket-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <style>
+                    .rocket-body {
+                      animation: launch 1.5s ease-in-out infinite;
+                    }
+                    .flame {
+                      animation: flicker 0.3s ease-in-out infinite alternate;
+                    }
+                    .smoke {
+                      animation: puff 1.5s ease-out infinite;
+                      opacity: 0;
+                    }
+                    @keyframes launch {
+                      0% { transform: translateY(2px); }
+                      50% { transform: translateY(-2px); }
+                      100% { transform: translateY(2px); }
+                    }
+                    @keyframes flicker {
+                      0% { transform: scaleY(1); }
+                      100% { transform: scaleY(1.2); }
+                    }
+                    @keyframes puff {
+                      0% { transform: scale(0.8) translateY(0); opacity: 0; }
+                      50% { opacity: 0.5; }
+                      100% { transform: scale(1.3) translateY(4px); opacity: 0; }
+                    }
+                  </style>
+                  <!-- Rocket body -->
+                  <path d="M12 2l-2 7v6l2 1 2-1v-6l-2-7z" class="rocket-body"/>
+                  <!-- Rocket fins -->
+                  <path d="M8 14l-2 2v3h2m8-5l2 2v3h-2" class="rocket-body"/>
+                  <!-- Rocket window -->
+                  <circle cx="12" cy="8" r="1.5" class="rocket-body"/>
+                  <!-- Flames -->
+                  <path d="M10 16l-1 3m4-3l1 3m-2-3l0 3" class="flame"/>
+                  <!-- Smoke puffs -->
+                  <circle cx="9" cy="20" r="1" class="smoke"/>
+                  <circle cx="12" cy="21" r="1.5" class="smoke" style="animation-delay: 0.5s;"/>
+                  <circle cx="15" cy="20" r="1" class="smoke" style="animation-delay: 1s;"/>
                 </svg>
                 <div>
                   <div class="deploying-title">Deploying ${moduleName}...</div>
@@ -589,9 +761,114 @@ export class DashboardGrid extends LitElement {
           `)}
         ` : ''}
 
-        ${moduleServices.length === 0 && (!this.deployingModules || this.deployingModules.length === 0) ? html`
+        ${this.undeployingModules && this.undeployingModules.length > 0 ? html`
+          ${this.undeployingModules.map(moduleName => html`
+            <div class="undeploying-card">
+              <div class="undeploying-header">
+                <svg class="gravestone-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <style>
+                    .tombstone {
+                      animation: fade 2s ease-in-out infinite;
+                    }
+                    .rip-text {
+                      animation: fade 2s ease-in-out infinite;
+                      animation-delay: -0.3s;
+                    }
+                    @keyframes fade {
+                      0% { opacity: 1; }
+                      50% { opacity: 0.3; }
+                      100% { opacity: 1; }
+                    }
+                  </style>
+                  <!-- Tombstone shape -->
+                  <path d="M6 22h12v-8c0-3.3-2.7-6-6-6s-6 2.7-6 6v8z" class="tombstone"/>
+                  <!-- Ground line -->
+                  <path d="M3 22h18" class="tombstone"/>
+                  <!-- RIP text -->
+                  <path d="M9 13h2m-2 3h2" class="rip-text" stroke-width="1.5"/>
+                  <path d="M11 13v3" class="rip-text" stroke-width="1.5"/>
+                  <path d="M13 13h2c.5 0 1 .5 1 1s-.5 1-1 1h-2v1" class="rip-text" stroke-width="1.5"/>
+                </svg>
+                <div>
+                  <div class="undeploying-title">Undeploying ${moduleName}...</div>
+                  <div class="undeploying-subtitle">${this.deploymentStatuses.get(moduleName) || 'Removing module and containers'}</div>
+                </div>
+              </div>
+            </div>
+          `)}
+        ` : ''}
+
+        ${this.healthCheckingModules && this.healthCheckingModules.length > 0 ? html`
+          ${this.healthCheckingModules.map(moduleName => html`
+            <div class="health-checking-card">
+              <div class="health-checking-header">
+                <svg class="health-cross-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                  <style>
+                    .helicopter-body {
+                      animation: hover 2s ease-in-out infinite;
+                    }
+                    .rotor {
+                      animation: spin 0.3s linear infinite;
+                      transform-origin: 12px 5px;
+                    }
+                    .cross-pulse {
+                      animation: pulse-cross 1.5s ease-in-out infinite;
+                    }
+                    @keyframes hover {
+                      0%, 100% { transform: translateY(0); }
+                      50% { transform: translateY(-3px); }
+                    }
+                    @keyframes spin {
+                      from { transform: rotate(0deg); }
+                      to { transform: rotate(360deg); }
+                    }
+                    @keyframes pulse-cross {
+                      0%, 100% { opacity: 1; }
+                      50% { opacity: 0.5; }
+                    }
+                  </style>
+                  <!-- Main rotor -->
+                  <path d="M2 5h20" class="rotor"/>
+                  <!-- Rotor mast -->
+                  <path d="M12 5v3" class="helicopter-body"/>
+                  <!-- Helicopter body -->
+                  <path d="M5 11h14c1 0 2 1 2 2v4c0 1-1 2-2 2H5c-1 0-2-1-2-2v-4c0-1 1-2 2-2z" class="helicopter-body"/>
+                  <!-- Cockpit window -->
+                  <path d="M5 13h4" class="helicopter-body"/>
+                  <!-- Landing skids -->
+                  <path d="M6 19v2m12-2v2" class="helicopter-body"/>
+                  <path d="M4 21h6m4 0h6" class="helicopter-body"/>
+                  <!-- Medical cross -->
+                  <rect x="11" y="13" width="4" height="4" rx="0.5" class="helicopter-body"/>
+                  <path d="M13 14v2m-1-1h2" class="cross-pulse" stroke-width="1.5"/>
+                  <!-- Tail -->
+                  <path d="M19 13l3-2v-1l-3-2" class="helicopter-body"/>
+                  <!-- Tail rotor -->
+                  <circle cx="22" cy="10" r="1" class="rotor"/>
+                </svg>
+                <div>
+                  <div class="health-checking-title">${moduleName}</div>
+                  <div class="health-checking-subtitle">${this.deploymentStatuses.get(moduleName) || 'Waiting for module to be healthy...'}</div>
+                </div>
+              </div>
+            </div>
+          `)}
+        ` : ''}
+
+        ${moduleServices.length === 0 && 
+          (!this.deployingModules || this.deployingModules.length === 0) && 
+          (!this.undeployingModules || this.undeployingModules.length === 0) &&
+          (!this.healthCheckingModules || this.healthCheckingModules.length === 0) ? html`
           <div class="empty-state">No module services found</div>
-        ` : moduleServices.map(module => html`
+        ` : moduleServices
+          .filter(module => {
+            // Don't show modules that are currently being deployed or health-checked
+            const moduleName = module.module_name?.toLowerCase() || '';
+            return !this.deployingModules?.some(m => m.toLowerCase() === moduleName) &&
+                   !this.healthCheckingModules?.some(m => m.toLowerCase() === moduleName) &&
+                   !this.undeployingModules?.some(m => m.toLowerCase() === moduleName);
+          })
+          .map(module => html`
           <div class="module-service">
             <div class="module-header">
               <div class="module-name">${module.module_name}</div>

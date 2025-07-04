@@ -285,6 +285,19 @@ smallrye:
         # Silence Docker client debug logs
         "com.github.dockerjava":
           level: WARN
+        # Silence web bundler debug logs
+        "io.quarkiverse.web.bundler":
+          level: INFO
+        "io.mvnpm.esbuild":
+          level: INFO
+        # Silence ProcessBuilder debug logs
+        "java.lang.ProcessBuilder":
+          level: WARN
+        # Silence compose dev services debug logs
+        "io.quarkus.devservices.deployment.compose":
+          level: INFO
+        "io.quarkus.deployment.util.ContainerRuntimeUtil":
+          level: INFO
 
     # HTTP configuration for dev mode
     http:

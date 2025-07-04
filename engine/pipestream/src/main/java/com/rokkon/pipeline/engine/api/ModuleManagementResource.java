@@ -479,7 +479,7 @@ public class ModuleManagementResource {
                         .collect(Collectors.toList());
                     
                     return Uni.combine().all().unis(deregisterUnis)
-                        .combinedWith(results -> {
+                        .with(results -> {
                             long deregistered = results.stream()
                                 .filter(result -> (Boolean) result)
                                 .count();

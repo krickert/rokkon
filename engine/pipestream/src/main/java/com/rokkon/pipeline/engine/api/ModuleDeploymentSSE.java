@@ -86,6 +86,19 @@ public class ModuleDeploymentSSE {
     }
     
     /**
+     * Send module undeploying event to all connected clients
+     */
+    public void notifyModuleUndeploying(String moduleName) {
+        DeploymentEvent event = new DeploymentEvent(
+            "module_undeploying",
+            moduleName,
+            "undeploying",
+            "Module is being undeployed..."
+        );
+        eventProcessor.onNext(event);
+    }
+    
+    /**
      * Send module undeployed event to all connected clients
      */
     public void notifyModuleUndeployed(String moduleName) {

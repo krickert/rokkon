@@ -1,0 +1,40 @@
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <style>
+    .rocket-body {
+      animation: launch 1.5s ease-in-out infinite;
+    }
+    .flame {
+      animation: flicker 0.3s ease-in-out infinite alternate;
+    }
+    .smoke {
+      animation: puff 1.5s ease-out infinite;
+      opacity: 0;
+    }
+    @keyframes launch {
+      0% { transform: translateY(2px); }
+      50% { transform: translateY(-2px); }
+      100% { transform: translateY(2px); }
+    }
+    @keyframes flicker {
+      0% { transform: scaleY(1); }
+      100% { transform: scaleY(1.2); }
+    }
+    @keyframes puff {
+      0% { transform: scale(0.8) translateY(0); opacity: 0; }
+      50% { opacity: 0.5; }
+      100% { transform: scale(1.3) translateY(4px); opacity: 0; }
+    }
+  </style>
+  <!-- Rocket body -->
+  <path d="M12 2l-2 7v6l2 1 2-1v-6l-2-7z" class="rocket-body"/>
+  <!-- Rocket fins -->
+  <path d="M8 14l-2 2v3h2m8-5l2 2v3h-2" class="rocket-body"/>
+  <!-- Rocket window -->
+  <circle cx="12" cy="8" r="1.5" class="rocket-body"/>
+  <!-- Flames -->
+  <path d="M10 16l-1 3m4-3l1 3m-2-3l0 3" class="flame"/>
+  <!-- Smoke puffs -->
+  <circle cx="9" cy="20" r="1" class="smoke"/>
+  <circle cx="12" cy="21" r="1.5" class="smoke" style="animation-delay: 0.5s;"/>
+  <circle cx="15" cy="20" r="1" class="smoke" style="animation-delay: 1s;"/>
+</svg>

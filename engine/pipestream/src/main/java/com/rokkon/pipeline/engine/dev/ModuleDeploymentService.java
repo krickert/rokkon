@@ -15,9 +15,11 @@ import io.smallrye.mutiny.Uni;
 import java.time.Duration;
 import com.rokkon.pipeline.engine.api.ModuleDeploymentSSE;
 import io.quarkus.arc.Arc;
+import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
+import com.rokkon.pipeline.engine.events.ModuleLifecycleEvent;
+import jakarta.enterprise.event.Event;
 
 import java.util.*;
-import java.util.Arrays;
 import java.util.stream.Collectors;
 
 /**
@@ -43,6 +45,12 @@ public class ModuleDeploymentService {
     @Inject
     HostIPDetector hostIPDetector;
     
+    @Inject
+    GlobalModuleRegistryService moduleRegistry;
+    
+    @Inject
+    Event<ModuleLifecycleEvent> moduleLifecycleEvent;
+    
     @ConfigProperty(name = "consul.server.port", defaultValue = "38500")
     int consulServerPort;
     
@@ -67,15 +75,64 @@ public class ModuleDeploymentService {
         // Notify via SSE
         notifyDeploymentStarted(module.getModuleName());
         
+        // Fire module lifecycle event
+        moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+            module.getModuleName(), 
+            ModuleLifecycleEvent.EventType.DEPLOYING, 
+            "Starting module deployment"
+        ));
+        
         if (!dockerChecker.isDockerAvailable()) {
-            notifyDeploymentFailed(module.getModuleName(), "Docker is not available");
+            String errorMsg = "Docker is not available";
+            notifyDeploymentFailed(module.getModuleName(), errorMsg);
+            moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+                module.getModuleName(),
+                ModuleLifecycleEvent.EventType.DEPLOYMENT_FAILED,
+                errorMsg
+            ));
             return new ModuleDeploymentResult(false, "Docker is not available");
         }
         
         // Clean up any existing containers first
         LOG.infof("Cleaning up any existing containers for module: %s", module.getModuleName());
         notifyDeploymentProgress(module.getModuleName(), "cleaning", "Cleaning up existing containers...");
-        cleanupModule(module);
+        
+        // Do a thorough cleanup with retries
+        boolean cleanupSuccess = false;
+        for (int i = 0; i < 3; i++) {
+            try {
+                cleanupModule(module);
+                
+                // Verify cleanup was successful
+                Thread.sleep(1000); // Give Docker time to process
+                List<Container> remainingContainers = dockerClient.listContainersCmd()
+                    .withShowAll(true)
+                    .withNameFilter(Arrays.asList(
+                        module.getSidecarName(),
+                        module.getContainerName(),
+                        module.getModuleName() + "-registrar"
+                    ))
+                    .exec();
+                
+                if (remainingContainers.isEmpty()) {
+                    cleanupSuccess = true;
+                    break;
+                } else {
+                    LOG.debugf("Cleanup attempt %d: Found %d remaining containers", i + 1, remainingContainers.size());
+                    for (Container c : remainingContainers) {
+                        LOG.debugf("  - %s (state: %s)", c.getNames()[0], c.getState());
+                    }
+                }
+            } catch (Exception e) {
+                LOG.warnf("Cleanup attempt %d failed: %s", i + 1, e.getMessage());
+            }
+        }
+        
+        if (!cleanupSuccess) {
+            LOG.errorf("Failed to clean up existing containers after 3 attempts");
+            notifyDeploymentFailed(module.getModuleName(), "Failed to clean up existing containers");
+            return new ModuleDeploymentResult(false, "Failed to clean up existing containers");
+        }
         
         try {
             // 1. Use bridge network instead of creating custom network
@@ -99,6 +156,13 @@ public class ModuleDeploymentService {
             
             LOG.infof("Successfully deployed module %s with sidecars", module.getModuleName());
             notifyDeploymentCompleted(module.getModuleName(), true, "Module deployed successfully");
+            
+            // Fire module deployed event
+            moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+                module.getModuleName(),
+                ModuleLifecycleEvent.EventType.DEPLOYED,
+                "Module deployed successfully"
+            ));
             return new ModuleDeploymentResult(true, 
                 "Module deployed successfully", 
                 moduleId, 
@@ -111,6 +175,15 @@ public class ModuleDeploymentService {
             // Cleanup on failure
             cleanupModule(module);
             notifyDeploymentFailed(module.getModuleName(), "Deployment failed: " + e.getMessage());
+            
+            // Fire deployment failed event
+            moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+                module.getModuleName(),
+                ModuleLifecycleEvent.EventType.DEPLOYMENT_FAILED,
+                "Deployment failed: " + e.getMessage(),
+                null,
+                e
+            ));
             return new ModuleDeploymentResult(false, "Deployment failed: " + e.getMessage());
         }
     }
@@ -203,8 +276,15 @@ public class ModuleDeploymentService {
         LOG.infof("Started Consul agent sidecar: %s", containerName);
         
         // Wait for container to be running
-        if (!waitForContainerRunning(container.getId(), containerName, Duration.ofSeconds(5))) {
+        if (!waitForContainerRunning(container.getId(), containerName, Duration.ofSeconds(10))) {
             throw new RuntimeException("Consul container failed to start within timeout");
+        }
+        
+        // Additional wait to ensure container is fully ready for network sharing
+        try {
+            Thread.sleep(1000);  // Give Docker a moment to fully initialize the container
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
         }
         
         return container.getId();
@@ -275,36 +355,62 @@ public class ModuleDeploymentService {
         long memoryReservation = memoryBytes / 2;  // Reserve half
         
         // Create the module container - shares network with Consul sidecar
-        CreateContainerResponse container = dockerClient.createContainerCmd(module.getDockerImage())
-            .withName(containerName)
-            .withHostConfig(HostConfig.newHostConfig()
-                .withNetworkMode("container:" + module.getSidecarName())  // Share network with Consul sidecar
-                .withMemory(memoryBytes)
-                .withMemoryReservation(memoryReservation)
-            )
-            .withEnv(List.of(
-                "MODULE_NAME=" + module.getModuleName() + "-module",
-                "MODULE_HOST=0.0.0.0",
-                "MODULE_PORT=" + module.getUnifiedPort(),
-                "ENGINE_HOST=" + hostIP,
-                "ENGINE_PORT=39001",  // Engine unified port
-                "CONSUL_HOST=localhost",  // Via shared network namespace
-                "CONSUL_PORT=8500",  // Consul HTTP API port
-                "REGISTRATION_HOST=" + hostIP,  // What the engine should use to reach this module
-                "REGISTRATION_PORT=" + module.getUnifiedPort(),  // Module's exposed port
-                "QUARKUS_HTTP_PORT=" + module.getUnifiedPort(),
-                "QUARKUS_PROFILE=dev",
-                "OTEL_EXPORTER_OTLP_ENDPOINT=" + otelEndpoint.orElse("http://" + hostIP + ":4317"),
-                "OTEL_SERVICE_NAME=" + module.getModuleName() + "-module",
-                "JAVA_OPTS=-Xmx" + memory + " -Xms" + (parseMemoryString(memory) / 4 / 1024 / 1024) + "m",
-                "AUTO_REGISTER=false",  // Disable auto registration - use sidecar instead
-                "SHUTDOWN_ON_REGISTRATION_FAILURE=false"  // Keep module running even if registration fails
-            ))
-            .withLabels(Map.of(
-                "pipeline.module", module.getModuleName(),
-                "pipeline.type", "module"
-            ))
-            .exec();
+        CreateContainerResponse container = null;
+        int retries = 3;
+        Exception lastException = null;
+        
+        for (int i = 0; i < retries; i++) {
+            try {
+                container = dockerClient.createContainerCmd(module.getDockerImage())
+                    .withName(containerName)
+                    .withHostConfig(HostConfig.newHostConfig()
+                        .withNetworkMode("container:" + module.getSidecarName())  // Share network with Consul sidecar
+                        .withMemory(memoryBytes)
+                        .withMemoryReservation(memoryReservation)
+                    )
+                    .withEnv(List.of(
+                        "MODULE_NAME=" + module.getModuleName() + "-module",
+                        "MODULE_HOST=0.0.0.0",
+                        "MODULE_PORT=" + module.getUnifiedPort(),
+                        "ENGINE_HOST=" + hostIP,
+                        "ENGINE_PORT=39001",  // Engine unified port
+                        "CONSUL_HOST=localhost",  // Via shared network namespace
+                        "CONSUL_PORT=8500",  // Consul HTTP API port
+                        "REGISTRATION_HOST=" + hostIP,  // What the engine should use to reach this module
+                        "REGISTRATION_PORT=" + module.getUnifiedPort(),  // Module's exposed port
+                        "QUARKUS_HTTP_PORT=" + module.getUnifiedPort(),
+                        "QUARKUS_PROFILE=dev",
+                        "OTEL_EXPORTER_OTLP_ENDPOINT=" + otelEndpoint.orElse("http://" + hostIP + ":4317"),
+                        "OTEL_SERVICE_NAME=" + module.getModuleName() + "-module",
+                        "JAVA_OPTS=-Xmx" + memory + " -Xms" + (parseMemoryString(memory) / 4 / 1024 / 1024) + "m",
+                        "AUTO_REGISTER=false",  // Disable auto registration - use sidecar instead
+                        "SHUTDOWN_ON_REGISTRATION_FAILURE=false"  // Keep module running even if registration fails
+                    ))
+                    .withLabels(Map.of(
+                        "pipeline.module", module.getModuleName(),
+                        "pipeline.type", "module"
+                    ))
+                    .exec();
+                break;  // Success!
+            } catch (Exception e) {
+                lastException = e;
+                if (e.getMessage() != null && e.getMessage().contains("cannot join network namespace")) {
+                    LOG.warnf("Consul container not ready for network sharing (attempt %d/%d), waiting...", i + 1, retries);
+                    try {
+                        Thread.sleep(2000);  // Wait 2 seconds before retry
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Interrupted while waiting for retry", ie);
+                    }
+                } else {
+                    throw e;  // Different error, don't retry
+                }
+            }
+        }
+        
+        if (container == null) {
+            throw new RuntimeException("Failed to create module container after " + retries + " attempts", lastException);
+        }
             
         // Start the container
         dockerClient.startContainerCmd(container.getId()).exec();
@@ -356,18 +462,44 @@ public class ModuleDeploymentService {
         );
         
         // Create the registration sidecar using the same image as the module (it has the CLI)
-        CreateContainerResponse container = dockerClient.createContainerCmd(module.getDockerImage())
-            .withName(containerName)
-            .withHostConfig(HostConfig.newHostConfig()
-                .withNetworkMode("container:" + module.getSidecarName())  // Share network with Consul sidecar
-            )
-            .withEntrypoint("/bin/sh")  // Override the default entrypoint
-            .withCmd("-c", registrationScript)
-            .withLabels(Map.of(
-                "pipeline.module", module.getModuleName(),
-                "pipeline.type", "registration-sidecar"
-            ))
-            .exec();
+        CreateContainerResponse container = null;
+        int retries = 3;
+        Exception lastException = null;
+        
+        for (int i = 0; i < retries; i++) {
+            try {
+                container = dockerClient.createContainerCmd(module.getDockerImage())
+                    .withName(containerName)
+                    .withHostConfig(HostConfig.newHostConfig()
+                        .withNetworkMode("container:" + module.getSidecarName())  // Share network with Consul sidecar
+                    )
+                    .withEntrypoint("/bin/sh")  // Override the default entrypoint
+                    .withCmd("-c", registrationScript)
+                    .withLabels(Map.of(
+                        "pipeline.module", module.getModuleName(),
+                        "pipeline.type", "registration-sidecar"
+                    ))
+                    .exec();
+                break;  // Success!
+            } catch (Exception e) {
+                lastException = e;
+                if (e.getMessage() != null && e.getMessage().contains("cannot join network namespace")) {
+                    LOG.warnf("Consul container not ready for network sharing (attempt %d/%d), waiting...", i + 1, retries);
+                    try {
+                        Thread.sleep(2000);  // Wait 2 seconds before retry
+                    } catch (InterruptedException ie) {
+                        Thread.currentThread().interrupt();
+                        throw new RuntimeException("Interrupted while waiting for retry", ie);
+                    }
+                } else {
+                    throw e;  // Different error, don't retry
+                }
+            }
+        }
+        
+        if (container == null) {
+            throw new RuntimeException("Failed to create registration sidecar after " + retries + " attempts", lastException);
+        }
             
         // Start the container
         dockerClient.startContainerCmd(container.getId()).exec();
@@ -377,7 +509,7 @@ public class ModuleDeploymentService {
     }
     
     /**
-     * Removes a container if it exists
+     * Removes a container if it exists, with proper handling of "removing" state
      */
     private void removeContainerIfExists(String containerName) {
         try {
@@ -387,14 +519,92 @@ public class ModuleDeploymentService {
                 .exec();
                 
             for (Container container : containers) {
-                LOG.infof("Removing existing container: %s", containerName);
-                dockerClient.removeContainerCmd(container.getId())
-                    .withForce(true)
-                    .exec();
+                LOG.infof("Found existing container: %s (state: %s)", containerName, container.getState());
+                
+                // First try to stop the container if it's running
+                if ("running".equalsIgnoreCase(container.getState())) {
+                    try {
+                        LOG.infof("Stopping container: %s", containerName);
+                        dockerClient.stopContainerCmd(container.getId())
+                            .withTimeout(5)  // 5 seconds timeout
+                            .exec();
+                        // Wait a bit for stop to complete
+                        Thread.sleep(500);
+                    } catch (Exception e) {
+                        LOG.debugf("Failed to stop container %s: %s", containerName, e.getMessage());
+                    }
+                }
+                
+                // Now remove the container
+                try {
+                    LOG.infof("Removing container: %s", containerName);
+                    dockerClient.removeContainerCmd(container.getId())
+                        .withForce(true)
+                        .exec();
+                } catch (Exception e) {
+                    // If it's already being removed, wait for it
+                    if (e.getMessage() != null && e.getMessage().contains("is removing")) {
+                        LOG.infof("Container %s is already being removed, waiting...", containerName);
+                        waitForContainerRemoval(containerName, Duration.ofSeconds(10));
+                    } else {
+                        throw e;
+                    }
+                }
             }
+            
+            // Final check - wait to ensure container is fully removed
+            waitForContainerRemoval(containerName, Duration.ofSeconds(5));
+            
         } catch (Exception e) {
-            LOG.debugf("Failed to remove container %s: %s", containerName, e.getMessage());
+            LOG.warnf("Failed to remove container %s: %s", containerName, e.getMessage());
+            // Don't fail deployment, just warn
         }
+    }
+    
+    /**
+     * Waits for a container to be fully removed
+     */
+    private void waitForContainerRemoval(String containerName, Duration timeout) {
+        long startTime = System.currentTimeMillis();
+        long timeoutMillis = timeout.toMillis();
+        
+        while (System.currentTimeMillis() - startTime < timeoutMillis) {
+            try {
+                List<Container> containers = dockerClient.listContainersCmd()
+                    .withShowAll(true)
+                    .withNameFilter(List.of(containerName))
+                    .exec();
+                    
+                if (containers.isEmpty()) {
+                    LOG.infof("Container %s has been fully removed", containerName);
+                    return;
+                }
+                
+                // Check if any container is still in "removing" state
+                boolean stillRemoving = containers.stream()
+                    .anyMatch(c -> "removing".equalsIgnoreCase(c.getState()));
+                    
+                if (!stillRemoving && containers.stream().allMatch(c -> "exited".equalsIgnoreCase(c.getState()))) {
+                    // All containers are exited, try to remove them again
+                    for (Container container : containers) {
+                        try {
+                            dockerClient.removeContainerCmd(container.getId())
+                                .withForce(true)
+                                .exec();
+                        } catch (Exception e) {
+                            LOG.debugf("Retry remove failed: %s", e.getMessage());
+                        }
+                    }
+                }
+                
+                // Wait a bit before checking again
+                Thread.sleep(500);
+            } catch (Exception e) {
+                LOG.debugf("Error checking container removal: %s", e.getMessage());
+            }
+        }
+        
+        LOG.warnf("Container %s was not fully removed within %s", containerName, timeout);
     }
     
     
@@ -419,9 +629,38 @@ public class ModuleDeploymentService {
      */
     public void stopModule(PipelineModule module) {
         LOG.infof("Stopping module: %s", module.getModuleName());
+        
+        // Notify via SSE that undeployment is starting
+        try {
+            var sseInstance = Arc.container().instance(ModuleDeploymentSSE.class);
+            if (sseInstance.isAvailable()) {
+                sseInstance.get().notifyModuleUndeploying(module.getModuleName());
+            }
+        } catch (Exception e) {
+            LOG.debugf("Failed to send SSE notification: %s", e.getMessage());
+        }
+        
+        // Fire undeploying event
+        moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+            module.getModuleName(),
+            ModuleLifecycleEvent.EventType.UNDEPLOYING,
+            "Starting module undeployment"
+        ));
+        
+        // Deregister from Consul BEFORE stopping containers
+        deregisterModuleFromConsul(module.getModuleName());
+        
+        // Now clean up containers
         cleanupModule(module);
         
-        // Notify via SSE
+        // Fire undeployed event
+        moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+            module.getModuleName(),
+            ModuleLifecycleEvent.EventType.UNDEPLOYED,
+            "Module undeployed successfully"
+        ));
+        
+        // Notify via SSE that undeployment is complete
         try {
             var sseInstance = Arc.container().instance(ModuleDeploymentSSE.class);
             if (sseInstance.isAvailable()) {
@@ -436,10 +675,17 @@ public class ModuleDeploymentService {
      * Cleans up module resources
      */
     private void cleanupModule(PipelineModule module) {
-        // Stop and remove containers
+        // Stop and remove containers in order - module first, then sidecars
+        LOG.infof("Cleaning up containers for module: %s", module.getModuleName());
+        
+        // Remove registration sidecar first (it depends on the network of consul sidecar)
+        removeContainerIfExists(module.getModuleName() + "-registrar");
+        
+        // Remove module container (it depends on the network of consul sidecar)
         removeContainerIfExists(module.getContainerName());
+        
+        // Finally remove the consul sidecar (owns the network namespace)
         removeContainerIfExists(module.getSidecarName());
-        removeContainerIfExists(module.getModuleName() + "-registrar");  // Registration sidecar
         
         // Remove network only if it's a module-specific network
         String networkName = module.getModuleName() + "-network";
@@ -584,5 +830,47 @@ public class ModuleDeploymentService {
     
     private void notifyDeploymentFailed(String moduleName, String message) {
         notifyDeploymentCompleted(moduleName, false, message);
+    }
+    
+    /**
+     * Deregisters module from Consul
+     */
+    private void deregisterModuleFromConsul(String moduleName) {
+        try {
+            // Use the module registry to find and deregister all instances
+            moduleRegistry.listRegisteredModules()
+                .subscribe().with(registrations -> {
+                    // Find all registrations for this module
+                    registrations.stream()
+                        .filter(reg -> reg.moduleName() != null && 
+                                reg.moduleName().toLowerCase().contains(moduleName.toLowerCase()))
+                        .forEach(reg -> {
+                            LOG.infof("Deregistering module instance: %s", reg.moduleId());
+                            moduleRegistry.deregisterModule(reg.moduleId())
+                                .subscribe().with(
+                                    success -> {
+                                        if (success) {
+                                            LOG.infof("Successfully deregistered module instance: %s", reg.moduleId());
+                                            // Fire deregistered event
+                                            moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+                                                moduleName,
+                                                ModuleLifecycleEvent.EventType.DEREGISTERED,
+                                                "Module instance deregistered",
+                                                reg.moduleId()
+                                            ));
+                                        } else {
+                                            LOG.warnf("Failed to deregister module instance: %s", reg.moduleId());
+                                        }
+                                    },
+                                    failure -> LOG.warnf("Error deregistering module instance %s: %s", 
+                                        reg.moduleId(), failure.getMessage())
+                                );
+                        });
+                }, failure -> {
+                    LOG.warnf("Failed to list registered modules for deregistration: %s", failure.getMessage());
+                });
+        } catch (Exception e) {
+            LOG.warnf("Error deregistering module from Consul: %s", e.getMessage());
+        }
     }
 }

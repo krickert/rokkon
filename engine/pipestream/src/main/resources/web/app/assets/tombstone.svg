@@ -1,0 +1,24 @@
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <style>
+    .tombstone {
+      animation: fade 2s ease-in-out infinite;
+    }
+    .rip-text {
+      animation: fade 2s ease-in-out infinite;
+      animation-delay: -0.3s;
+    }
+    @keyframes fade {
+      0% { opacity: 1; }
+      50% { opacity: 0.3; }
+      100% { opacity: 1; }
+    }
+  </style>
+  <!-- Tombstone shape -->
+  <path d="M6 22h12v-8c0-3.3-2.7-6-6-6s-6 2.7-6 6v8z" class="tombstone"/>
+  <!-- Ground line -->
+  <path d="M3 22h18" class="tombstone"/>
+  <!-- RIP text -->
+  <path d="M9 13h2m-2 3h2" class="rip-text" stroke-width="1.5"/>
+  <path d="M11 13v3" class="rip-text" stroke-width="1.5"/>
+  <path d="M13 13h2c.5 0 1 .5 1 1s-.5 1-1 1h-2v1" class="rip-text" stroke-width="1.5"/>
+</svg>
