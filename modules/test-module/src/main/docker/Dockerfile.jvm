@@ -11,7 +11,8 @@
 #
 # Then run the container using:
 #
-# docker run -i --rm -p 8080:8080 quarkus/test-module-jvm
+# docker run -i --rm -p 39100:39100 quarkus/test-module-jvm
+# Note: In deployment, external port will be dynamically allocated
 #
 # If you want to include the debug port into your docker image
 # you will have to expose the debug port (default 5005 being the default) like this :  EXPOSE 8080 5005.
@@ -20,7 +21,8 @@
 #
 # Then run the container using :
 #
-# docker run -i --rm -p 8080:8080 quarkus/test-module-jvm
+# docker run -i --rm -p 39100:39100 quarkus/test-module-jvm
+# Note: In deployment, external port will be dynamically allocated
 #
 # This image uses the `run-java.sh` script to run the application.
 # This scripts computes the command line to execute your Java application, and
@@ -91,7 +93,7 @@ COPY --chown=185 build/quarkus-app/app/ /deployments/app/
 COPY --chown=185 build/quarkus-app/quarkus/ /deployments/quarkus/
 
 # Copy the CLI tool and entrypoint from build directory
-COPY --chown=185 build/docker/register-module-cli.jar /deployments/pipeline-cli.jar
+COPY --chown=185 build/docker/pipeline-cli.jar /deployments/pipeline-cli.jar
 COPY --chown=185 src/main/bash/module-entrypoint.sh /deployments/module-entrypoint.sh
 
 # Create CLI wrapper and make scripts executable
@@ -102,8 +104,8 @@ RUN echo '#!/bin/bash' > /deployments/pipeline && \
 # Set PATH to include the deployments directory
 ENV PATH="/deployments:${PATH}"
 
-EXPOSE 39095
-EXPOSE 49095
+# Standard internal module port
+EXPOSE 39100
 USER 185
 ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"

@@ -235,6 +235,104 @@ public class ModuleDiscoveryResource {
         List<String> ServiceTags
     ) {}
 
+    /**
+     * Checks if a service is a sidecar based on naming patterns
+     */
+    private boolean isSidecar(String serviceName, Map<String, List<ServiceInfo>> allServicesByName) {
+        // Check common sidecar naming patterns
+        if (serviceName.endsWith("-sidecar") || 
+            serviceName.endsWith("-sidecar-proxy") || 
+            serviceName.endsWith("-proxy") ||
+            serviceName.startsWith("consul-agent-")) {
+            return true;
+        }
+        
+        // Check if any service in the metadata indicates this is a sidecar
+        List<ServiceInfo> instances = allServicesByName.get(serviceName);
+        if (instances != null && !instances.isEmpty()) {
+            ServiceInfo first = instances.get(0);
+            if (first.metadata() != null && first.metadata().containsKey("sidecar-for")) {
+                return true;
+            }
+            if (first.tags() != null && first.tags().contains("sidecar")) {
+                return true;
+            }
+        }
+        
+        return false;
+    }
+
+    /**
+     * Identifies sidecars for a given service based on naming patterns and metadata
+     */
+    private List<SidecarInfo> findSidecarsForService(String serviceName, Map<String, List<ServiceInfo>> allServicesByName) {
+        List<SidecarInfo> sidecars = new ArrayList<>();
+        
+        // Common sidecar naming patterns
+        List<String> possibleSidecarNames = List.of(
+            serviceName + "-sidecar",
+            serviceName + "-sidecar-proxy",
+            serviceName + "-proxy",
+            "consul-agent-" + serviceName,
+            "pipeline-" + serviceName + "-sidecar"
+        );
+        
+        // Also check for sidecars that might be prefixed
+        if (serviceName.startsWith("module-")) {
+            String moduleName = serviceName.substring("module-".length());
+            possibleSidecarNames = new ArrayList<>(possibleSidecarNames);
+            possibleSidecarNames.add(moduleName + "-sidecar");
+            possibleSidecarNames.add("pipeline-" + moduleName + "-sidecar");
+        }
+        
+        for (String sidecarName : possibleSidecarNames) {
+            List<ServiceInfo> sidecarInstances = allServicesByName.get(sidecarName);
+            if (sidecarInstances != null) {
+                for (ServiceInfo sidecar : sidecarInstances) {
+                    // Determine sidecar type based on name and tags
+                    String sidecarType = "agent";
+                    if (sidecarName.contains("proxy") || (sidecar.tags() != null && sidecar.tags().contains("connect-proxy"))) {
+                        sidecarType = "connect-proxy";
+                    }
+                    
+                    sidecars.add(new SidecarInfo(
+                        sidecarName,
+                        sidecarType,
+                        sidecar.address(),
+                        sidecar.port(),
+                        sidecar.healthy(),
+                        sidecar.metadata()
+                    ));
+                }
+            }
+        }
+        
+        // Also check for sidecars identified by tags or metadata
+        for (Map.Entry<String, List<ServiceInfo>> entry : allServicesByName.entrySet()) {
+            String candidateName = entry.getKey();
+            if (!possibleSidecarNames.contains(candidateName)) {
+                for (ServiceInfo candidate : entry.getValue()) {
+                    // Check if metadata indicates this is a sidecar for our service
+                    if (candidate.metadata() != null) {
+                        String sidecarFor = candidate.metadata().get("sidecar-for");
+                        if (serviceName.equals(sidecarFor)) {
+                            sidecars.add(new SidecarInfo(
+                                candidateName,
+                                "agent",
+                                candidate.address(),
+                                candidate.port(),
+                                candidate.healthy(),
+                                candidate.metadata()
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+        
+        return sidecars;
+    }
+
     @GET
     @Path("/dashboard")
     @Operation(summary = "Get comprehensive service data for dashboard")
@@ -270,6 +368,11 @@ public class ModuleDiscoveryResource {
                     .collect(Collectors.groupingBy(ServiceInfo::name));
 
                 servicesByName.forEach((serviceName, instances) -> {
+                    // Skip services that are sidecars (they'll be shown with their parent services)
+                    if (isSidecar(serviceName, servicesByName)) {
+                        return;
+                    }
+                    
                     // Check if this is a module by looking at metadata
                     boolean isModule = false;
                     String moduleName = serviceName;
@@ -308,8 +411,28 @@ public class ModuleDiscoveryResource {
                                     moduleNames.add(reg.moduleName());
                                 }
 
+                                // Extract gRPC services from registration metadata or tags
+                                List<String> grpcServices = extractGrpcServicesFromInstance(instance, reg);
+                                
+                                // Find sidecars for this module
+                                List<SidecarInfo> sidecars = findSidecarsForService(serviceName, servicesByName);
+                                
+                                // In dev mode, modules typically have Consul agent sidecars
+                                // If no sidecars found but this is a module with metadata, assume it has a Consul agent sidecar
+                                if (sidecars.isEmpty() && reg != null && reg.metadata().get("moduleName") != null) {
+                                    // Add inferred Consul agent sidecar
+                                    sidecars.add(new SidecarInfo(
+                                        "consul-agent-" + reg.moduleName(),
+                                        "consul-agent",
+                                        instance.address(), // Same network namespace
+                                        8501, // Standard Consul agent port
+                                        true, // Assume healthy if module is healthy
+                                        Map.of("inferred", "true", "note", "Consul agent sidecar (inferred from deployment pattern)")
+                                    ));
+                                }
+
                                 return new ModuleInstanceInfo(
-                                    reg != null ? reg.moduleId() : null,
+                                    reg != null && reg.moduleId() != null ? reg.moduleId() : extractServiceId(instance),
                                     instance.address(),
                                     instance.port(),
                                     instance.healthy(),
@@ -317,7 +440,9 @@ public class ModuleDiscoveryResource {
                                     reg != null && reg.enabled(),
                                     reg != null ? reg.metadata().get("containerId") : null,
                                     reg != null ? reg.metadata().get("containerName") : null,
-                                    reg != null ? reg.metadata() : Map.of()
+                                    grpcServices,
+                                    reg != null ? reg.metadata() : Map.of(),
+                                    sidecars
                                 );
                             })
                             .toList();
@@ -348,15 +473,35 @@ public class ModuleDiscoveryResource {
                         List<String> grpcServices = extractGrpcServices(serviceName, instances);
 
                         List<BaseServiceInstanceInfo> baseInstances = instances.stream()
-                            .map(instance -> new BaseServiceInstanceInfo(
-                                extractServiceId(instance),
-                                instance.address(),
-                                instance.port(),
-                                instance.healthy(),
-                                extractVersion(instance.tags()),
-                                grpcServices,
-                                instance.metadata()
-                            ))
+                            .map(instance -> {
+                                // Find sidecars for this base service instance
+                                List<SidecarInfo> sidecars = findSidecarsForService(serviceName, servicesByName);
+                                
+                                // Special handling for Consul service - it IS the sidecar/agent
+                                if ("consul".equals(serviceName) && sidecars.isEmpty()) {
+                                    // Consul itself doesn't have sidecars, but we can note it's role
+                                    String role = instance.port() == 8300 || instance.port() == 38500 ? "server" : "agent";
+                                    sidecars.add(new SidecarInfo(
+                                        "consul-" + role,
+                                        "consul-" + role,
+                                        instance.address(),
+                                        instance.port(),
+                                        instance.healthy(),
+                                        Map.of("role", role, "note", "This is the Consul " + role + " itself")
+                                    ));
+                                }
+                                
+                                return new BaseServiceInstanceInfo(
+                                    extractServiceId(instance),
+                                    instance.address(),
+                                    instance.port(),
+                                    instance.healthy(),
+                                    extractVersion(instance.tags()),
+                                    grpcServices,
+                                    instance.metadata(),
+                                    sidecars
+                                );
+                            })
                             .toList();
 
                         baseServices.add(new BaseServiceInfo(
@@ -455,6 +600,11 @@ public class ModuleDiscoveryResource {
         if ("pipeline-engine".equals(serviceName)) {
             return List.of("ConnectorEngine", "PipeStreamEngine", "ModuleRegistrationService");
         }
+        
+        // For consul, return its HTTP API services
+        if ("consul".equals(serviceName)) {
+            return List.of("Agent API", "Catalog API", "Health API", "KV Store API", "ACL API");
+        }
 
         // For other services, check tags for gRPC service info
         return instances.stream()
@@ -463,6 +613,47 @@ public class ModuleDiscoveryResource {
             .map(tag -> tag.substring("grpc-service:".length()))
             .distinct()
             .toList();
+    }
+    
+    private List<String> extractGrpcServicesFromInstance(ServiceInfo instance, GlobalModuleRegistryService.ModuleRegistration reg) {
+        List<String> services = new ArrayList<>();
+        
+        // First, check registration metadata for gRPC services
+        if (reg != null && reg.metadata() != null) {
+            String grpcServicesStr = reg.metadata().get("grpc-services");
+            if (grpcServicesStr != null && !grpcServicesStr.isEmpty()) {
+                services.addAll(List.of(grpcServicesStr.split(",")));
+            }
+        }
+        
+        // If not found in metadata, check tags
+        if (services.isEmpty() && instance.tags() != null) {
+            services.addAll(
+                instance.tags().stream()
+                    .filter(tag -> tag.startsWith("grpc-service:"))
+                    .map(tag -> tag.substring("grpc-service:".length()))
+                    .toList()
+            );
+        }
+        
+        // Special handling for known modules
+        if (services.isEmpty() && instance.name() != null) {
+            if (instance.name().contains("test-module")) {
+                // Test module has TestProcessor service and potentially TestHarness
+                services.add("TestProcessor");
+                services.add("TestHarness");
+            } else if (instance.name().contains("echo-module")) {
+                services.add("EchoService");
+            } else if (instance.name().contains("parser-module")) {
+                services.add("ParserService");
+            } else if (instance.name().contains("chunker-module")) {
+                services.add("ChunkerService");
+            } else if (instance.name().contains("embedder-module")) {
+                services.add("EmbedderService");
+            }
+        }
+        
+        return services;
     }
 
     private String extractVersion(List<String> tags) {
@@ -527,7 +718,8 @@ public class ModuleDiscoveryResource {
         boolean healthy,
         String version,
         List<String> grpcServices,
-        Map<String, String> metadata
+        Map<String, String> metadata,
+        List<SidecarInfo> sidecars
     ) {}
 
     public record ModuleServiceInfo(
@@ -546,7 +738,9 @@ public class ModuleDiscoveryResource {
         boolean enabled,
         String containerId,
         String containerName,
-        Map<String, String> metadata
+        List<String> grpcServices,
+        Map<String, String> metadata,
+        List<SidecarInfo> sidecars
     ) {}
 
     public record ServiceStatistics(
@@ -554,5 +748,14 @@ public class ModuleDiscoveryResource {
         int totalModules,
         int healthyModules,
         int zombieCount
+    ) {}
+    
+    public record SidecarInfo(
+        String name,
+        String type,
+        String address,
+        int port,
+        boolean healthy,
+        Map<String, String> metadata
     ) {}
 }

@@ -9,6 +9,7 @@ import org.eclipse.microprofile.config.inject.ConfigProperty;
 import jakarta.inject.Inject;
 import com.rokkon.pipeline.engine.service.EngineRegistrationService;
 import com.rokkon.pipeline.consul.connection.ConsulConnectionManager;
+import io.smallrye.mutiny.Uni;
 
 import java.util.Map;
 import java.util.HashMap;
@@ -56,7 +57,7 @@ public class EngineInfoResource {
     ConsulConnectionManager consulConnectionManager;
     
     @GET
-    public Response getEngineInfo() {
+    public Uni<Response> getEngineInfo() {
         // Determine engine status based on registration and consul connection
         boolean isRegistered = registrationService.isRegistered();
         boolean hasConsulConnection = consulConnectionManager.getClient().isPresent();
@@ -117,6 +118,52 @@ public class EngineInfoResource {
         runtime.put("maxMemory", Runtime.getRuntime().maxMemory());
         info.put("runtime", runtime);
         
-        return Response.ok(info).build();
+        // Consul agent info
+        if (hasConsulConnection) {
+            Map<String, Object> consul = new HashMap<>();
+            consul.put("connected", true);
+            consul.put("host", consulConnectionManager.getConfiguration().host());
+            consul.put("port", consulConnectionManager.getConfiguration().port());
+            
+            // Try to get agent info asynchronously
+            return consulConnectionManager.getClient()
+                .map(client -> {
+                    return Uni.createFrom().completionStage(client.agentInfo().toCompletionStage())
+                        .onItem().transform(agentInfo -> {
+                            // Extract Consul agent details
+                            Map<String, Object> agent = new HashMap<>();
+                            if (agentInfo.containsKey("Config")) {
+                                io.vertx.core.json.JsonObject config = agentInfo.getJsonObject("Config");
+                                agent.put("nodeName", config.getString("NodeName", "unknown"));
+                                agent.put("datacenter", config.getString("Datacenter", "unknown"));
+                                agent.put("version", config.getString("Version", "unknown"));
+                                agent.put("protocol", config.getInteger("Protocol", 0));
+                                agent.put("serverMode", config.getBoolean("Server", false));
+                            }
+                            
+                            if (agentInfo.containsKey("Member")) {
+                                io.vertx.core.json.JsonObject member = agentInfo.getJsonObject("Member");
+                                agent.put("address", member.getString("Addr", "unknown"));
+                                agent.put("status", member.getInteger("Status", 0));
+                            }
+                            
+                            consul.put("agent", agent);
+                            info.put("consul", consul);
+                            return Response.ok(info).build();
+                        })
+                        .onFailure().recoverWithItem(error -> {
+                            consul.put("error", "Failed to fetch agent info: " + error.getMessage());
+                            info.put("consul", consul);
+                            return Response.ok(info).build();
+                        });
+                })
+                .orElseGet(() -> {
+                    info.put("consul", Map.of("connected", false));
+                    return Uni.createFrom().item(Response.ok(info).build());
+                });
+        } else {
+            info.put("consul", Map.of("connected", false));
+            return Uni.createFrom().item(Response.ok(info).build());
+        }
     }
 }

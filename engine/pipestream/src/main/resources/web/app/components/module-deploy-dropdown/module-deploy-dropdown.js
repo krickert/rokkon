@@ -17,7 +17,7 @@ export class ModuleDeployDropdown extends LitElement {
     }
 
     .deploy-button {
-      background: #1976d2;
+      background: #ff9800;
       color: white;
       border: none;
       padding: 8px 16px;
@@ -31,7 +31,7 @@ export class ModuleDeployDropdown extends LitElement {
     }
 
     .deploy-button:hover {
-      background: #1565c0;
+      background: #fb8c00;
     }
 
     .deploy-button:disabled {
@@ -317,7 +317,6 @@ export class ModuleDeployDropdown extends LitElement {
                 <div class="module-info">
                   <div>
                     <span class="module-type">${module.type}</span>
-                    <span style="margin-left: 8px; color: #999;">Port: ${module.default_ports?.unified || 'N/A'}</span>
                   </div>
                   ${isDeployed ? html`
                     <div class="module-status">

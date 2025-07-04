@@ -33,10 +33,10 @@ ENV ENGINE_PORT="8081"
 ENV CONSUL_HOST="localhost"
 ENV CONSUL_PORT="8500"
 ENV MODULE_HOST="localhost"
-ENV MODULE_PORT="49095"
+ENV MODULE_PORT="39100"
 
-EXPOSE 39095
-EXPOSE 49095
+# Expose unified server port
+EXPOSE 39100
 USER 185
 ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"

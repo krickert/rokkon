@@ -16,17 +16,17 @@ import org.junit.jupiter.api.BeforeEach;
 @QuarkusTest
 class GrpcHealthCheckTest extends GrpcHealthCheckTestBase {
     
-    @ConfigProperty(name = "quarkus.grpc.server.test-port", defaultValue = "9000")
-    int grpcPort;
+    @ConfigProperty(name = "quarkus.http.test-port", defaultValue = "8081")
+    int httpPort;
     
     private ManagedChannel channel;
     private HealthGrpc.HealthBlockingStub healthService;
     
     @BeforeEach
     void setup() {
-        // Connect to Quarkus test mode gRPC port
+        // Connect to Quarkus test mode HTTP port (unified server)
         channel = ManagedChannelBuilder
-                .forAddress("localhost", grpcPort)
+                .forAddress("localhost", httpPort)
                 .usePlaintext()
                 .build();
         healthService = HealthGrpc.newBlockingStub(channel);

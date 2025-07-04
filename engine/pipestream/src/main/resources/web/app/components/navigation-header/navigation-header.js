@@ -454,6 +454,47 @@ export class NavigationHeader extends LitElement {
                       </div>
                     </div>
                   ` : ''}
+                  
+                  ${engineInfo.consul && engineInfo.consul.connected ? html`
+                    <div class="info-section">
+                      <div class="info-section-title">Consul Agent</div>
+                      <div class="info-row">
+                        <span class="info-label">Host:</span>
+                        <span class="info-value">${engineInfo.consul.host}:${engineInfo.consul.port}</span>
+                      </div>
+                      ${engineInfo.consul.agent ? html`
+                        <div class="info-row">
+                          <span class="info-label">Version:</span>
+                          <span class="info-value">${engineInfo.consul.agent.version || 'Unknown'}</span>
+                        </div>
+                        <div class="info-row">
+                          <span class="info-label">Node:</span>
+                          <span class="info-value">${engineInfo.consul.agent.nodeName || 'Unknown'}</span>
+                        </div>
+                        <div class="info-row">
+                          <span class="info-label">Datacenter:</span>
+                          <span class="info-value">${engineInfo.consul.agent.datacenter || 'Unknown'}</span>
+                        </div>
+                        <div class="info-row">
+                          <span class="info-label">Server Mode:</span>
+                          <span class="info-value">${engineInfo.consul.agent.serverMode ? 'Yes' : 'No'}</span>
+                        </div>
+                        ${engineInfo.consul.agent.address ? html`
+                          <div class="info-row">
+                            <span class="info-label">Address:</span>
+                            <span class="info-value">${engineInfo.consul.agent.address}</span>
+                          </div>
+                        ` : ''}
+                      ` : html`
+                        ${engineInfo.consul.error ? html`
+                          <div class="info-row">
+                            <span class="info-label">Error:</span>
+                            <span class="info-value" style="color: #f44336;">${engineInfo.consul.error}</span>
+                          </div>
+                        ` : ''}
+                      `}
+                    </div>
+                  ` : ''}
                 </div>
               ` : ''}
             </span>

@@ -316,7 +316,7 @@ public class ModuleManagementResource {
                             Map.of(
                                 "module", moduleName,
                                 "status", "deployed",
-                                "port", module.getUnifiedPort(),
+                                "port", result.allocatedPort(),
                                 "containerId", result.moduleContainerId()
                             )))
                         .build();
@@ -493,6 +493,83 @@ public class ModuleManagementResource {
     }
 
     @POST
+    @Path("/{moduleName}/scale-up")
+    @Operation(
+        summary = "Deploy additional instance of module",
+        description = "Deploys an additional instance of a module with incremental IP addressing (dev mode only)"
+    )
+    @APIResponses({
+        @APIResponse(
+            responseCode = "202",
+            description = "Additional instance deployment initiated",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON,
+                schema = @Schema(implementation = ModuleOperationResponse.class)
+            )
+        ),
+        @APIResponse(
+            responseCode = "400",
+            description = "Invalid module or maximum instances reached"
+        ),
+        @APIResponse(
+            responseCode = "503",
+            description = "Service not available (not in dev mode)"
+        )
+    })
+    public Uni<Response> scaleUpModule(
+            @Parameter(description = "Module name", required = true, example = "echo")
+            @PathParam("moduleName") String moduleName) {
+        
+        LOG.infof("Request to scale up module: %s", moduleName);
+        
+        // Check if deployment service is available (only in dev mode)
+        if (!deploymentService.isResolvable()) {
+            return Uni.createFrom().item(
+                Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Module scaling is only available in dev mode", null))
+                    .build()
+            );
+        }
+        
+        // Deploy additional instance
+        return Uni.createFrom().item(() -> {
+            try {
+                PipelineModule module = PipelineModule.fromName(moduleName);
+                
+                // Deploy additional instance
+                ModuleDeploymentService.ModuleDeploymentResult result = 
+                    deploymentService.get().deployAdditionalInstance(module);
+                
+                if (result.success()) {
+                    return Response.status(Response.Status.ACCEPTED)
+                        .entity(new ModuleOperationResponse(true, 
+                            result.message(), 
+                            Map.of(
+                                "module", moduleName,
+                                "status", "scaling",
+                                "newInstance", result.instanceNumber(),
+                                "port", result.allocatedPort(),
+                                "containerId", result.moduleContainerId()
+                            )))
+                        .build();
+                } else {
+                    return Response.status(Response.Status.BAD_REQUEST)
+                        .entity(new ModuleOperationResponse(false, 
+                            result.message(), null))
+                        .build();
+                }
+            } catch (IllegalArgumentException e) {
+                return Response.status(Response.Status.BAD_REQUEST)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Invalid module: " + moduleName, null))
+                    .build();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+    }
+
+    @POST
     @Path("/{moduleName}/test")
     @Operation(
         summary = "Test a module",
@@ -577,5 +654,71 @@ public class ModuleManagementResource {
                       "2024-01-01 10:00:02 INFO Ready to process requests\n")
                 .build()
         );
+    }
+    
+    @DELETE
+    @Path("/{moduleName}/instance/{moduleId}")
+    @Operation(
+        summary = "Stop a specific module instance", 
+        description = "Stops and removes a specific instance of a module in dev mode"
+    )
+    @APIResponses({
+        @APIResponse(
+            responseCode = "200",
+            description = "Instance stopped successfully",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON,
+                schema = @Schema(implementation = ModuleOperationResponse.class)
+            )
+        ),
+        @APIResponse(
+            responseCode = "404",
+            description = "Module or instance not found"
+        ),
+        @APIResponse(
+            responseCode = "503",
+            description = "Service not available (not in dev mode)"
+        )
+    })
+    public Uni<Response> stopModuleInstance(
+            @Parameter(description = "Module name", required = true, example = "echo")
+            @PathParam("moduleName") String moduleName,
+            @Parameter(description = "Module ID", required = true, example = "echo-module-abc123")
+            @PathParam("moduleId") String moduleId) {
+        
+        LOG.infof("Request to stop module instance: %s (moduleId: %s)", moduleName, moduleId);
+        
+        // Check if deployment service is available (only in dev mode)
+        if (!deploymentService.isResolvable()) {
+            return Uni.createFrom().item(
+                Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Module instance management is only available in dev mode", null))
+                    .build()
+            );
+        }
+        
+        return Uni.createFrom().item(() -> {
+            try {
+                PipelineModule module = PipelineModule.fromName(moduleName);
+                
+                // Stop the specific instance by moduleId
+                deploymentService.get().stopModuleByInstanceId(module, moduleId);
+                
+                return Response.ok(new ModuleOperationResponse(true, 
+                    String.format("Module instance %s stopped successfully", moduleId), 
+                    Map.of(
+                        "module", moduleName,
+                        "moduleId", moduleId
+                    )))
+                    .build();
+            } catch (IllegalArgumentException e) {
+                return Response.status(Response.Status.NOT_FOUND)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Module not found: " + moduleName, null))
+                    .build();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
 }

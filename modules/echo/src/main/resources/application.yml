@@ -1,6 +1,6 @@
 quarkus:
   application:
-    name: echo-module
+    name: echo
   http:
     port: 39100  # Single port for both HTTP and gRPC (391xx convention for modules)
   generate-code:

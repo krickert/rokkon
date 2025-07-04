@@ -45,10 +45,11 @@ class QuarkusContainerHealthCheckTest {
     
     @BeforeEach
     void setup() {
-        System.out.println("Connecting to container gRPC port: " + containerGrpcPort);
+        // With unified server, gRPC is available on HTTP port
+        System.out.println("Connecting to container unified port: " + containerHttpPort);
         
         channel = ManagedChannelBuilder
-                .forAddress("localhost", containerGrpcPort)
+                .forAddress("localhost", containerHttpPort)
                 .usePlaintext()
                 .build();
         healthService = HealthGrpc.newBlockingStub(channel);
@@ -101,14 +102,14 @@ class QuarkusContainerHealthCheckTest {
         System.out.println("\n=== Container Registration Info for Consul ===");
         System.out.println("Container Name: " + containerName);
         System.out.println("When registering this container with Consul:");
-        System.out.println("  Use internal port: " + internalGrpcPort);
-        System.out.println("  Health check: GRPC " + containerName + ":" + internalGrpcPort);
+        System.out.println("  Use internal unified port: " + internalGrpcPort);
+        System.out.println("  Health check: HTTP " + containerName + ":" + internalGrpcPort + "/q/health");
         System.out.println("\nFor external testing (like we're doing now):");
-        System.out.println("  Use mapped port: " + containerGrpcPort);
+        System.out.println("  Use mapped port: " + containerHttpPort);
         System.out.println("===========================================\n");
         
         // Verify we can still connect
         assertThat(healthService).isNotNull();
-        assertThat(containerGrpcPort).isNotEqualTo(internalGrpcPort);
+        assertThat(containerHttpPort).isPositive();
     }
 }

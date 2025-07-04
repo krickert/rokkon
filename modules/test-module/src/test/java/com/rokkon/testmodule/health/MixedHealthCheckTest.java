@@ -22,8 +22,8 @@ import static org.assertj.core.api.Assertions.assertThat;
 @QuarkusTest
 class MixedHealthCheckTest {
     
-    @ConfigProperty(name = "quarkus.grpc.server.test-port", defaultValue = "9000")
-    int grpcPort;
+    @ConfigProperty(name = "quarkus.http.test-port", defaultValue = "8081")
+    int httpPort;
     
     // Removed Mutiny client since we're testing with standard stubs
     
@@ -33,9 +33,9 @@ class MixedHealthCheckTest {
     
     @BeforeEach
     void setup() {
-        // Create a channel to the same service
+        // Create a channel to the unified server (HTTP port)
         channel = ManagedChannelBuilder
-                .forAddress("localhost", grpcPort)
+                .forAddress("localhost", httpPort)
                 .usePlaintext()
                 .build();
         

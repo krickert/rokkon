@@ -20,6 +20,7 @@ import com.rokkon.pipeline.engine.events.ModuleLifecycleEvent;
 import jakarta.enterprise.event.Event;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
 import java.util.stream.Collectors;
 
 /**
@@ -66,20 +67,110 @@ public class ModuleDeploymentService {
     @ConfigProperty(name = "quarkus.otel.exporter.otlp.endpoint", defaultValue = "")
     Optional<String> otelEndpoint;
     
+    // Track instance numbers for each module
+    private final Map<String, Integer> moduleInstanceCounts = new HashMap<>();
+    
+    // Track modules currently being deployed to prevent duplicates
+    private final Set<String> deployingModules = new ConcurrentHashMap<String, Boolean>().keySet(Boolean.TRUE);
+    
+    // Port range for modules
+    private static final int BASE_MODULE_PORT = 39100;
+    private static final int MAX_MODULE_PORT = 39999;
+    
+    /**
+     * Find the next available port starting from BASE_MODULE_PORT
+     */
+    private int findNextAvailablePort() {
+        // Scan running containers to find ports in use
+        Set<Integer> portsInUse = new HashSet<>();
+        try {
+            List<Container> containers = dockerClient.listContainersCmd().exec();
+            for (Container container : containers) {
+                for (ContainerPort port : container.getPorts()) {
+                    if (port.getPublicPort() != null && port.getPublicPort() >= BASE_MODULE_PORT && port.getPublicPort() <= MAX_MODULE_PORT) {
+                        portsInUse.add(port.getPublicPort().intValue());
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOG.warnf("Failed to scan container ports: %s", e.getMessage());
+        }
+        
+        // Find the first available port
+        for (int port = BASE_MODULE_PORT; port <= MAX_MODULE_PORT; port++) {
+            if (!portsInUse.contains(port)) {
+                LOG.debugf("Found available port: %d", port);
+                return port;
+            }
+        }
+        
+        throw new RuntimeException("No available ports in range " + BASE_MODULE_PORT + "-" + MAX_MODULE_PORT);
+    }
+    
     /**
      * Deploys a module with its sidecars
      */
     public ModuleDeploymentResult deployModule(PipelineModule module) {
-        LOG.infof("Starting deployment of module: %s", module.getModuleName());
+        // For first deployment, use instance 1
+        return deployModuleInstance(module, 1);
+    }
+    
+    /**
+     * Deploys an additional instance of a module
+     */
+    public ModuleDeploymentResult deployAdditionalInstance(PipelineModule module) {
+        // First check how many instances are actually running
+        int runningInstances = countRunningInstances(module);
+        moduleInstanceCounts.put(module.getModuleName(), runningInstances);
         
-        // Notify via SSE
-        notifyDeploymentStarted(module.getModuleName());
+        // Get current instance count
+        int currentCount = moduleInstanceCounts.getOrDefault(module.getModuleName(), 0);
+        if (currentCount >= 10) {
+            return new ModuleDeploymentResult(false, 
+                "Maximum instances (10) reached for module: " + module.getModuleName());
+        }
+        
+        int nextInstance = currentCount + 1;
+        return deployModuleInstance(module, nextInstance);
+    }
+    
+    /**
+     * Count how many instances of a module are currently running
+     */
+    private int countRunningInstances(PipelineModule module) {
+        int count = 0;
+        for (int i = 1; i <= 10; i++) {
+            String containerName = i == 1 ? module.getContainerName() : module.getContainerName() + "-" + i;
+            if (isContainerRunning(containerName)) {
+                count = i;
+            }
+        }
+        return count;
+    }
+    
+    /**
+     * Internal method to deploy a specific module instance
+     */
+    private ModuleDeploymentResult deployModuleInstance(PipelineModule module, int instanceNumber) {
+        String deploymentKey = module.getModuleName() + "-" + instanceNumber;
+        
+        // Check if already deploying
+        if (!deployingModules.add(deploymentKey)) {
+            LOG.warnf("Deployment already in progress for module: %s (instance %d)", module.getModuleName(), instanceNumber);
+            return new ModuleDeploymentResult(false, "Deployment already in progress");
+        }
+        
+        try {
+            LOG.infof("Starting deployment of module: %s (instance %d)", module.getModuleName(), instanceNumber);
+            
+            // Notify via SSE
+            notifyDeploymentStarted(module.getModuleName());
         
         // Fire module lifecycle event
         moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
             module.getModuleName(), 
             ModuleLifecycleEvent.EventType.DEPLOYING, 
-            "Starting module deployment"
+            "Starting module deployment (instance " + instanceNumber + ")"
         ));
         
         if (!dockerChecker.isDockerAvailable()) {
@@ -93,66 +184,54 @@ public class ModuleDeploymentService {
             return new ModuleDeploymentResult(false, "Docker is not available");
         }
         
-        // Clean up any existing containers first
-        LOG.infof("Cleaning up any existing containers for module: %s", module.getModuleName());
-        notifyDeploymentProgress(module.getModuleName(), "cleaning", "Cleaning up existing containers...");
-        
-        // Do a thorough cleanup with retries
-        boolean cleanupSuccess = false;
-        for (int i = 0; i < 3; i++) {
-            try {
-                cleanupModule(module);
-                
-                // Verify cleanup was successful
-                Thread.sleep(1000); // Give Docker time to process
-                List<Container> remainingContainers = dockerClient.listContainersCmd()
-                    .withShowAll(true)
-                    .withNameFilter(Arrays.asList(
-                        module.getSidecarName(),
-                        module.getContainerName(),
-                        module.getModuleName() + "-registrar"
-                    ))
-                    .exec();
-                
-                if (remainingContainers.isEmpty()) {
-                    cleanupSuccess = true;
-                    break;
-                } else {
-                    LOG.debugf("Cleanup attempt %d: Found %d remaining containers", i + 1, remainingContainers.size());
-                    for (Container c : remainingContainers) {
-                        LOG.debugf("  - %s (state: %s)", c.getNames()[0], c.getState());
-                    }
-                }
-            } catch (Exception e) {
-                LOG.warnf("Cleanup attempt %d failed: %s", i + 1, e.getMessage());
-            }
-        }
-        
-        if (!cleanupSuccess) {
-            LOG.errorf("Failed to clean up existing containers after 3 attempts");
-            notifyDeploymentFailed(module.getModuleName(), "Failed to clean up existing containers");
-            return new ModuleDeploymentResult(false, "Failed to clean up existing containers");
+        // For additional instances, only clean up the specific instance we're deploying
+        if (instanceNumber > 1) {
+            LOG.infof("Cleaning up any existing containers for module %s instance %d", module.getModuleName(), instanceNumber);
+            notifyDeploymentProgress(module.getModuleName(), "cleaning", "Preparing instance " + instanceNumber + "...");
+            
+            // Clean up only this specific instance's containers
+            removeContainerIfExists(module.getModuleName() + "-registrar-" + instanceNumber);
+            removeContainerIfExists(module.getContainerName() + "-" + instanceNumber);
+            removeContainerIfExists(module.getSidecarName() + "-" + instanceNumber);
+        } else {
+            // For instance 1, do the full cleanup as before
+            LOG.infof("Cleaning up any existing containers for module: %s", module.getModuleName());
+            notifyDeploymentProgress(module.getModuleName(), "cleaning", "Cleaning up existing containers...");
+            
+            // Clean up only instance 1 containers
+            removeContainerIfExists(module.getModuleName() + "-registrar");
+            removeContainerIfExists(module.getContainerName());
+            removeContainerIfExists(module.getSidecarName());
         }
         
         try {
-            // 1. Use bridge network instead of creating custom network
+            // 1. Allocate a unique port for this instance
+            int allocatedPort = findNextAvailablePort();
+            LOG.infof("Allocated port %d for module %s instance %d", allocatedPort, module.getModuleName(), instanceNumber);
+            
+            // 2. Use bridge network instead of creating custom network
             String networkName = "bridge";  // Use default Docker bridge network
             LOG.infof("Using default bridge network for module %s", module.getModuleName());
             
-            // 2. Start Consul agent sidecar
+            // 3. Start Consul agent sidecar
             notifyDeploymentProgress(module.getModuleName(), "consul", "Starting Consul agent sidecar...");
-            String consulAgentId = startConsulAgent(module, networkName);
+            String consulAgentId = startConsulAgent(module, networkName, instanceNumber, allocatedPort);
             
             // 3. Skip OTEL collector sidecar - modules will send directly to LGTM stack
             // String otelCollectorId = startOTELCollector(module, networkName);
             
             // 4. Start the module container
             notifyDeploymentProgress(module.getModuleName(), "module", "Starting module container...");
-            String moduleId = startModuleContainer(module, networkName);
+            String moduleId = startModuleContainer(module, networkName, instanceNumber);
+            
+            // All instances use host IP since they all get unique host ports now
+            String hostIP = hostIPDetector.detectHostIP();
+            LOG.infof("Module instance %d will register with host IP %s and port %d", 
+                instanceNumber, hostIP, allocatedPort);
             
             // 5. Start registration sidecar
             notifyDeploymentProgress(module.getModuleName(), "registration", "Starting registration sidecar...");
-            String registrationId = startRegistrationSidecar(module, networkName);
+            String registrationId = startRegistrationSidecar(module, networkName, instanceNumber, hostIP, allocatedPort);
             
             LOG.infof("Successfully deployed module %s with sidecars", module.getModuleName());
             notifyDeploymentCompleted(module.getModuleName(), true, "Module deployed successfully");
@@ -163,12 +242,17 @@ public class ModuleDeploymentService {
                 ModuleLifecycleEvent.EventType.DEPLOYED,
                 "Module deployed successfully"
             ));
+            // Update instance count
+            moduleInstanceCounts.put(module.getModuleName(), instanceNumber);
+            
             return new ModuleDeploymentResult(true, 
-                "Module deployed successfully", 
+                "Module deployed successfully (instance " + instanceNumber + ")", 
                 moduleId, 
                 consulAgentId, 
                 registrationId,  // Registration sidecar ID
-                networkName);
+                networkName,
+                instanceNumber,
+                allocatedPort);
                 
         } catch (Exception e) {
             LOG.errorf("Failed to deploy module %s: %s", module.getModuleName(), e.getMessage(), e);
@@ -185,6 +269,10 @@ public class ModuleDeploymentService {
                 e
             ));
             return new ModuleDeploymentResult(false, "Deployment failed: " + e.getMessage());
+        }
+        } finally {
+            // Always remove from deploying set
+            deployingModules.remove(deploymentKey);
         }
     }
     
@@ -236,8 +324,10 @@ public class ModuleDeploymentService {
     /**
      * Starts the Consul agent sidecar
      */
-    private String startConsulAgent(PipelineModule module, String networkName) {
-        String containerName = module.getSidecarName();
+    private String startConsulAgent(PipelineModule module, String networkName, int instanceNumber, int hostPort) {
+        String containerName = instanceNumber == 1 
+            ? module.getSidecarName() 
+            : module.getSidecarName() + "-" + instanceNumber;
         String hostIP = hostIPDetector.detectHostIP();
         
         // Remove existing container if it exists
@@ -246,9 +336,12 @@ public class ModuleDeploymentService {
         // No need to verify bridge network - it always exists
         
         // Create the Consul agent container with port bindings for the module
+        // All instances get a unique host port binding
         ExposedPort modulePort = ExposedPort.tcp(module.getUnifiedPort());
         Ports portBindings = new Ports();
-        portBindings.bind(modulePort, Ports.Binding.bindPort(module.getUnifiedPort()));
+        
+        // Bind the module's internal port to the allocated host port
+        portBindings.bind(modulePort, Ports.Binding.bindPort(hostPort));
         
         CreateContainerResponse container = dockerClient.createContainerCmd("hashicorp/consul:" + consulVersion)
             .withName(containerName)
@@ -342,8 +435,10 @@ public class ModuleDeploymentService {
     /**
      * Starts the module container
      */
-    private String startModuleContainer(PipelineModule module, String networkName) {
-        String containerName = module.getContainerName();
+    private String startModuleContainer(PipelineModule module, String networkName, int instanceNumber) {
+        String containerName = instanceNumber == 1 
+            ? module.getContainerName() 
+            : module.getContainerName() + "-" + instanceNumber;
         String hostIP = hostIPDetector.detectHostIP();
         
         // Remove existing container if it exists
@@ -364,20 +459,21 @@ public class ModuleDeploymentService {
                 container = dockerClient.createContainerCmd(module.getDockerImage())
                     .withName(containerName)
                     .withHostConfig(HostConfig.newHostConfig()
-                        .withNetworkMode("container:" + module.getSidecarName())  // Share network with Consul sidecar
+                        .withNetworkMode("container:" + (instanceNumber == 1 
+                            ? module.getSidecarName() 
+                            : module.getSidecarName() + "-" + instanceNumber))  // Share network with Consul sidecar
                         .withMemory(memoryBytes)
                         .withMemoryReservation(memoryReservation)
                     )
                     .withEnv(List.of(
-                        "MODULE_NAME=" + module.getModuleName() + "-module",
+                        "MODULE_NAME=" + module.getModuleName() + "-module" + (instanceNumber > 1 ? "-" + instanceNumber : ""),
                         "MODULE_HOST=0.0.0.0",
                         "MODULE_PORT=" + module.getUnifiedPort(),
                         "ENGINE_HOST=" + hostIP,
                         "ENGINE_PORT=39001",  // Engine unified port
                         "CONSUL_HOST=localhost",  // Via shared network namespace
                         "CONSUL_PORT=8500",  // Consul HTTP API port
-                        "REGISTRATION_HOST=" + hostIP,  // What the engine should use to reach this module
-                        "REGISTRATION_PORT=" + module.getUnifiedPort(),  // Module's exposed port
+                        // Registration is handled by the sidecar, not needed here
                         "QUARKUS_HTTP_PORT=" + module.getUnifiedPort(),
                         "QUARKUS_PROFILE=dev",
                         "OTEL_EXPORTER_OTLP_ENDPOINT=" + otelEndpoint.orElse("http://" + hostIP + ":4317"),
@@ -422,20 +518,25 @@ public class ModuleDeploymentService {
     /**
      * Starts the registration sidecar
      */
-    private String startRegistrationSidecar(PipelineModule module, String networkName) {
-        String containerName = module.getModuleName() + "-registrar";
+    private String startRegistrationSidecar(PipelineModule module, String networkName, int instanceNumber, String registrationHost, int allocatedPort) {
+        String containerName = instanceNumber == 1 
+            ? module.getModuleName() + "-registrar"
+            : module.getModuleName() + "-registrar-" + instanceNumber;
         String hostIP = hostIPDetector.detectHostIP();
         
         // Remove existing container if it exists
         removeContainerIfExists(containerName);
         
-        // Create a registration script
+        // Create a registration script using the provided registration host and allocated port
+        String moduleName = module.getModuleName() + "-module" + (instanceNumber > 1 ? "-" + instanceNumber : "");
         String registrationScript = String.format("""
             #!/bin/sh
             echo 'Waiting for module to be ready...'
             sleep 15
             
-            echo 'Attempting to register module %s with engine...'
+            echo 'Attempting to register module %s (instance %d) with engine...'
+            echo 'Registration host: %s'
+            echo 'Registration port: %d'
             
             # Try to register the module
             if java -jar /deployments/pipeline-cli.jar register \
@@ -454,11 +555,14 @@ public class ModuleDeploymentService {
             echo 'Registration sidecar complete. Sleeping...'
             sleep infinity
             """,
-            module.getModuleName(),
+            moduleName,
+            instanceNumber,
+            registrationHost,
+            allocatedPort,
             module.getUnifiedPort(),
             hostIP,
-            hostIP,
-            module.getUnifiedPort()
+            registrationHost,
+            allocatedPort
         );
         
         // Create the registration sidecar using the same image as the module (it has the CLI)
@@ -471,7 +575,9 @@ public class ModuleDeploymentService {
                 container = dockerClient.createContainerCmd(module.getDockerImage())
                     .withName(containerName)
                     .withHostConfig(HostConfig.newHostConfig()
-                        .withNetworkMode("container:" + module.getSidecarName())  // Share network with Consul sidecar
+                        .withNetworkMode("container:" + (instanceNumber == 1 
+                            ? module.getSidecarName() 
+                            : module.getSidecarName() + "-" + instanceNumber))  // Share network with Consul sidecar
                     )
                     .withEntrypoint("/bin/sh")  // Override the default entrypoint
                     .withCmd("-c", registrationScript)
@@ -506,6 +612,15 @@ public class ModuleDeploymentService {
         LOG.infof("Started registration sidecar: %s", containerName);
         
         return container.getId();
+    }
+    
+    /**
+     * Remove a container by Container object
+     */
+    private void removeContainer(Container container) {
+        String containerName = container.getNames()[0];
+        containerName = containerName.startsWith("/") ? containerName.substring(1) : containerName;
+        removeContainerIfExists(containerName);
     }
     
     /**
@@ -625,6 +740,245 @@ public class ModuleDeploymentService {
     }
     
     /**
+     * Stops and removes a specific module instance by moduleId
+     */
+    public void stopModuleByInstanceId(PipelineModule module, String moduleId) {
+        LOG.infof("Stopping module instance by ID: %s (moduleId: %s)", module.getModuleName(), moduleId);
+        
+        // Fire undeploying event
+        moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+            module.getModuleName(),
+            ModuleLifecycleEvent.EventType.UNDEPLOYING,
+            String.format("Stopping module instance %s", moduleId)
+        ));
+        
+        // First, deregister from Consul
+        moduleRegistry.deregisterModule(moduleId)
+            .subscribe().with(
+                success -> {
+                    if (success) {
+                        LOG.infof("Successfully deregistered module instance: %s", moduleId);
+                        moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+                            module.getModuleName(),
+                            ModuleLifecycleEvent.EventType.DEREGISTERED,
+                            String.format("Module instance %s deregistered", moduleId)
+                        ));
+                    } else {
+                        LOG.warnf("Failed to deregister module instance: %s", moduleId);
+                    }
+                },
+                failure -> LOG.errorf(failure, "Error deregistering module instance: %s", moduleId)
+            );
+        
+        // Extract instance suffix from moduleId (e.g., "echo-module-abc123" -> find containers)
+        // We need to find which containers belong to this specific module instance
+        // by matching the port from the registration
+        moduleRegistry.getModule(moduleId)
+            .subscribe().with(
+                registration -> {
+                    if (registration != null) {
+                        int port = registration.port();
+                        // Find containers using this port
+                        cleanupModuleInstanceByPort(module, port);
+                    } else {
+                        LOG.warnf("No registration found for moduleId: %s, attempting cleanup by name pattern", moduleId);
+                        // Try to clean up by moduleId pattern
+                        cleanupModuleInstanceByPattern(module, moduleId);
+                    }
+                },
+                failure -> {
+                    LOG.errorf(failure, "Failed to get module registration for cleanup: %s", moduleId);
+                    // Try cleanup anyway
+                    cleanupModuleInstanceByPattern(module, moduleId);
+                }
+            );
+        
+        // Fire undeployed event
+        moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+            module.getModuleName(),
+            ModuleLifecycleEvent.EventType.UNDEPLOYED,
+            String.format("Module instance %s stopped successfully", moduleId)
+        ));
+        
+        // Notify via SSE
+        try {
+            var sseInstance = Arc.container().instance(ModuleDeploymentSSE.class);
+            if (sseInstance.isAvailable()) {
+                sseInstance.get().notifyModuleUndeployed(module.getModuleName());
+            }
+        } catch (Exception e) {
+            LOG.debugf("Failed to send SSE notification: %s", e.getMessage());
+        }
+    }
+    
+    /**
+     * Clean up module instance by port number
+     */
+    private void cleanupModuleInstanceByPort(PipelineModule module, int port) {
+        LOG.infof("Cleaning up module instance by port: %s (port: %d)", module.getModuleName(), port);
+        
+        // Find containers that expose this port
+        List<Container> containers = dockerClient.listContainersCmd()
+            .withShowAll(true)
+            .exec().stream()
+            .filter(container -> {
+                // Check if this container exposes the target port
+                ContainerPort[] ports = container.getPorts();
+                if (ports != null) {
+                    for (ContainerPort p : ports) {
+                        if (p.getPublicPort() != null && p.getPublicPort() == port) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            })
+            .collect(Collectors.toList());
+        
+        // Find the consul agent container that owns this port
+        Container consulAgent = containers.stream()
+            .filter(c -> {
+                String[] names = c.getNames();
+                if (names != null) {
+                    for (String name : names) {
+                        if (name.contains("consul-agent-" + module.getModuleName())) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            })
+            .findFirst()
+            .orElse(null);
+        
+        if (consulAgent != null) {
+            // Extract instance suffix from consul agent name
+            String consulAgentName = consulAgent.getNames()[0];
+            consulAgentName = consulAgentName.startsWith("/") ? consulAgentName.substring(1) : consulAgentName;
+            
+            // Determine instance suffix (e.g., "-2", "-3", or empty for first instance)
+            String suffix = "";
+            if (consulAgentName.matches(".*-\\d+$")) {
+                suffix = consulAgentName.substring(consulAgentName.lastIndexOf("-"));
+            }
+            
+            // Remove containers in order
+            removeContainerIfExists(module.getModuleName() + "-registrar" + suffix);
+            removeContainerIfExists(module.getContainerName() + suffix);
+            removeContainerIfExists(consulAgentName);
+        } else {
+            LOG.warnf("Could not find consul agent container for port %d", port);
+        }
+    }
+    
+    /**
+     * Clean up module instance by pattern matching
+     */
+    private void cleanupModuleInstanceByPattern(PipelineModule module, String moduleId) {
+        LOG.infof("Cleaning up module instance by pattern: %s (moduleId: %s)", module.getModuleName(), moduleId);
+        
+        // This is a fallback - try to find containers that might belong to this instance
+        // This is less precise but better than nothing
+        List<Container> moduleContainers = dockerClient.listContainersCmd()
+            .withShowAll(true)
+            .exec().stream()
+            .filter(container -> {
+                String[] names = container.getNames();
+                if (names != null) {
+                    for (String name : names) {
+                        String cleanName = name.startsWith("/") ? name.substring(1) : name;
+                        // Look for containers that might belong to this module
+                        if (cleanName.contains(module.getModuleName())) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            })
+            .collect(Collectors.toList());
+        
+        // Just log what we found - don't remove without being certain
+        LOG.infof("Found %d potential containers for module %s", moduleContainers.size(), module.getModuleName());
+        for (Container c : moduleContainers) {
+            LOG.debugf("  - %s", Arrays.toString(c.getNames()));
+        }
+    }
+    
+    /**
+     * Stops and removes a specific module instance
+     */
+    public void stopModuleInstance(PipelineModule module, int instanceNumber) {
+        LOG.infof("Stopping module instance: %s (instance %d)", module.getModuleName(), instanceNumber);
+        
+        // Fire undeploying event
+        moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+            module.getModuleName(),
+            ModuleLifecycleEvent.EventType.UNDEPLOYING,
+            String.format("Stopping module instance %d", instanceNumber)
+        ));
+        
+        // Find the specific instance's module ID for deregistration
+        String moduleIdPattern = module.getModuleName() + "-module-";
+        
+        // Deregister the specific instance from Consul
+        moduleRegistry.listRegisteredModules()
+            .onItem().transformToUni(modules -> {
+                // Find modules matching this instance
+                Optional<GlobalModuleRegistryService.ModuleRegistration> instanceReg = modules.stream()
+                    .filter(m -> {
+                        // Check if this is the right instance based on port or container metadata
+                        int port = m.port();
+                        int expectedPort = BASE_MODULE_PORT + instanceNumber - 1;
+                        return m.moduleName().equals(module.getModuleName() + "-module") && port == expectedPort;
+                    })
+                    .findFirst();
+                    
+                if (instanceReg.isPresent()) {
+                    LOG.infof("Deregistering module instance: %s", instanceReg.get().moduleId());
+                    return moduleRegistry.deregisterModule(instanceReg.get().moduleId())
+                        .map(success -> {
+                            if (success) {
+                                LOG.infof("Successfully deregistered module instance: %s", instanceReg.get().moduleId());
+                                moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+                                    module.getModuleName(),
+                                    ModuleLifecycleEvent.EventType.DEREGISTERED,
+                                    String.format("Module instance %d deregistered", instanceNumber)
+                                ));
+                            }
+                            return success;
+                        });
+                } else {
+                    LOG.warnf("No registration found for module instance %s-%d", module.getModuleName(), instanceNumber);
+                    return Uni.createFrom().item(false);
+                }
+            })
+            .subscribe().with(
+                success -> LOG.debugf("Instance deregistration completed: %s", success),
+                failure -> LOG.errorf(failure, "Failed to deregister instance")
+            );
+        
+        // Clean up the specific instance's containers
+        cleanupModuleInstance(module, instanceNumber);
+        
+        // Fire undeployed event
+        moduleLifecycleEvent.fire(new ModuleLifecycleEvent(
+            module.getModuleName(),
+            ModuleLifecycleEvent.EventType.UNDEPLOYED,
+            String.format("Module instance %d stopped successfully", instanceNumber)
+        ));
+        
+        // Notify via SSE
+        try {
+            var sseInstance = Arc.container().instance(ModuleDeploymentSSE.class);
+            if (sseInstance.isAvailable()) {
+                sseInstance.get().notifyModuleUndeployed(module.getModuleName());
+            }
+        } catch (Exception e) {
+            LOG.debugf("Failed to send SSE notification: %s", e.getMessage());
+        }
+    }
+    
+    /**
      * Stops a deployed module and its sidecars
      */
     public void stopModule(PipelineModule module) {
@@ -672,20 +1026,90 @@ public class ModuleDeploymentService {
     }
     
     /**
+     * Cleans up a specific module instance
+     */
+    private void cleanupModuleInstance(PipelineModule module, int instanceNumber) {
+        LOG.infof("Cleaning up module instance: %s (instance %d)", module.getModuleName(), instanceNumber);
+        
+        // Determine container names for this instance
+        String registrarName = instanceNumber == 1 ? 
+            module.getModuleName() + "-registrar" : 
+            module.getModuleName() + "-registrar-" + instanceNumber;
+        String moduleName = instanceNumber == 1 ? 
+            module.getContainerName() : 
+            module.getContainerName() + "-" + instanceNumber;
+        String sidecarName = instanceNumber == 1 ? 
+            module.getSidecarName() : 
+            module.getSidecarName() + "-" + instanceNumber;
+        
+        // Remove containers in order
+        removeContainerIfExists(registrarName);
+        removeContainerIfExists(moduleName);
+        removeContainerIfExists(sidecarName);
+    }
+    
+    /**
      * Cleans up module resources
      */
     private void cleanupModule(PipelineModule module) {
         // Stop and remove containers in order - module first, then sidecars
-        LOG.infof("Cleaning up containers for module: %s", module.getModuleName());
+        LOG.infof("Cleaning up ALL containers for module: %s", module.getModuleName());
         
-        // Remove registration sidecar first (it depends on the network of consul sidecar)
-        removeContainerIfExists(module.getModuleName() + "-registrar");
+        // First, find all containers that belong to this module
+        List<Container> moduleContainers = dockerClient.listContainersCmd()
+            .withShowAll(true)
+            .exec().stream()
+            .filter(container -> {
+                String[] names = container.getNames();
+                if (names != null) {
+                    for (String name : names) {
+                        // Remove leading slash from container name
+                        String cleanName = name.startsWith("/") ? name.substring(1) : name;
+                        // Check if this container belongs to our module
+                        if (cleanName.startsWith(module.getModuleName() + "-registrar") ||
+                            cleanName.equals(module.getContainerName()) || 
+                            cleanName.startsWith(module.getContainerName() + "-") ||
+                            cleanName.equals(module.getSidecarName()) ||
+                            cleanName.startsWith(module.getSidecarName() + "-")) {
+                            return true;
+                        }
+                    }
+                }
+                return false;
+            })
+            .collect(Collectors.toList());
         
-        // Remove module container (it depends on the network of consul sidecar)
-        removeContainerIfExists(module.getContainerName());
+        LOG.infof("Found %d containers to clean up for module %s", moduleContainers.size(), module.getModuleName());
         
-        // Finally remove the consul sidecar (owns the network namespace)
-        removeContainerIfExists(module.getSidecarName());
+        // Group containers by type and instance number for proper ordering
+        Map<String, List<Container>> containersByType = new HashMap<>();
+        containersByType.put("registrar", new java.util.ArrayList<>());
+        containersByType.put("module", new java.util.ArrayList<>());
+        containersByType.put("sidecar", new java.util.ArrayList<>());
+        
+        for (Container container : moduleContainers) {
+            String containerName = container.getNames()[0];
+            containerName = containerName.startsWith("/") ? containerName.substring(1) : containerName;
+            
+            if (containerName.contains("-registrar")) {
+                containersByType.get("registrar").add(container);
+            } else if (containerName.contains("consul-agent-")) {
+                containersByType.get("sidecar").add(container);
+            } else {
+                containersByType.get("module").add(container);
+            }
+        }
+        
+        // Remove in order: registrars first, then modules, then sidecars
+        for (Container container : containersByType.get("registrar")) {
+            removeContainer(container);
+        }
+        for (Container container : containersByType.get("module")) {
+            removeContainer(container);
+        }
+        for (Container container : containersByType.get("sidecar")) {
+            removeContainer(container);
+        }
         
         // Remove network only if it's a module-specific network
         String networkName = module.getModuleName() + "-network";
@@ -778,10 +1202,19 @@ public class ModuleDeploymentService {
         String moduleContainerId,
         String consulContainerId,
         String otelContainerId,
-        String networkName
+        String networkName,
+        int instanceNumber,
+        int allocatedPort
     ) {
         public ModuleDeploymentResult(boolean success, String message) {
-            this(success, message, null, null, null, null);
+            this(success, message, null, null, null, null, 1, 0);
+        }
+        
+        public ModuleDeploymentResult(boolean success, String message, 
+                String moduleContainerId, String consulContainerId, 
+                String otelContainerId, String networkName) {
+            this(success, message, moduleContainerId, consulContainerId, 
+                    otelContainerId, networkName, 1, 0);
         }
     }
     

@@ -311,8 +311,21 @@ class PipelineDashboard extends LitElement {
           // For dev mode - undeploy the Docker container
           // Extract module name from service name or module_id
           let moduleNameForUndeploy = this.extractModuleName(instance, service);
-          endpoint = `/api/v1/module-management/${moduleNameForUndeploy}/undeploy`;
+          
+          // Use the module_id to identify which specific instance to remove
+          if (instance.module_id) {
+            endpoint = `/api/v1/module-management/${moduleNameForUndeploy}/instance/${instance.module_id}`;
+          } else {
+            // Fallback to removing all instances
+            endpoint = `/api/v1/module-management/${moduleNameForUndeploy}/undeploy`;
+          }
           method = 'DELETE';
+          break;
+        case 'scale-up':
+          // For dev mode - deploy additional instance
+          let moduleNameForScale = this.extractModuleName(instance, service);
+          endpoint = `/api/v1/module-management/${moduleNameForScale}/scale-up`;
+          method = 'POST';
           break;
       }
       

@@ -17,8 +17,8 @@ import java.util.Map;
  */
 public class ModuleContainerResource implements QuarkusTestResourceLifecycleManager {
     
-    protected static final int DEFAULT_GRPC_PORT = 49095;
-    protected static final int DEFAULT_HTTP_PORT = 39095;
+    protected static final int DEFAULT_GRPC_PORT = 39100;  // Unified server port
+    protected static final int DEFAULT_HTTP_PORT = 39100;  // Same port for unified server
     
     private final String imageName;
     private final int internalGrpcPort;
@@ -75,10 +75,10 @@ public class ModuleContainerResource implements QuarkusTestResourceLifecycleMana
         }
         
         moduleContainer = new GenericContainer<>(imageName)
-                .withExposedPorts(internalGrpcPort, internalHttpPort)
+                .withExposedPorts(internalHttpPort)  // Only expose unified port
                 // Add environment variables to ensure consistent ports
                 .withEnv("QUARKUS_HTTP_PORT", String.valueOf(internalHttpPort))
-                .withEnv("QUARKUS_GRPC_SERVER_PORT", String.valueOf(internalGrpcPort))
+                .withEnv("MODULE_PORT", String.valueOf(internalHttpPort))  // For entrypoint script
                 .waitingFor(Wait.forHttp("/q/health").forPort(internalHttpPort).forStatusCode(200))
                 .withLogConsumer(outputFrame -> System.out.print("[container] " + outputFrame.getUtf8String()));
         
@@ -94,8 +94,8 @@ public class ModuleContainerResource implements QuarkusTestResourceLifecycleMana
         
         moduleContainer.start();
         
-        Integer externalGrpcPort = moduleContainer.getMappedPort(internalGrpcPort);
-        Integer externalHttpPort = moduleContainer.getMappedPort(internalHttpPort);
+        // With unified server, both gRPC and HTTP use the same port
+        Integer externalPort = moduleContainer.getMappedPort(internalHttpPort);
         
         String moduleName = extractModuleName(imageName);
         String networkAlias = moduleName.toLowerCase().replace(" ", "-");
@@ -103,8 +103,7 @@ public class ModuleContainerResource implements QuarkusTestResourceLifecycleMana
         System.out.println("\n=== " + moduleName + " Container Started ===");
         System.out.println("Container ID: " + moduleContainer.getContainerId());
         System.out.println("Port Mapping:");
-        System.out.println("  gRPC: " + internalGrpcPort + " -> " + externalGrpcPort);
-        System.out.println("  HTTP: " + internalHttpPort + " -> " + externalHttpPort);
+        System.out.println("  Unified Server: " + internalHttpPort + " -> " + externalPort);
         if (sharedNetwork != null) {
             System.out.println("Network: " + sharedNetwork.getId());
             System.out.println("Network Alias: " + networkAlias);
@@ -114,9 +113,9 @@ public class ModuleContainerResource implements QuarkusTestResourceLifecycleMana
         // Return configuration properties for the test
         Map<String, String> config = new java.util.HashMap<>();
         config.put("test.module.container.host", "localhost");
-        config.put("test.module.container.grpc.port", String.valueOf(externalGrpcPort));
-        config.put("test.module.container.http.port", String.valueOf(externalHttpPort));
-        config.put("test.module.container.internal.grpc.port", String.valueOf(internalGrpcPort));
+        config.put("test.module.container.grpc.port", String.valueOf(externalPort));  // Same port for gRPC
+        config.put("test.module.container.http.port", String.valueOf(externalPort));  // Same port for HTTP
+        config.put("test.module.container.internal.grpc.port", String.valueOf(internalHttpPort));
         config.put("test.module.container.internal.http.port", String.valueOf(internalHttpPort));
         config.put("test.module.container.id", moduleContainer.getContainerId());
         config.put("test.module.container.name", moduleContainer.getContainerName());
