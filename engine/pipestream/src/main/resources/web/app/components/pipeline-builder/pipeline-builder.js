@@ -10,7 +10,6 @@ export class PipelineBuilder extends LitElement {
     draggedNode: { type: Object },
     connectionStart: { type: Object },
     isConnecting: { type: Boolean },
-    validationErrors: { type: Array },
     zoom: { type: Number },
     panX: { type: Number },
     panY: { type: Number }
@@ -272,27 +271,6 @@ export class PipelineBuilder extends LitElement {
       background: #d32f2f;
     }
 
-    .validation-panel {
-      position: absolute;
-      top: 70px;
-      right: 16px;
-      background: #fee;
-      border: 1px solid #fcc;
-      border-radius: 8px;
-      padding: 12px;
-      max-width: 300px;
-      font-size: 13px;
-      color: #c00;
-    }
-
-    .validation-title {
-      font-weight: 600;
-      margin-bottom: 8px;
-    }
-
-    .validation-error {
-      margin-bottom: 4px;
-    }
   `;
 
   constructor() {
@@ -309,7 +287,6 @@ export class PipelineBuilder extends LitElement {
     this.draggedNode = null;
     this.connectionStart = null;
     this.isConnecting = false;
-    this.validationErrors = [];
     this.zoom = 1;
     this.panX = 0;
     this.panY = 0;
@@ -321,6 +298,17 @@ export class PipelineBuilder extends LitElement {
     
     // If we have an existing pipeline, convert it to visual format
     if (this.pipeline && this.pipeline.pipelineSteps) {
+      console.log('Loading existing pipeline:', this.pipeline);
+      this.loadExistingPipeline();
+    }
+  }
+
+  updated(changedProperties) {
+    super.updated(changedProperties);
+    
+    // If pipeline property changed and it has pipelineSteps, load it
+    if (changedProperties.has('pipeline') && this.pipeline && this.pipeline.pipelineSteps) {
+      console.log('Pipeline property changed, loading:', this.pipeline);
       this.loadExistingPipeline();
     }
   }
@@ -513,7 +501,7 @@ export class PipelineBuilder extends LitElement {
         connections: [...this.pipeline.connections, connection]
       };
       
-      this.validatePipeline();
+      this.notifyPipelineChanged();
     }
   }
 
@@ -527,7 +515,7 @@ export class PipelineBuilder extends LitElement {
         )
       };
       this.selectedNode = null;
-      this.validatePipeline();
+      this.notifyPipelineChanged();
     }
   }
 
@@ -538,84 +526,19 @@ export class PipelineBuilder extends LitElement {
         connections: this.pipeline.connections.filter(c => c.id !== this.selectedConnection.id)
       };
       this.selectedConnection = null;
-      this.validatePipeline();
+      this.notifyPipelineChanged();
     }
   }
 
-  validatePipeline() {
-    const errors = [];
-    
-    // Check for cycles
-    if (this.hasCycles()) {
-      errors.push('Pipeline contains cycles - loops are not allowed');
-    }
-    
-    // Check for disconnected nodes
-    const connectedNodes = new Set();
-    this.pipeline.connections.forEach(c => {
-      connectedNodes.add(c.from);
-      connectedNodes.add(c.to);
-    });
-    
-    const disconnectedNodes = this.pipeline.nodes.filter(
-      n => !connectedNodes.has(n.id) && this.pipeline.nodes.length > 1
-    );
-    
-    if (disconnectedNodes.length > 0 && this.pipeline.connections.length > 0) {
-      errors.push(`${disconnectedNodes.length} disconnected node(s) found`);
-    }
-    
-    // Check for minimum requirements
-    if (this.pipeline.nodes.length < 2) {
-      errors.push('Pipeline must have at least 2 modules');
-    }
-    
-    this.validationErrors = errors;
-    
-    // Emit validation status
-    const event = new CustomEvent('pipeline-validated', {
+  // Removed client-side validation - let the backend handle it
+  notifyPipelineChanged() {
+    // Just emit that the pipeline changed, no validation
+    const event = new CustomEvent('pipeline-changed', {
       detail: {
-        isValid: errors.length === 0,
-        errors,
         pipeline: this.pipeline
       }
     });
     this.dispatchEvent(event);
-  }
-
-  hasCycles() {
-    const adjacency = {};
-    this.pipeline.nodes.forEach(n => adjacency[n.id] = []);
-    this.pipeline.connections.forEach(c => {
-      adjacency[c.from].push(c.to);
-    });
-    
-    const visited = new Set();
-    const recursionStack = new Set();
-    
-    const hasCycleDFS = (nodeId) => {
-      visited.add(nodeId);
-      recursionStack.add(nodeId);
-      
-      for (const neighbor of adjacency[nodeId] || []) {
-        if (!visited.has(neighbor)) {
-          if (hasCycleDFS(neighbor)) return true;
-        } else if (recursionStack.has(neighbor)) {
-          return true;
-        }
-      }
-      
-      recursionStack.delete(nodeId);
-      return false;
-    };
-    
-    for (const node of this.pipeline.nodes) {
-      if (!visited.has(node.id)) {
-        if (hasCycleDFS(node.id)) return true;
-      }
-    }
-    
-    return false;
   }
 
   getSVGPoint(e) {
@@ -650,7 +573,6 @@ export class PipelineBuilder extends LitElement {
       };
       this.selectedNode = null;
       this.selectedConnection = null;
-      this.validationErrors = [];
     }
   }
 
@@ -806,10 +728,7 @@ export class PipelineBuilder extends LitElement {
     const x1 = fromNode.x + fromNode.width;
     const y1 = fromNode.y + fromNode.height / 2;
     
-    const mousePos = this.shadowRoot.querySelector('.canvas-svg')?.getScreenCTM();
-    if (!mousePos) return '';
-    
-    // This is a simplified preview - in production you'd track mouse position
+    // For now, just show a static preview line
     return html`
       <line class="connection-preview"
             x1="${x1}"
@@ -907,14 +826,6 @@ export class PipelineBuilder extends LitElement {
             </button>
           </div>
           
-          ${this.validationErrors.length > 0 ? html`
-            <div class="validation-panel">
-              <div class="validation-title">Validation Issues:</div>
-              ${this.validationErrors.map(error => html`
-                <div class="validation-error">• ${error}</div>
-              `)}
-            </div>
-          ` : ''}
           
           ${this.selectedNode || this.selectedConnection ? html`
             <div class="properties-panel">

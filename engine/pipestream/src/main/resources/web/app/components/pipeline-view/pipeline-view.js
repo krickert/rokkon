@@ -246,9 +246,18 @@ export class PipelineView extends LitElement {
     this.showModal = true;
   }
 
-  editPipeline(pipeline) {
-    this.editingPipeline = pipeline;
-    this.showModal = true;
+  async editPipeline(pipeline) {
+    try {
+      // Fetch the full pipeline definition
+      const response = await fetch(`/api/v1/pipelines/definitions/${pipeline.id}`);
+      if (!response.ok) throw new Error('Failed to fetch pipeline definition');
+      
+      const fullPipeline = await response.json();
+      this.editingPipeline = fullPipeline;
+      this.showModal = true;
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
   }
 
   async deployPipeline(pipeline) {
@@ -304,12 +313,16 @@ export class PipelineView extends LitElement {
           body: JSON.stringify(this.editingPipeline) // Use full pipeline config, not just DTO
         });
         
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to update pipeline');
-        }
-        
         const result = await response.json();
+        
+        if (!response.ok) {
+          // Handle validation errors
+          if (result.errors && result.errors.length > 0) {
+            this.showToast(`Validation errors: ${result.errors.join(', ')}`, 'error');
+            return; // Don't close modal, let user fix
+          }
+          throw new Error(result.message || 'Failed to update pipeline');
+        }
         if (result.warnings && result.warnings.length > 0) {
           this.showToast(`Pipeline updated with warnings: ${result.warnings.join(', ')}`, 'warning');
         } else {
@@ -325,12 +338,16 @@ export class PipelineView extends LitElement {
           body: JSON.stringify(pipeline)
         });
         
-        if (!response.ok) {
-          const error = await response.json();
-          throw new Error(error.message || 'Failed to create pipeline');
-        }
-        
         const result = await response.json();
+        
+        if (!response.ok) {
+          // Handle validation errors
+          if (result.errors && result.errors.length > 0) {
+            this.showToast(`Validation errors: ${result.errors.join(', ')}`, 'error');
+            return; // Don't close modal, let user fix
+          }
+          throw new Error(result.message || 'Failed to create pipeline');
+        }
         if (result.warnings && result.warnings.length > 0) {
           this.showToast(`Pipeline created with warnings: ${result.warnings.join(', ')}`, 'warning');
         } else {
@@ -345,10 +362,10 @@ export class PipelineView extends LitElement {
     }
   }
 
-  handleValidation(validationResult) {
-    // Update the pipeline validation status in the modal
-    // This could be used to enable/disable save button or show warnings
-    console.log('Pipeline validation:', validationResult);
+  handlePipelineChanged(pipelineData) {
+    // Pipeline changed in the builder
+    // We could track unsaved changes here if needed
+    console.log('Pipeline changed:', pipelineData);
   }
 
   showToast(message, type) {
@@ -468,9 +485,9 @@ export class PipelineView extends LitElement {
             </div>
             <pipeline-builder 
               style="flex: 1; display: block; overflow: hidden;"
-              .pipeline=${this.editingPipeline || { name: 'New Pipeline', nodes: [], connections: [] }}
+              .pipeline=${this.editingPipeline ? {...this.editingPipeline} : { name: 'New Pipeline', nodes: [], connections: [] }}
               @save-pipeline=${(e) => this.savePipeline(e.detail.pipeline)}
-              @pipeline-validated=${(e) => this.handleValidation(e.detail)}>
+              @pipeline-changed=${(e) => this.handlePipelineChanged(e.detail)}>
             </pipeline-builder>
           </div>
         </div>
