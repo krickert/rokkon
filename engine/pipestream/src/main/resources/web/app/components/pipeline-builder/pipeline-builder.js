@@ -275,11 +275,8 @@ export class PipelineBuilder extends LitElement {
 
   constructor() {
     super();
-    this.pipeline = {
-      name: 'New Pipeline',
-      nodes: [],
-      connections: []
-    };
+    // Initialize with a default pipeline structure
+    this._initializePipeline();
     this.availableModules = [];
     this.selectedNode = null;
     this.selectedConnection = null;
@@ -290,6 +287,14 @@ export class PipelineBuilder extends LitElement {
     this.zoom = 1;
     this.panX = 0;
     this.panY = 0;
+  }
+
+  _initializePipeline() {
+    this.pipeline = {
+      name: 'New Pipeline',
+      nodes: [],
+      connections: []
+    };
   }
 
   connectedCallback() {
@@ -441,6 +446,10 @@ export class PipelineBuilder extends LitElement {
       nodes: [...this.pipeline.nodes, node]
     };
 
+    console.log('Pipeline after adding node:', this.pipeline);
+    console.log('Total nodes:', this.pipeline.nodes.length);
+    
+    this.requestUpdate(); // Force re-render
     this.notifyPipelineChanged();
   }
 
@@ -816,7 +825,10 @@ export class PipelineBuilder extends LitElement {
               ${this.renderConnectionPreview()}
               
               <!-- Nodes -->
-              ${this.pipeline.nodes.map(node => this.renderNode(node))}
+              ${console.log('Rendering nodes:', this.pipeline.nodes)}
+              ${this.pipeline.nodes && this.pipeline.nodes.length > 0 ? 
+                this.pipeline.nodes.map(node => this.renderNode(node)) : 
+                ''}
             </g>
           </svg>
           
