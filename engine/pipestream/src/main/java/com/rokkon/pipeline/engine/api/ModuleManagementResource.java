@@ -1,9 +1,7 @@
 package com.rokkon.pipeline.engine.api;
 
-import io.quarkus.arc.profile.IfBuildProfile;
 import io.smallrye.mutiny.Uni;
 import jakarta.inject.Inject;
-import jakarta.enterprise.inject.Instance;
 import jakarta.ws.rs.*;
 import jakarta.ws.rs.core.MediaType;
 import jakarta.ws.rs.core.Response;
@@ -16,36 +14,26 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponse;
 import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
-import com.rokkon.pipeline.engine.dev.ModuleDeploymentService;
-import com.rokkon.pipeline.engine.dev.ModuleDeploymentService.OrphanedModule;
-import com.rokkon.pipeline.engine.dev.PipelineModule;
-import com.rokkon.pipeline.engine.dev.PipelineDevModeInfrastructure;
 import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Arrays;
 import java.util.stream.Collectors;
-import io.smallrye.mutiny.infrastructure.Infrastructure;
 
 /**
- * REST API for module lifecycle management.
- * Provides operations for deploying, monitoring, and managing modules in dev mode.
+ * REST API for production module management operations.
+ * Provides operations for querying and managing registered modules via the module registry.
+ * 
+ * For development mode operations (Docker containers, deployment, etc.), see ModuleDevManagementResource.
  */
 @Path("/api/v1/module-management")
 @Produces(MediaType.APPLICATION_JSON)
 @Consumes(MediaType.APPLICATION_JSON)
-@Tag(name = "Module Management", description = "Module lifecycle and deployment management")
+@Tag(name = "Module Management", description = "Module registry operations")
 public class ModuleManagementResource {
 
     private static final Logger LOG = Logger.getLogger(ModuleManagementResource.class);
 
-    @Inject
-    Instance<ModuleDeploymentService> deploymentService;
-    
-    @Inject
-    Instance<PipelineDevModeInfrastructure> infrastructure;
-    
     @Inject
     GlobalModuleRegistryService moduleRegistry;
 
@@ -54,156 +42,99 @@ public class ModuleManagementResource {
      */
     @Schema(description = "Module operation response")
     public record ModuleOperationResponse(
-        @Schema(description = "Success indicator", example = "true")
+        @Schema(description = "Whether the operation was successful", example = "true")
         boolean success,
         
-        @Schema(description = "Response message", example = "Module deployed successfully")
+        @Schema(description = "Operation message", example = "Module deregistered successfully")
         String message,
         
-        @Schema(description = "Additional details", implementation = Object.class)
+        @Schema(description = "Additional details about the operation")
         Map<String, Object> details
     ) {}
 
     /**
-     * Module status information
+     * Registered module information from the registry
      */
-    @Schema(description = "Module status")
-    public record ModuleStatus(
+    @Schema(description = "Registered module information")
+    public record RegisteredModule(
+        @Schema(description = "Module ID", example = "echo-abc123")
+        String moduleId,
+        
         @Schema(description = "Module name", example = "echo")
-        String name,
+        String moduleName,
         
-        @Schema(description = "Current status", example = "running", enumeration = {"deployed", "running", "stopped", "error"})
-        String status,
+        @Schema(description = "Module host", example = "module-host.example.com")
+        String host,
         
-        @Schema(description = "Health status", example = "healthy", enumeration = {"healthy", "unhealthy", "unknown"})
-        String health,
+        @Schema(description = "Module port", example = "39100")
+        int port,
         
-        @Schema(description = "Container ID if deployed", example = "abc123def456")
-        String containerId,
+        @Schema(description = "Service type", example = "GRPC")
+        String serviceType,
         
-        @Schema(description = "Sidecar container ID", example = "def456ghi789")
-        String sidecarId,
+        @Schema(description = "Module version", example = "1.0.0")
+        String version,
         
-        @Schema(description = "Assigned ports")
-        Map<String, Integer> ports
-    ) {}
-
-    /**
-     * Available module information
-     */
-    @Schema(description = "Available module definition")
-    public record AvailableModule(
-        @Schema(description = "Module name", example = "echo")
-        String name,
+        @Schema(description = "Whether module is enabled", example = "true")
+        boolean enabled,
         
-        @Schema(description = "Module type", example = "PROCESSOR")
-        String type,
+        @Schema(description = "Registration timestamp")
+        long registeredAt,
         
-        @Schema(description = "Docker image", example = "rokkon/echo-module:latest")
-        String image,
-        
-        @Schema(description = "Required memory", example = "1G")
-        String memory,
-        
-        @Schema(description = "Default ports")
-        Map<String, Integer> defaultPorts,
-        
-        @Schema(description = "Whether module is available for deployment", example = "true")
-        boolean available
+        @Schema(description = "Additional metadata")
+        Map<String, String> metadata
     ) {}
 
     @GET
-    @Path("/available")
+    @Path("/registered")
     @Operation(
-        summary = "List available modules",
-        description = "Returns a list of all modules available for deployment"
+        summary = "List registered modules",
+        description = "Returns a list of all modules registered in the module registry"
     )
     @APIResponse(
         responseCode = "200",
-        description = "List of available modules",
+        description = "List of registered modules",
         content = @Content(
             mediaType = MediaType.APPLICATION_JSON,
             schema = @Schema(
                 type = SchemaType.ARRAY,
-                implementation = AvailableModule.class
+                implementation = RegisteredModule.class
             )
         )
     )
-    public Uni<List<AvailableModule>> listAvailableModules() {
-        LOG.info("Listing available modules");
+    public Uni<List<RegisteredModule>> listRegisteredModules() {
+        LOG.info("Listing registered modules from registry");
         
-        // Get available modules from PipelineModule enum
-        List<AvailableModule> modules = Arrays.stream(PipelineModule.values())
-            .map(module -> new AvailableModule(
-                module.getModuleName(),
-                "PROCESSOR",
-                module.getDockerImage(),
-                module.getDefaultMemory(),
-                Map.of("unified", module.getUnifiedPort()),  // Unified server port
-                true
-            ))
-            .collect(Collectors.toList());
-            
-        return Uni.createFrom().item(modules);
+        return moduleRegistry.listRegisteredModules()
+            .map(registrations -> registrations.stream()
+                .map(reg -> new RegisteredModule(
+                    reg.moduleId(),
+                    reg.moduleName(),
+                    reg.host(),
+                    reg.port(),
+                    reg.serviceType(),
+                    reg.version(),
+                    reg.enabled(),
+                    reg.registeredAt(),
+                    reg.metadata()
+                ))
+                .collect(Collectors.toList())
+            );
     }
 
     @GET
-    @Path("/deployed")
+    @Path("/{moduleId}")
     @Operation(
-        summary = "List deployed modules",
-        description = "Returns a list of currently deployed modules with their status"
-    )
-    @APIResponse(
-        responseCode = "200",
-        description = "List of deployed modules",
-        content = @Content(
-            mediaType = MediaType.APPLICATION_JSON,
-            schema = @Schema(
-                type = SchemaType.ARRAY,
-                implementation = ModuleStatus.class
-            )
-        )
-    )
-    public Uni<List<ModuleStatus>> listDeployedModules() {
-        LOG.info("Listing deployed modules");
-        
-        // Check if services are available
-        if (!deploymentService.isResolvable() || !infrastructure.isResolvable()) {
-            return Uni.createFrom().item(List.of());
-        }
-        
-        // Get status of all modules
-        List<ModuleStatus> statuses = Arrays.stream(PipelineModule.values())
-            .filter(module -> infrastructure.get().isModuleRunning(module))
-            .map(module -> {
-                ModuleDeploymentService.ModuleStatus status = deploymentService.get().getModuleStatus(module);
-                return new ModuleStatus(
-                    module.getModuleName(),
-                    status.toString().toLowerCase(),
-                    status == ModuleDeploymentService.ModuleStatus.RUNNING ? "healthy" : "unknown",
-                    module.getContainerName(),
-                    module.getSidecarName(),
-                    Map.of("unified", module.getUnifiedPort())
-                );
-            })
-            .collect(Collectors.toList());
-            
-        return Uni.createFrom().item(statuses);
-    }
-
-    @GET
-    @Path("/{moduleName}/status")
-    @Operation(
-        summary = "Get module status",
-        description = "Returns detailed status information for a specific module"
+        summary = "Get module details",
+        description = "Returns detailed information about a specific registered module"
     )
     @APIResponses({
         @APIResponse(
             responseCode = "200",
-            description = "Module status retrieved successfully",
+            description = "Module details retrieved successfully",
             content = @Content(
                 mediaType = MediaType.APPLICATION_JSON,
-                schema = @Schema(implementation = ModuleStatus.class)
+                schema = @Schema(implementation = RegisteredModule.class)
             )
         ),
         @APIResponse(
@@ -211,567 +142,45 @@ public class ModuleManagementResource {
             description = "Module not found"
         )
     })
-    public Uni<Response> getModuleStatus(
-            @Parameter(description = "Module name", required = true, example = "echo")
-            @PathParam("moduleName") String moduleName) {
-        
-        LOG.infof("Getting status for module: %s", moduleName);
-        
-        try {
-            PipelineModule module = PipelineModule.fromName(moduleName);
-            
-            // Check if services are available
-            if (!deploymentService.isResolvable()) {
-                return Uni.createFrom().item(
-                    Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                        .entity(Map.of("error", "Service not available in current mode"))
-                        .build()
-                );
-            }
-            
-            ModuleDeploymentService.ModuleStatus status = deploymentService.get().getModuleStatus(module);
-            
-            ModuleStatus moduleStatus = new ModuleStatus(
-                module.getModuleName(),
-                status.toString().toLowerCase(),
-                status == ModuleDeploymentService.ModuleStatus.RUNNING ? "healthy" : "unknown",
-                module.getContainerName(),
-                module.getSidecarName(),
-                Map.of("unified", module.getUnifiedPort())
-            );
-            
-            return Uni.createFrom().item(Response.ok(moduleStatus).build());
-        } catch (IllegalArgumentException e) {
-            return Uni.createFrom().item(
-                Response.status(Response.Status.NOT_FOUND)
-                    .entity(Map.of("error", "Module not found: " + moduleName))
-                    .build()
-            );
-        }
-    }
-
-    @POST
-    @Path("/{moduleName}/deploy")
-    @Operation(
-        summary = "Deploy a module",
-        description = "Deploys a module with its sidecar container (dev mode only)"
-    )
-    @APIResponses({
-        @APIResponse(
-            responseCode = "202",
-            description = "Module deployment initiated",
-            content = @Content(
-                mediaType = MediaType.APPLICATION_JSON,
-                schema = @Schema(implementation = ModuleOperationResponse.class)
-            )
-        ),
-        @APIResponse(
-            responseCode = "400",
-            description = "Invalid module or configuration"
-        ),
-        @APIResponse(
-            responseCode = "409",
-            description = "Module already deployed"
-        ),
-        @APIResponse(
-            responseCode = "503",
-            description = "Service not available (not in dev mode)"
-        )
-    })
-    public Uni<Response> deployModule(
-            @Parameter(description = "Module name", required = true, example = "echo")
-            @PathParam("moduleName") String moduleName) {
-        
-        LOG.infof("Request to deploy module: %s", moduleName);
-        
-        // Check if deployment service is available (only in dev mode)
-        if (!deploymentService.isResolvable()) {
-            return Uni.createFrom().item(
-                Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Module deployment is only available in dev mode", null))
-                    .build()
-            );
-        }
-        
-        // Deploy the module
-        return Uni.createFrom().item(() -> {
-            try {
-                PipelineModule module = PipelineModule.fromName(moduleName);
-                
-                // Check if already deployed
-                if (infrastructure.get().isModuleRunning(module)) {
-                    return Response.status(Response.Status.CONFLICT)
-                        .entity(new ModuleOperationResponse(false, 
-                            "Module already deployed: " + moduleName, null))
-                        .build();
-                }
-                
-                // Deploy module with sidecars
-                ModuleDeploymentService.ModuleDeploymentResult result = deploymentService.get().deployModule(module);
-                
-                if (result.success()) {
-                    return Response.status(Response.Status.ACCEPTED)
-                        .entity(new ModuleOperationResponse(true, 
-                            result.message(), 
-                            Map.of(
-                                "module", moduleName,
-                                "status", "deployed",
-                                "port", result.allocatedPort(),
-                                "containerId", result.moduleContainerId()
-                            )))
-                        .build();
-                } else {
-                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                        .entity(new ModuleOperationResponse(false, 
-                            result.message(), null))
-                        .build();
-                }
-            } catch (IllegalArgumentException e) {
-                return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Invalid module: " + moduleName, null))
-                    .build();
-            }
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
-    }
-
-    @DELETE
-    @Path("/{moduleName}")
-    @Operation(
-        summary = "Stop a module",
-        description = "Stops a deployed module and removes its containers"
-    )
-    @APIResponses({
-        @APIResponse(
-            responseCode = "200",
-            description = "Module stopped successfully",
-            content = @Content(
-                mediaType = MediaType.APPLICATION_JSON,
-                schema = @Schema(implementation = ModuleOperationResponse.class)
-            )
-        ),
-        @APIResponse(
-            responseCode = "404",
-            description = "Module not found"
-        )
-    })
-    public Uni<Response> stopModule(
-            @Parameter(description = "Module name", required = true, example = "echo")
-            @PathParam("moduleName") String moduleName) {
-        
-        LOG.infof("Request to stop module: %s", moduleName);
-        
-        return Uni.createFrom().item(() -> {
-            try {
-                PipelineModule module = PipelineModule.fromName(moduleName);
-                
-                // Check if services are available
-                if (!deploymentService.isResolvable() || !infrastructure.isResolvable()) {
-                    return Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                        .entity(new ModuleOperationResponse(false, 
-                            "Service not available in current mode", null))
-                        .build();
-                }
-                
-                // Check if deployed
-                if (!infrastructure.get().isModuleRunning(module)) {
-                    return Response.status(Response.Status.NOT_FOUND)
-                        .entity(new ModuleOperationResponse(false, 
-                            "Module not deployed: " + moduleName, null))
-                        .build();
-                }
-                
-                // Stop the module
-                deploymentService.get().stopModule(module);
-                
-                return Response.ok(new ModuleOperationResponse(true, 
-                    "Module stopped successfully", 
-                    Map.of("module", moduleName)))
-                    .build();
-            } catch (IllegalArgumentException e) {
-                return Response.status(Response.Status.NOT_FOUND)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Module not found: " + moduleName, null))
-                    .build();
-            }
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
-    }
-
-    @DELETE
-    @Path("/{moduleName}/undeploy")
-    @Operation(
-        summary = "Undeploy a module (dev mode)",
-        description = "Stops a deployed module, deregisters it, and removes all containers (dev mode only)"
-    )
-    @APIResponses({
-        @APIResponse(
-            responseCode = "200",
-            description = "Module undeployed successfully",
-            content = @Content(
-                mediaType = MediaType.APPLICATION_JSON,
-                schema = @Schema(implementation = ModuleOperationResponse.class)
-            )
-        ),
-        @APIResponse(
-            responseCode = "404",
-            description = "Module not found"
-        ),
-        @APIResponse(
-            responseCode = "503",
-            description = "Service not available (not in dev mode)"
-        )
-    })
-    public Uni<Response> undeployModule(
-            @Parameter(description = "Module name", required = true, example = "echo")
-            @PathParam("moduleName") String moduleName) {
-        
-        LOG.infof("Request to undeploy module: %s", moduleName);
-        
-        // Check if deployment service is available (only in dev mode)
-        if (!deploymentService.isResolvable() || !infrastructure.isResolvable()) {
-            return Uni.createFrom().item(
-                Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Module undeployment is only available in dev mode", null))
-                    .build()
-            );
-        }
-        
-        return Uni.createFrom().item(() -> {
-            try {
-                PipelineModule module = PipelineModule.fromName(moduleName);
-                
-                // Stop the module containers first
-                deploymentService.get().stopModule(module);
-                
-                return Response.ok(new ModuleOperationResponse(true, 
-                    "Module undeployed successfully", 
-                    Map.of("module", moduleName)))
-                    .build();
-            } catch (IllegalArgumentException e) {
-                return Response.status(Response.Status.NOT_FOUND)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Module not found: " + moduleName, null))
-                    .build();
-            }
-        })
-        .flatMap(response -> {
-            // After stopping containers, deregister all instances of this module
-            return moduleRegistry.listRegisteredModules()
-                .flatMap(registrations -> {
-                    // Find all registrations for this module
-                    List<String> moduleIds = registrations.stream()
-                        .filter(reg -> reg.moduleName() != null && 
-                                reg.moduleName().toLowerCase().contains(moduleName.toLowerCase()))
-                        .map(GlobalModuleRegistryService.ModuleRegistration::moduleId)
-                        .collect(Collectors.toList());
-                    
-                    if (moduleIds.isEmpty()) {
-                        return Uni.createFrom().item(response);
-                    }
-                    
-                    // Deregister all found module IDs
-                    List<Uni<Boolean>> deregisterUnis = moduleIds.stream()
-                        .map(moduleId -> moduleRegistry.deregisterModule(moduleId)
-                            .onFailure().recoverWithItem(false))
-                        .collect(Collectors.toList());
-                    
-                    return Uni.combine().all().unis(deregisterUnis)
-                        .with(results -> {
-                            long deregistered = results.stream()
-                                .filter(result -> (Boolean) result)
-                                .count();
-                            LOG.infof("Deregistered %d instances of module %s", deregistered, moduleName);
-                            return response;
-                        });
-                })
-                .onFailure().recoverWithItem(response);
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
-    }
-
-    @POST
-    @Path("/{moduleName}/scale-up")
-    @Operation(
-        summary = "Deploy additional instance of module",
-        description = "Deploys an additional instance of a module with incremental IP addressing (dev mode only)"
-    )
-    @APIResponses({
-        @APIResponse(
-            responseCode = "202",
-            description = "Additional instance deployment initiated",
-            content = @Content(
-                mediaType = MediaType.APPLICATION_JSON,
-                schema = @Schema(implementation = ModuleOperationResponse.class)
-            )
-        ),
-        @APIResponse(
-            responseCode = "400",
-            description = "Invalid module or maximum instances reached"
-        ),
-        @APIResponse(
-            responseCode = "503",
-            description = "Service not available (not in dev mode)"
-        )
-    })
-    public Uni<Response> scaleUpModule(
-            @Parameter(description = "Module name", required = true, example = "echo")
-            @PathParam("moduleName") String moduleName) {
-        
-        LOG.infof("Request to scale up module: %s", moduleName);
-        
-        // Check if deployment service is available (only in dev mode)
-        if (!deploymentService.isResolvable()) {
-            return Uni.createFrom().item(
-                Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Module scaling is only available in dev mode", null))
-                    .build()
-            );
-        }
-        
-        // Deploy additional instance
-        return Uni.createFrom().item(() -> {
-            try {
-                PipelineModule module = PipelineModule.fromName(moduleName);
-                
-                // Deploy additional instance
-                ModuleDeploymentService.ModuleDeploymentResult result = 
-                    deploymentService.get().deployAdditionalInstance(module);
-                
-                if (result.success()) {
-                    return Response.status(Response.Status.ACCEPTED)
-                        .entity(new ModuleOperationResponse(true, 
-                            result.message(), 
-                            Map.of(
-                                "module", moduleName,
-                                "status", "scaling",
-                                "newInstance", result.instanceNumber(),
-                                "port", result.allocatedPort(),
-                                "containerId", result.moduleContainerId()
-                            )))
-                        .build();
-                } else {
-                    return Response.status(Response.Status.BAD_REQUEST)
-                        .entity(new ModuleOperationResponse(false, 
-                            result.message(), null))
-                        .build();
-                }
-            } catch (IllegalArgumentException e) {
-                return Response.status(Response.Status.BAD_REQUEST)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Invalid module: " + moduleName, null))
-                    .build();
-            }
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
-    }
-
-    @POST
-    @Path("/{moduleName}/test")
-    @Operation(
-        summary = "Test a module",
-        description = "Runs health and integration tests for a deployed module"
-    )
-    @APIResponses({
-        @APIResponse(
-            responseCode = "200",
-            description = "Test completed",
-            content = @Content(
-                mediaType = MediaType.APPLICATION_JSON,
-                schema = @Schema(implementation = ModuleOperationResponse.class)
-            )
-        ),
-        @APIResponse(
-            responseCode = "404",
-            description = "Module not found"
-        )
-    })
-    public Uni<Response> testModule(
-            @Parameter(description = "Module name", required = true, example = "echo")
-            @PathParam("moduleName") String moduleName) {
-        
-        LOG.infof("Request to test module: %s", moduleName);
-        
-        // TODO: Implement when service is ready
-        return Uni.createFrom().item(
-            Response.ok(new ModuleOperationResponse(true, 
-                "Module test completed", 
-                Map.of("module", moduleName, "status", "passed", "tests", 3)))
-                .build()
-        );
-    }
-
-    @GET
-    @Path("/{moduleName}/logs")
-    @Operation(
-        summary = "Get module logs",
-        description = "Retrieves recent logs from a deployed module (dev mode only)"
-    )
-    @APIResponses({
-        @APIResponse(
-            responseCode = "200",
-            description = "Logs retrieved successfully",
-            content = @Content(
-                mediaType = MediaType.TEXT_PLAIN
-            )
-        ),
-        @APIResponse(
-            responseCode = "404",
-            description = "Module not found"
-        ),
-        @APIResponse(
-            responseCode = "503",
-            description = "Service not available (not in dev mode)"
-        )
-    })
-    @Produces(MediaType.TEXT_PLAIN)
-    public Uni<Response> getModuleLogs(
-            @Parameter(description = "Module name", required = true, example = "echo")
-            @PathParam("moduleName") String moduleName,
-            
-            @Parameter(description = "Number of lines to retrieve", example = "100")
-            @QueryParam("lines") @DefaultValue("100") int lines) {
-        
-        LOG.infof("Request to get logs for module: %s (last %d lines)", moduleName, lines);
-        
-        // Check if services are available (only in dev mode)
-        if (!deploymentService.isResolvable()) {
-            return Uni.createFrom().item(
-                Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity("Log retrieval is only available in dev mode")
-                    .build()
-            );
-        }
-        
-        // TODO: Implement when service is ready
-        return Uni.createFrom().item(
-            Response.ok("Sample logs for module: " + moduleName + "\n" +
-                      "2024-01-01 10:00:00 INFO Module started\n" +
-                      "2024-01-01 10:00:01 INFO Connected to engine\n" +
-                      "2024-01-01 10:00:02 INFO Ready to process requests\n")
-                .build()
-        );
-    }
-    
-    @DELETE
-    @Path("/{moduleName}/instance/{moduleId}")
-    @Operation(
-        summary = "Stop a specific module instance", 
-        description = "Stops and removes a specific instance of a module in dev mode"
-    )
-    @APIResponses({
-        @APIResponse(
-            responseCode = "200",
-            description = "Instance stopped successfully",
-            content = @Content(
-                mediaType = MediaType.APPLICATION_JSON,
-                schema = @Schema(implementation = ModuleOperationResponse.class)
-            )
-        ),
-        @APIResponse(
-            responseCode = "404",
-            description = "Module or instance not found"
-        ),
-        @APIResponse(
-            responseCode = "503",
-            description = "Service not available (not in dev mode)"
-        )
-    })
-    public Uni<Response> stopModuleInstance(
-            @Parameter(description = "Module name", required = true, example = "echo")
-            @PathParam("moduleName") String moduleName,
-            @Parameter(description = "Module ID", required = true, example = "echo-module-abc123")
+    public Uni<Response> getModuleDetails(
+            @Parameter(description = "Module ID", required = true, example = "echo-abc123")
             @PathParam("moduleId") String moduleId) {
         
-        LOG.infof("Request to stop module instance: %s (moduleId: %s)", moduleName, moduleId);
+        LOG.infof("Getting details for module: %s", moduleId);
         
-        // Check if deployment service is available (only in dev mode)
-        if (!deploymentService.isResolvable()) {
-            return Uni.createFrom().item(
-                Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Module instance management is only available in dev mode", null))
-                    .build()
-            );
-        }
-        
-        return Uni.createFrom().item(() -> {
-            try {
-                PipelineModule module = PipelineModule.fromName(moduleName);
-                
-                // Stop the specific instance by moduleId
-                deploymentService.get().stopModuleByInstanceId(module, moduleId);
-                
-                return Response.ok(new ModuleOperationResponse(true, 
-                    String.format("Module instance %s stopped successfully", moduleId), 
-                    Map.of(
-                        "module", moduleName,
-                        "moduleId", moduleId
-                    )))
-                    .build();
-            } catch (IllegalArgumentException e) {
-                return Response.status(Response.Status.NOT_FOUND)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Module not found: " + moduleName, null))
-                    .build();
-            }
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+        return moduleRegistry.getModule(moduleId)
+            .map(reg -> {
+                if (reg != null) {
+                    RegisteredModule module = new RegisteredModule(
+                        reg.moduleId(),
+                        reg.moduleName(),
+                        reg.host(),
+                        reg.port(),
+                        reg.serviceType(),
+                        reg.version(),
+                        reg.enabled(),
+                        reg.registeredAt(),
+                        reg.metadata()
+                    );
+                    return Response.ok(module).build();
+                } else {
+                    return Response.status(Response.Status.NOT_FOUND)
+                        .entity(Map.of("error", "Module not found: " + moduleId))
+                        .build();
+                }
+            });
     }
-    
-    @GET
-    @Path("/orphaned")
+
+    @DELETE
+    @Path("/{moduleId}/deregister")
     @Operation(
-        summary = "Find orphaned module containers",
-        description = "Finds module containers that are running but not registered (dev mode only)"
+        summary = "Deregister a module",
+        description = "Removes a module from the module registry"
     )
     @APIResponses({
         @APIResponse(
             responseCode = "200",
-            description = "Orphaned modules retrieved successfully",
-            content = @Content(
-                mediaType = MediaType.APPLICATION_JSON,
-                schema = @Schema(implementation = List.class)
-            )
-        ),
-        @APIResponse(
-            responseCode = "503",
-            description = "Service not available (not in dev mode)"
-        )
-    })
-    public Uni<Response> findOrphanedModules() {
-        LOG.info("Request to find orphaned module containers");
-        
-        // Check if deployment service is available (only in dev mode)
-        if (!deploymentService.isResolvable()) {
-            return Uni.createFrom().item(
-                Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity(Map.of("error", "Orphaned module detection is only available in dev mode"))
-                    .build()
-            );
-        }
-        
-        return Uni.createFrom().item(() -> {
-            List<OrphanedModule> orphanedModules = deploymentService.get().findOrphanedModules();
-            return Response.ok(orphanedModules).build();
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
-    }
-    
-    @POST
-    @Path("/orphaned/{containerId}/register")
-    @Operation(
-        summary = "Register an orphaned module",
-        description = "Attempts to register an orphaned module container with the pipeline (dev mode only)"
-    )
-    @APIResponses({
-        @APIResponse(
-            responseCode = "202",
-            description = "Registration initiated",
+            description = "Module deregistered successfully",
             content = @Content(
                 mediaType = MediaType.APPLICATION_JSON,
                 schema = @Schema(implementation = ModuleOperationResponse.class)
@@ -779,121 +188,42 @@ public class ModuleManagementResource {
         ),
         @APIResponse(
             responseCode = "404",
-            description = "Container not found"
-        ),
-        @APIResponse(
-            responseCode = "503",
-            description = "Service not available (not in dev mode)"
+            description = "Module not found"
         )
     })
-    public Uni<Response> registerOrphanedModule(
-            @Parameter(description = "Container ID", required = true)
-            @PathParam("containerId") String containerId) {
+    public Uni<Response> deregisterModule(
+            @Parameter(description = "Module ID", required = true, example = "echo-abc123")
+            @PathParam("moduleId") String moduleId) {
         
-        LOG.infof("Request to register orphaned module container: %s", containerId);
+        LOG.infof("Request to deregister module: %s", moduleId);
         
-        // Check if deployment service is available (only in dev mode)
-        if (!deploymentService.isResolvable()) {
-            return Uni.createFrom().item(
-                Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Orphaned module registration is only available in dev mode", null))
-                    .build()
-            );
-        }
-        
-        return Uni.createFrom().item(() -> {
-            try {
-                boolean success = deploymentService.get().registerOrphanedModule(containerId);
-                
+        return moduleRegistry.deregisterModule(moduleId)
+            .map(success -> {
                 if (success) {
-                    return Response.status(Response.Status.ACCEPTED)
-                        .entity(new ModuleOperationResponse(true, 
-                            "Registration initiated for container: " + containerId, 
-                            Map.of("containerId", containerId)))
+                    return Response.ok(new ModuleOperationResponse(true,
+                        "Module deregistered successfully",
+                        Map.of("moduleId", moduleId)))
                         .build();
                 } else {
                     return Response.status(Response.Status.NOT_FOUND)
-                        .entity(new ModuleOperationResponse(false, 
-                            "Container not found or not a module: " + containerId, null))
+                        .entity(new ModuleOperationResponse(false,
+                            "Module not found or deregistration failed",
+                            Map.of("moduleId", moduleId)))
                         .build();
                 }
-            } catch (Exception e) {
-                LOG.errorf("Failed to register orphaned module: %s", e.getMessage(), e);
-                return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Failed to register module: " + e.getMessage(), null))
-                    .build();
-            }
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+            });
     }
-    
-    @DELETE
-    @Path("/{moduleName}/cleanup")
+
+    @PUT
+    @Path("/{moduleId}/enable")
     @Operation(
-        summary = "Completely clean up a module",
-        description = "Removes all containers and Consul registrations for a module (dev mode only)"
+        summary = "Enable a module",
+        description = "Enables a disabled module in the registry"
     )
     @APIResponses({
         @APIResponse(
             responseCode = "200",
-            description = "Module cleaned up successfully",
-            content = @Content(
-                mediaType = MediaType.APPLICATION_JSON,
-                schema = @Schema(implementation = ModuleOperationResponse.class)
-            )
-        ),
-        @APIResponse(
-            responseCode = "503",
-            description = "Service not available (not in dev mode)"
-        )
-    })
-    public Uni<Response> cleanupModule(
-            @Parameter(description = "Module name", required = true, example = "test-module")
-            @PathParam("moduleName") String moduleName) {
-        
-        LOG.infof("Request to completely clean up module: %s", moduleName);
-        
-        // Check if deployment service is available (only in dev mode)
-        if (!deploymentService.isResolvable()) {
-            return Uni.createFrom().item(
-                Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Module cleanup is only available in dev mode", null))
-                    .build()
-            );
-        }
-        
-        return Uni.createFrom().item(() -> {
-            try {
-                deploymentService.get().cleanupModuleCompletely(moduleName);
-                
-                return Response.ok(new ModuleOperationResponse(true, 
-                    String.format("Module %s cleaned up completely", moduleName), 
-                    Map.of("module", moduleName, "status", "cleaned")))
-                    .build();
-            } catch (Exception e) {
-                LOG.errorf("Failed to clean up module: %s", e.getMessage(), e);
-                return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Failed to clean up module: " + e.getMessage(), null))
-                    .build();
-            }
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
-    }
-    
-    @POST
-    @Path("/orphaned/{containerId}/redeploy")
-    @Operation(
-        summary = "Redeploy an orphaned module",
-        description = "Removes orphaned module containers and deploys fresh with the existing deployment logic (dev mode only)"
-    )
-    @APIResponses({
-        @APIResponse(
-            responseCode = "202",
-            description = "Redeployment initiated",
+            description = "Module enabled successfully",
             content = @Content(
                 mediaType = MediaType.APPLICATION_JSON,
                 schema = @Schema(implementation = ModuleOperationResponse.class)
@@ -901,59 +231,130 @@ public class ModuleManagementResource {
         ),
         @APIResponse(
             responseCode = "404",
-            description = "Container not found"
-        ),
-        @APIResponse(
-            responseCode = "503",
-            description = "Service not available (not in dev mode)"
+            description = "Module not found"
         )
     })
-    public Uni<Response> redeployOrphanedModule(
-            @Parameter(description = "Container ID", required = true)
-            @PathParam("containerId") String containerId) {
+    public Uni<Response> enableModule(
+            @Parameter(description = "Module ID", required = true, example = "echo-abc123")
+            @PathParam("moduleId") String moduleId) {
         
-        LOG.infof("Request to redeploy orphaned module container: %s", containerId);
+        LOG.infof("Request to enable module: %s", moduleId);
         
-        // Check if deployment service is available (only in dev mode)
-        if (!deploymentService.isResolvable()) {
-            return Uni.createFrom().item(
-                Response.status(Response.Status.SERVICE_UNAVAILABLE)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Orphaned module redeployment is only available in dev mode", null))
-                    .build()
-            );
-        }
-        
-        return Uni.createFrom().item(() -> {
-            try {
-                ModuleDeploymentService.ModuleDeploymentResult result = 
-                    deploymentService.get().redeployOrphanedModule(containerId);
-                
-                if (result.success()) {
-                    return Response.status(Response.Status.ACCEPTED)
-                        .entity(new ModuleOperationResponse(true, 
-                            result.message(), 
-                            Map.of(
-                                "status", "redeployed",
-                                "port", result.allocatedPort(),
-                                "containerId", result.moduleContainerId(),
-                                "instanceNumber", result.instanceNumber()
-                            )))
+        return moduleRegistry.enableModule(moduleId)
+            .map(success -> {
+                if (success) {
+                    return Response.ok(new ModuleOperationResponse(true,
+                        "Module enabled successfully",
+                        Map.of("moduleId", moduleId)))
                         .build();
                 } else {
-                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                        .entity(new ModuleOperationResponse(false, 
-                            result.message(), null))
+                    return Response.status(Response.Status.NOT_FOUND)
+                        .entity(new ModuleOperationResponse(false,
+                            "Module not found or enable failed",
+                            Map.of("moduleId", moduleId)))
                         .build();
                 }
-            } catch (Exception e) {
-                LOG.errorf("Failed to redeploy orphaned module: %s", e.getMessage(), e);
-                return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
-                    .entity(new ModuleOperationResponse(false, 
-                        "Failed to redeploy module: " + e.getMessage(), null))
-                    .build();
-            }
-        })
-        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+            });
+    }
+
+    @PUT
+    @Path("/{moduleId}/disable")
+    @Operation(
+        summary = "Disable a module",
+        description = "Disables a module in the registry without removing it"
+    )
+    @APIResponses({
+        @APIResponse(
+            responseCode = "200",
+            description = "Module disabled successfully",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON,
+                schema = @Schema(implementation = ModuleOperationResponse.class)
+            )
+        ),
+        @APIResponse(
+            responseCode = "404",
+            description = "Module not found"
+        )
+    })
+    public Uni<Response> disableModule(
+            @Parameter(description = "Module ID", required = true, example = "echo-abc123")
+            @PathParam("moduleId") String moduleId) {
+        
+        LOG.infof("Request to disable module: %s", moduleId);
+        
+        return moduleRegistry.disableModule(moduleId)
+            .map(success -> {
+                if (success) {
+                    return Response.ok(new ModuleOperationResponse(true,
+                        "Module disabled successfully",
+                        Map.of("moduleId", moduleId)))
+                        .build();
+                } else {
+                    return Response.status(Response.Status.NOT_FOUND)
+                        .entity(new ModuleOperationResponse(false,
+                            "Module not found or disable failed",
+                            Map.of("moduleId", moduleId)))
+                        .build();
+                }
+            });
+    }
+
+    @GET
+    @Path("/{moduleId}/health")
+    @Operation(
+        summary = "Check module health",
+        description = "Performs health check on a specific module"
+    )
+    @APIResponses({
+        @APIResponse(
+            responseCode = "200",
+            description = "Health check result",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON,
+                schema = @Schema(implementation = GlobalModuleRegistryService.ServiceHealthStatus.class)
+            )
+        ),
+        @APIResponse(
+            responseCode = "404",
+            description = "Module not found"
+        )
+    })
+    public Uni<Response> checkModuleHealth(
+            @Parameter(description = "Module ID", required = true, example = "echo-abc123")
+            @PathParam("moduleId") String moduleId) {
+        
+        LOG.infof("Performing health check on module: %s", moduleId);
+        
+        return moduleRegistry.getModuleHealthStatus(moduleId)
+            .map(status -> {
+                if (status != null) {
+                    return Response.ok(status).build();
+                } else {
+                    return Response.status(Response.Status.NOT_FOUND)
+                        .entity(Map.of("error", "Module not found: " + moduleId))
+                        .build();
+                }
+            });
+    }
+
+    @DELETE
+    @Path("/zombies/cleanup")
+    @Operation(
+        summary = "Clean up zombie modules",
+        description = "Removes modules from registry that are no longer responding"
+    )
+    @APIResponse(
+        responseCode = "200",
+        description = "Zombie cleanup results",
+        content = @Content(
+            mediaType = MediaType.APPLICATION_JSON,
+            schema = @Schema(implementation = GlobalModuleRegistryService.ZombieCleanupResult.class)
+        )
+    )
+    public Uni<GlobalModuleRegistryService.ZombieCleanupResult> cleanupZombies() {
+        LOG.info("Cleaning up zombie modules from registry");
+        
+        return moduleRegistry.cleanupZombieInstances();
     }
 }

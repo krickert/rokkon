@@ -7,6 +7,8 @@ import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.exception.ConflictException;
 import com.github.dockerjava.api.model.*;
 import com.github.dockerjava.api.model.Ports;
+import com.github.dockerjava.api.command.LogContainerCmd;
+import com.github.dockerjava.api.async.ResultCallback;
 import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -37,6 +39,13 @@ import java.util.stream.Collectors;
 public class ModuleDeploymentService {
     
     private static final Logger LOG = Logger.getLogger(ModuleDeploymentService.class);
+    
+    // All modules use the same internal port
+    private static final int MODULE_INTERNAL_PORT = 39100;
+    
+    // External port range for dynamic allocation
+    private static final int EXTERNAL_PORT_START = 39100;
+    private static final int EXTERNAL_PORT_END = 39200;
     
     @Inject
     DockerClient dockerClient;
@@ -338,7 +347,7 @@ public class ModuleDeploymentService {
         
         // Create the Consul agent container with port bindings for the module
         // All instances get a unique host port binding
-        ExposedPort modulePort = ExposedPort.tcp(module.getUnifiedPort());
+        ExposedPort modulePort = ExposedPort.tcp(MODULE_INTERNAL_PORT);
         Ports portBindings = new Ports();
         
         // Bind the module's internal port to the allocated host port
@@ -472,13 +481,13 @@ public class ModuleDeploymentService {
                     .withEnv(List.of(
                         "MODULE_NAME=" + module.getModuleName() + "-module" + (instanceNumber > 1 ? "-" + instanceNumber : ""),
                         "MODULE_HOST=0.0.0.0",
-                        "MODULE_PORT=" + module.getUnifiedPort(),
+                        "MODULE_PORT=" + MODULE_INTERNAL_PORT,
                         "ENGINE_HOST=" + hostIP,
                         "ENGINE_PORT=39001",  // Engine unified port
                         "CONSUL_HOST=localhost",  // Via shared network namespace
                         "CONSUL_PORT=8500",  // Consul HTTP API port
                         // Registration is handled by the sidecar, not needed here
-                        "QUARKUS_HTTP_PORT=" + module.getUnifiedPort(),
+                        "QUARKUS_HTTP_PORT=" + MODULE_INTERNAL_PORT,
                         "QUARKUS_PROFILE=dev",
                         "OTEL_EXPORTER_OTLP_ENDPOINT=" + otelEndpoint.orElse("http://" + hostIP + ":4317"),
                         "OTEL_SERVICE_NAME=" + module.getModuleName() + "-module",
@@ -491,7 +500,7 @@ public class ModuleDeploymentService {
                         "pipeline.module.name", module.getModuleName(),
                         "pipeline.type", "module",
                         "pipeline.grpc", "true",
-                        "pipeline.port", String.valueOf(module.getUnifiedPort()),
+                        "pipeline.port", String.valueOf(MODULE_INTERNAL_PORT),
                         "pipeline.instance", String.valueOf(instanceNumber)
                     ))
                     .exec();
@@ -518,7 +527,7 @@ public class ModuleDeploymentService {
             
         // Start the container
         dockerClient.startContainerCmd(container.getId()).exec();
-        LOG.infof("Started module container: %s on port %d", containerName, module.getUnifiedPort());
+        LOG.infof("Started module container: %s with internal port %d", containerName, MODULE_INTERNAL_PORT);
         
         return container.getId();
     }
@@ -567,7 +576,7 @@ public class ModuleDeploymentService {
             instanceNumber,
             registrationHost,
             allocatedPort,
-            module.getUnifiedPort(),
+            MODULE_INTERNAL_PORT,
             hostIP,
             registrationHost,
             allocatedPort
@@ -1442,9 +1451,9 @@ public class ModuleDeploymentService {
                                 // If still no port, try to call the module's gRPC service
                                 if (port == 0) {
                                     try {
-                                        // Use the container's internal port (known from module name)
+                                        // Use the container's internal port (all modules use the same)
                                         PipelineModule module = PipelineModule.fromName(moduleName);
-                                        int internalPort = module.getUnifiedPort();
+                                        int internalPort = MODULE_INTERNAL_PORT;
                                         
                                         // Try to connect to localhost with various port mappings
                                         // This would need actual gRPC client implementation
@@ -1685,10 +1694,10 @@ public class ModuleDeploymentService {
             
             try {
                 PipelineModule module = PipelineModule.fromName(moduleName);
-                internalPort = module.getUnifiedPort();
-                LOG.infof("Module %s has internal port %d", moduleName, internalPort);
+                internalPort = MODULE_INTERNAL_PORT;
+                LOG.infof("Module %s uses standard internal port %d", moduleName, internalPort);
             } catch (Exception e) {
-                LOG.errorf("Could not determine internal port for module %s", moduleName);
+                LOG.errorf("Module %s not found in PipelineModule enum", moduleName);
                 return false;
             }
             
@@ -1860,14 +1869,14 @@ public class ModuleDeploymentService {
                     "pipeline.type", "consul-sidecar",
                     "pipeline.sidecar.for", module.getModuleName(),
                     "pipeline.instance", String.valueOf(instanceNumber),
-                    "pipeline.port.mapping", hostPort + "->" + module.getUnifiedPort()
+                    "pipeline.port.mapping", hostPort + "->" + MODULE_INTERNAL_PORT
                 ))
                 .exec();
                 
             // Start the container
             dockerClient.startContainerCmd(container.getId()).exec();
             LOG.infof("Started orphaned module consul sidecar: %s with port %d->%d", 
-                     sidecarName, hostPort, module.getUnifiedPort());
+                     sidecarName, hostPort, MODULE_INTERNAL_PORT);
             
             return container.getId();
             
@@ -1886,15 +1895,8 @@ public class ModuleDeploymentService {
         try {
             String hostIP = hostIPDetector.detectHostIP();
             
-            // Get the internal port for this module type
-            int internalPort = 0;
-            try {
-                PipelineModule module = PipelineModule.fromName(moduleName);
-                internalPort = module.getUnifiedPort();
-            } catch (Exception e) {
-                LOG.errorf("Could not determine internal port for module %s", moduleName);
-                return false;
-            }
+            // All modules use the same internal port
+            int internalPort = MODULE_INTERNAL_PORT;
             
             // Create registration script matching the normal deployment pattern
             String moduleServiceName = moduleName + "-module" + (instanceNumber > 1 ? "-" + instanceNumber : "");
@@ -1984,4 +1986,92 @@ public class ModuleDeploymentService {
         String status,
         Map<String, String> labels
     ) {}
+    
+    /**
+     * Scale up a module by deploying another instance
+     */
+    public ModuleDeploymentResult scaleUpModule(PipelineModule module) {
+        // Find the highest instance number currently running
+        int nextInstance = 1;
+        try {
+            List<Container> containers = dockerClient.listContainersCmd()
+                .withNameFilter(List.of(module.getContainerName()))
+                .exec();
+                
+            for (Container container : containers) {
+                String name = container.getNames()[0].substring(1); // Remove leading /
+                if (name.matches(module.getContainerName() + "-\\d+")) {
+                    String instanceStr = name.substring(module.getContainerName().length() + 1);
+                    try {
+                        int instance = Integer.parseInt(instanceStr);
+                        nextInstance = Math.max(nextInstance, instance + 1);
+                    } catch (NumberFormatException e) {
+                        // Ignore
+                    }
+                }
+            }
+        } catch (Exception e) {
+            LOG.warnf("Error finding next instance number: %s", e.getMessage());
+        }
+        
+        // Also check the instance count map
+        Integer tracked = moduleInstanceCounts.get(module.getModuleName());
+        if (tracked != null && tracked >= nextInstance) {
+            nextInstance = tracked + 1;
+        }
+        
+        return deployModuleInstance(module, nextInstance);
+    }
+    
+    /**
+     * Get container logs
+     */
+    public List<String> getContainerLogs(String containerName, int lines) {
+        try {
+            // Find the container
+            List<Container> containers = dockerClient.listContainersCmd()
+                .withNameFilter(List.of(containerName))
+                .exec();
+                
+            if (containers.isEmpty()) {
+                return List.of("Container not found: " + containerName);
+            }
+            
+            // Get logs from the first matching container
+            String containerId = containers.get(0).getId();
+            LogContainerCmd logCmd = dockerClient.logContainerCmd(containerId)
+                .withStdOut(true)
+                .withStdErr(true)
+                .withTail(lines);
+                
+            // Collect logs in a frame consumer
+            final List<String> logLines = new ArrayList<>();
+            ResultCallback.Adapter<Frame> callback = new ResultCallback.Adapter<Frame>() {
+                @Override
+                public void onNext(Frame frame) {
+                    logLines.add(new String(frame.getPayload()).trim());
+                }
+            };
+            
+            logCmd.exec(callback);
+            
+            // Wait a bit for logs to be collected
+            try {
+                Thread.sleep(1000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+            
+            try {
+                callback.close();
+            } catch (Exception e) {
+                // Ignore
+            }
+                
+            return logLines;
+        } catch (Exception e) {
+            LOG.errorf("Failed to get logs for container %s: %s", containerName, e.getMessage());
+            return List.of("Failed to retrieve logs: " + e.getMessage());
+        }
+    }
 }

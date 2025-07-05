@@ -23,22 +23,58 @@ This guide documents the steps taken to convert the echo module from separate gR
 
 ## Important: Understanding Module Ports
 
+### CRITICAL: All Modules Use Port 39100 Internally
+**DO NOT** use the port numbers from PipelineModule.java for internal configuration!
+
+The ports defined in PipelineModule.java (39100, 39101, 39102, 39103, etc.) are **NOT** internal ports - they are just default values or documentation. All modules should use the **same internal port: 39100**.
+
 ### Internal Container Ports vs External Host Ports
 - **Internal Container Port**: The port the application listens on INSIDE the container (configured in application.yml and Dockerfile)
+  - **ALWAYS USE 39100** for all modules
 - **External Host Port**: The port exposed on the Docker host, dynamically allocated by the deployment service
 
 ### Port Convention
 
 **Internal Container Port (INSIDE container):**
-- All modules can use the same internal port: **39100**
-- This is what you configure in application.yml, Dockerfile, and entrypoint scripts
+- All modules use the same internal port: **39100**
+- This is what you configure in:
+  - `application.yml`: `quarkus.http.port: 39100`
+  - `module-entrypoint.sh`: `MODULE_PORT=${MODULE_PORT:-39100}`
+  - `Dockerfile.jvm`: `EXPOSE 39100`
 - Since each module runs in its own container, there's no conflict
 
 **External Host Ports (OUTSIDE container - dynamically allocated):**
-- First instance: 39100 (maps to internal 39100)
-- Second instance: 39101 (maps to internal 39100)
-- Third instance: 39102 (maps to internal 39100)
+- First instance: 39101 (maps to internal 39100)
+- Second instance: 39102 (maps to internal 39100)
+- Third instance: 39103 (maps to internal 39100)
 - etc.
+
+### Example Configuration
+✅ **CORRECT** (all modules use 39100 internally):
+```yaml
+# parser/application.yml
+quarkus:
+  http:
+    port: 39100  # Standard internal module port
+
+# test-module/application.yml  
+quarkus:
+  http:
+    port: 39100  # Standard internal module port
+
+# chunker/application.yml
+quarkus:
+  http:
+    port: 39100  # Standard internal module port
+```
+
+❌ **INCORRECT** (using PipelineModule ports):
+```yaml
+# chunker/application.yml
+quarkus:
+  http:
+    port: 39103  # WRONG! Don't use PipelineModule.java ports
+```
 
 **Example Docker mapping:**
 ```

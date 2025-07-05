@@ -2,14 +2,14 @@ quarkus:
   application:
     name: chunker
   http:
-    port: 39092
+    port: 39100  # Standard internal module port
   generate-code:
     grpc:
       scan-for-proto: com.rokkon.pipeline:protobuf
       scan-for-imports: com.google.protobuf:protobuf-java,com.google.api.grpc:proto-google-common-protos
   grpc:
     server:
-      port: 49092
+      use-separate-server: false  # Key change - tells Quarkus to use unified server
       host: 0.0.0.0
       enable-reflection-service: true
       max-inbound-message-size: 1073741824  # 1GB - it's 2025!
@@ -29,10 +29,43 @@ quarkus:
     registry: "registry.rokkon.com:8443"
     image: "pipeline/chunker:${quarkus.application.version}"
     dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
-    group: rokkon
+    group: pipeline
     # Credentials should be provided via environment variables:
     # QUARKUS_CONTAINER_IMAGE_USERNAME
     # QUARKUS_CONTAINER_IMAGE_PASSWORD
+
+# OpenTelemetry configuration
+otel:
+  enabled: true
+  traces:
+    enabled: true
+  metrics:
+    enabled: true
+  logs:
+    enabled: true
+  exporter:
+    otlp:
+      # In production, this will be set via environment variable to the sidecar collector
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+      protocol: ${OTEL_EXPORTER_OTLP_PROTOCOL:grpc}
+  resource:
+    attributes:
+      service.name: chunker
+      service.namespace: pipeline
+      deployment.environment: ${quarkus.profile:prod}
+
+# Micrometer metrics configuration
+micrometer:
+  enabled: true
+  export:
+    prometheus:
+      enabled: true
+  binder:
+    jvm: true
+    system: true
+    grpc:
+      server: true
+      client: true
 
 # Processing buffer configuration
 processing:
@@ -41,3 +74,18 @@ processing:
     capacity: ${PROCESSING_BUFFER_CAPACITY:100}
     directory: ${PROCESSING_BUFFER_DIRECTORY:build/chunker-output}
     prefix: ${PROCESSING_BUFFER_PREFIX:chunker_output}
+
+# Test profile configuration
+"%test":
+  quarkus:
+    # Disable OpenTelemetry in tests
+    otel:
+      enabled: false
+      sdk:
+        disabled: true
+
+# Build profile - enable container image building
+"%build":
+  quarkus:
+    container-image:
+      build: true

@@ -240,7 +240,7 @@ class PipelineDashboard extends LitElement {
       // WebSocket will handle the deploying state updates
       this.showToast(`Deploying ${module.name} module...`, 'info');
       
-      const response = await fetch(`/api/v1/module-management/${module.name}/deploy`, {
+      const response = await fetch(`/api/v1/dev/modules/${module.name}/deploy`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json'
@@ -315,17 +315,17 @@ class PipelineDashboard extends LitElement {
           
           // Use the module_id to identify which specific instance to remove
           if (instance.module_id) {
-            endpoint = `/api/v1/module-management/${moduleNameForUndeploy}/instance/${instance.module_id}`;
+            endpoint = `/api/v1/dev/modules/${moduleNameForUndeploy}/instance/${instance.module_id}`;
           } else {
             // Fallback to removing all instances
-            endpoint = `/api/v1/module-management/${moduleNameForUndeploy}/undeploy`;
+            endpoint = `/api/v1/dev/modules/${moduleNameForUndeploy}/undeploy`;
           }
           method = 'DELETE';
           break;
         case 'scale-up':
           // For dev mode - deploy additional instance
           let moduleNameForScale = this.extractModuleName(instance, service);
-          endpoint = `/api/v1/module-management/${moduleNameForScale}/scale-up`;
+          endpoint = `/api/v1/dev/modules/${moduleNameForScale}/scale-up`;
           method = 'POST';
           break;
       }
@@ -402,7 +402,7 @@ class PipelineDashboard extends LitElement {
 
   async fetchAvailableModules() {
     try {
-      const response = await fetch('/api/v1/module-management/available');
+      const response = await fetch('/api/v1/dev/modules/available');
       if (response.ok) {
         this.availableModules = await response.json();
         console.log('Available modules:', this.availableModules);
@@ -414,7 +414,7 @@ class PipelineDashboard extends LitElement {
 
   async fetchDeployedModules() {
     try {
-      const response = await fetch('/api/v1/module-management/deployed');
+      const response = await fetch('/api/v1/dev/modules/deployed');
       if (response.ok) {
         this.deployedModules = await response.json();
         console.log('Deployed modules updated:', this.deployedModules);
@@ -428,7 +428,7 @@ class PipelineDashboard extends LitElement {
 
   async fetchOrphanedModules() {
     try {
-      const response = await fetch('/api/v1/module-management/orphaned');
+      const response = await fetch('/api/v1/dev/modules/orphaned');
       if (response.ok) {
         this.orphanedModules = await response.json();
         console.log('Orphaned modules:', this.orphanedModules);

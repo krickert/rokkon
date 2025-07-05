@@ -758,7 +758,7 @@ export class DashboardGrid extends LitElement {
     this.requestUpdate();
 
     try {
-      const response = await fetch(`/api/v1/module-management/orphaned/${containerId}/redeploy`, {
+      const response = await fetch(`/api/v1/dev/modules/orphaned/${containerId}/redeploy`, {
         method: 'POST'
       });
 
