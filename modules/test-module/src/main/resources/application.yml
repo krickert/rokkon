@@ -5,11 +5,11 @@ quarkus:
     grpc:
       scan-for-proto: com.rokkon.pipeline:protobuf,com.google.api.grpc:proto-google-common-protos
   http:
-    port: 39095
+    port: 39100  # Standard internal module port
     test-port: 0  # Random port for tests
   grpc:
     server:
-      port: 49095  # Standardized port for test-module
+      use-separate-server: false  # Use unified server
       host: 0.0.0.0
       enable-reflection-service: true
       max-inbound-message-size: 1073741824  # 1GB
@@ -18,13 +18,16 @@ quarkus:
     clients:
       testService:
         max-inbound-message-size: 1073741824  # 1GB
+      TestHarness:
+        host: localhost
+        port: ${quarkus.http.port}  # Use HTTP port for unified server
   log:
     level: INFO
     category:
       "com.rokkon":
         level: DEBUG
   container-image:
-    build: true
+    build: false  # Disable by default, enable via profile
     push: false
     name: test-module
     tag: 1.0.0-SNAPSHOT
@@ -45,6 +48,39 @@ test:
     delay:
       ms: 0
 
+# OpenTelemetry configuration
+otel:
+  enabled: true
+  traces:
+    enabled: true
+  metrics:
+    enabled: true
+  logs:
+    enabled: true
+  exporter:
+    otlp:
+      # In production, this will be set via environment variable to the sidecar collector
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+      protocol: ${OTEL_EXPORTER_OTLP_PROTOCOL:grpc}
+  resource:
+    attributes:
+      service.name: test-module
+      service.namespace: pipeline
+      deployment.environment: ${quarkus.profile:prod}
+
+# Micrometer metrics configuration
+micrometer:
+  enabled: true
+  export:
+    prometheus:
+      enabled: true
+  binder:
+    jvm: true
+    system: true
+    grpc:
+      server: true
+      client: true
+
 # Test profile configuration
 "%test":
   quarkus:
@@ -55,3 +91,17 @@ test:
       clients:
         testService:
           max-inbound-message-size: 1073741824  # 1GB
+    # Disable OpenTelemetry in tests
+    otel:
+      enabled: false
+      sdk:
+        disabled: true
+    # Disable container image building in tests
+    container-image:
+      build: false
+
+# Build profile - enable container image building
+"%build":
+  quarkus:
+    container-image:
+      build: true

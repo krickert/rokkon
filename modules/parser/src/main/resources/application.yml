@@ -2,15 +2,17 @@ quarkus:
   application:
     name: parser-module
   http:
-    port: 39091
+    port: 39100  # Using standard internal module port
   generate-code:
     grpc:
       scan-for-proto: com.rokkon.pipeline:protobuf,com.google.api.grpc:proto-google-common-protos
   grpc:
     server:
-      port: 49091
+      use-separate-server: false  # Key change - tells Quarkus to use unified server
       host: 0.0.0.0
       enable-reflection-service: true
+      max-inbound-message-size: 1073741824  # 1GB for large documents
+      max-outbound-message-size: 1073741824  # 1GB for parsed content
     clients:
       # Add gRPC client configurations here if needed
   log:
@@ -22,9 +24,9 @@ quarkus:
     build: false  # Set to true when you want to build the image
     push: false   # Set to true when you want to push to registry
     registry: "registry.rokkon.com:8443"
-    image: "rokkon/parser-module:${quarkus.application.version}"
+    image: "pipeline/parser-module:${quarkus.application.version}"  # Changed from rokkon/ to pipeline/
     dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
-    group: rokkon
+    group: pipeline  # Changed from rokkon to pipeline
     # Credentials should be provided via environment variables:
     # QUARKUS_CONTAINER_IMAGE_USERNAME
     # QUARKUS_CONTAINER_IMAGE_PASSWORD
@@ -37,12 +39,50 @@ processing:
     directory: "build/test-data"
     prefix: "parser"
 
+# OpenTelemetry configuration
+otel:
+  enabled: true
+  traces:
+    enabled: true
+  metrics:
+    enabled: true
+  logs:
+    enabled: true
+  exporter:
+    otlp:
+      # In production, this will be set via environment variable to the sidecar collector
+      endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+      protocol: ${OTEL_EXPORTER_OTLP_PROTOCOL:grpc}
+  resource:
+    attributes:
+      service.name: parser-module
+      service.namespace: pipeline
+      deployment.environment: ${quarkus.profile:prod}
+
+# Micrometer metrics configuration
+micrometer:
+  enabled: true
+  export:
+    prometheus:
+      enabled: true
+  binder:
+    jvm: true
+    system: true
+    grpc:
+      server: true
+      client: true
+
 # Test profile configuration
 "%test":
   quarkus:
     grpc:
       server:
         port: 0  # Use random port for tests
+    # Disable OpenTelemetry in tests
+    otel:
+      enabled: false
+      sdk:
+        disabled: true
   processing:
     buffer:
       enabled: true  # Enable buffer in test mode

@@ -198,7 +198,7 @@ public class TestProcessorServiceImpl implements PipeStepProcessor {
      */
     private ServiceRegistrationResponse.Builder buildBaseRegistration() {
         return ServiceRegistrationResponse.newBuilder()
-                .setModuleName(processorName)
+                .setModuleName("test-module")  // Should match quarkus.application.name
                 .setJsonConfigSchema("""
                     {
                         "type": "object",

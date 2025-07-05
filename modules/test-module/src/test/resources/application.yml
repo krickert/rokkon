@@ -9,7 +9,7 @@ quarkus:
     test-port: 0
   grpc:
     server:
-      port: 0  # Random port for tests
+      use-separate-server: false  # Use unified server
       host: 0.0.0.0
       enable-reflection-service: true
       max-inbound-message-size: 1073741824  # 1GB
@@ -18,6 +18,9 @@ quarkus:
     clients:
       testService:
         max-inbound-message-size: 1073741824  # 1GB
+      TestHarness:
+        host: localhost
+        port: ${quarkus.http.test-port}  # Use test HTTP port for unified server
   log:
     level: INFO
     category:
@@ -33,17 +36,25 @@ test:
   module:
     container:
       name: "rokkon/test-module:1.0.0-SNAPSHOT"
+      port: 39100  # Unified server port
       grpc:
-        port: 9090
+        port: 39100  # For backward compatibility
       internal:
+        port: 39100  # Internal unified port
         grpc:
-          port: 9090
+          port: 39100  # For backward compatibility
       http:
-        port: 8080
+        port: 39100  # HTTP port same as unified port
 
 # Disable Consul config for tests
   consul-config:
     enabled: false
+    
+# Disable OpenTelemetry in tests
+  otel:
+    enabled: false
+    sdk:
+      disabled: true
     
 # Test isolation settings
   arc:

@@ -3,7 +3,7 @@ set -e
 
 # Configuration with defaults
 MODULE_HOST=${MODULE_HOST:-0.0.0.0}
-MODULE_PORT=${MODULE_PORT:-9090}
+MODULE_PORT=${MODULE_PORT:-39100}  # Use standard internal port 39100
 MODULE_HTTP_PORT=${MODULE_HTTP_PORT:-${MODULE_PORT}}
 MODULE_GRPC_PORT=${MODULE_GRPC_PORT:-${MODULE_PORT}}
 ENGINE_HOST=${ENGINE_HOST:-localhost}
@@ -24,8 +24,8 @@ register_module() {
   while [ $retry_count -lt $MAX_RETRIES ] && [ "$success" = false ]; do
     echo "Registering module with engine (attempt $((retry_count+1))/${MAX_RETRIES})..."
     
-    # Build CLI command with all options (use gRPC port for registration)
-    local cli_cmd="pipeline register --module-host=${MODULE_HOST} --module-port=${MODULE_GRPC_PORT} --engine-host=${ENGINE_HOST} --engine-port=${ENGINE_PORT}"
+    # Build CLI command with all options (use unified port for registration)
+    local cli_cmd="pipeline register --module-host=${MODULE_HOST} --module-port=${MODULE_PORT} --engine-host=${ENGINE_HOST} --engine-port=${ENGINE_PORT}"
     
     # Add optional parameters if provided
     if [ -n "$CONSUL_HOST" ]; then
@@ -59,9 +59,9 @@ register_module() {
   return 0
 }
 
-# Start the module in the background with port overrides
+# Start the module in the background with unified port
 echo "Starting module..."
-java ${JAVA_OPTS} ${JAVA_OPTS_APPEND} -Dquarkus.http.port=${MODULE_HTTP_PORT} -Dquarkus.grpc.server.port=${MODULE_GRPC_PORT} -jar /deployments/quarkus-run.jar &
+java ${JAVA_OPTS} ${JAVA_OPTS_APPEND} -Dquarkus.http.port=${MODULE_PORT} -jar /deployments/quarkus-run.jar &
 MODULE_PID=$!
 
 # Give the module a moment to start up

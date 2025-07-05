@@ -1,0 +1,7 @@
+{
+  "bundle": {
+    "esbuild": {
+      "external": ["lit-html/is-server.js"]
+    }
+  }
+}

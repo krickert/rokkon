@@ -1,0 +1,308 @@
+# docker/compose/docker-compose.dev.yml
+# Development environment with Consul + modules in Docker, engine runs locally in dev mode
+# 
+# Usage:
+# 1. Start this compose file: docker-compose -f docker-compose.dev.yml up
+# 2. Run engine in dev mode: cd ../../engine/pipestream && ./gradlew quarkusDev
+#
+version: '3.8'
+
+services:
+  # ==========================================
+  # 1. CONSUL SERVER - Central Service Discovery
+  # ==========================================
+  consul-server:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-server-dev
+    ports:
+      - "${CONSUL_HTTP_PORT:-8500}:8500"      # HTTP API & UI
+      - "${CONSUL_DNS_PORT:-8600}:8600/tcp"  # DNS
+      - "${CONSUL_DNS_PORT:-8600}:8600/udp"  # DNS
+    volumes:
+      - consul_data_dev:/consul/data
+    command: >
+      agent -server -ui 
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -bootstrap-expect=1 
+      -dev
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    healthcheck:
+      test: ["CMD", "consul", "info"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+    networks:
+      - pipeline-dev-network
+
+  # ==========================================
+  # 2. CONFIGURATION SEEDER - One-time Job
+  # ==========================================
+  seeder:
+    build:
+      context: ../../cli/seed-engine-consul-config
+      dockerfile: Dockerfile
+    container_name: consul-seeder-dev
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    entrypoint: ["/bin/sh", "-c"]
+    command:
+      - |
+        # Seed with dev-specific configuration
+        java -jar build/quarkus-app/quarkus-run.jar -h consul-server -p 8500 --key config/application --import seed-data.json --force &&
+        java -jar build/quarkus-app/quarkus-run.jar -h consul-server -p 8500 --key config/dev --import seed-data.json --force
+    volumes:
+      - ../../cli/seed-engine-consul-config/seed-data.json:/app/seed-data.json:ro
+    networks:
+      - pipeline-dev-network
+
+  # ==========================================
+  # 3. ALL MODULES WITH SIDECARS
+  # ==========================================
+  
+  # Echo Module
+  consul-agent-echo:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-echo-dev
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${ECHO_MODULE_REST_PORT:-39090}:39090"
+      - "${ECHO_MODULE_GRPC_PORT:-49090}:49090"
+    command: >
+      agent 
+      -node="echo-sidecar-dev"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-dev-network
+
+  echo-module:
+    image: ${ECHO_MODULE_IMAGE:-rokkon/echo-module:latest}
+    container_name: echo-module-dev
+    depends_on:
+      consul-agent-echo:
+        condition: service_started
+    environment:
+      - MODULE_NAME=echo
+      - MODULE_HOST=consul-agent-echo
+      - MODULE_HTTP_PORT=39090
+      - MODULE_GRPC_PORT=49090
+      - QUARKUS_HTTP_PORT=39090
+      - QUARKUS_GRPC_SERVER_PORT=49090
+      - ENGINE_HOST=host.docker.internal  # Points to host machine
+      - ENGINE_PORT=49000
+      - QUARKUS_PROFILE=${PROFILE:-dev}
+      - JAVA_OPTS=-Xmx1g -Xms512m
+    network_mode: "service:consul-agent-echo"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # Test Module
+  consul-agent-test:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-test-dev
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${TEST_MODULE_REST_PORT:-39095}:39095"
+      - "${TEST_MODULE_GRPC_PORT:-49095}:49095"
+    command: >
+      agent 
+      -node="test-sidecar-dev"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-dev-network
+
+  test-module:
+    image: ${TEST_MODULE_IMAGE:-rokkon/test-module:latest}
+    container_name: test-module-dev
+    depends_on:
+      consul-agent-test:
+        condition: service_started
+    environment:
+      - MODULE_NAME=test-module
+      - MODULE_HOST=consul-agent-test
+      - MODULE_HTTP_PORT=39095
+      - MODULE_GRPC_PORT=49095
+      - QUARKUS_HTTP_PORT=39095
+      - QUARKUS_GRPC_SERVER_PORT=49095
+      - ENGINE_HOST=host.docker.internal
+      - ENGINE_PORT=49000
+      - QUARKUS_PROFILE=${PROFILE:-dev}
+      - JAVA_OPTS=-Xmx1g -Xms512m
+    network_mode: "service:consul-agent-test"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # Parser Module
+  consul-agent-parser:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-parser-dev
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${PARSER_MODULE_REST_PORT:-39093}:39093"
+      - "${PARSER_MODULE_GRPC_PORT:-49093}:49093"
+    command: >
+      agent 
+      -node="parser-sidecar-dev"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-dev-network
+
+  parser-module:
+    image: ${PARSER_MODULE_IMAGE:-rokkon/parser-module:latest}
+    container_name: parser-module-dev
+    depends_on:
+      consul-agent-parser:
+        condition: service_started
+    environment:
+      - MODULE_NAME=parser
+      - MODULE_HOST=consul-agent-parser
+      - MODULE_HTTP_PORT=39093
+      - MODULE_GRPC_PORT=49093
+      - QUARKUS_HTTP_PORT=39093
+      - QUARKUS_GRPC_SERVER_PORT=49093
+      - ENGINE_HOST=host.docker.internal
+      - ENGINE_PORT=49000
+      - QUARKUS_PROFILE=${PROFILE:-dev}
+      - JAVA_OPTS=-Xmx1g -Xms512m
+    network_mode: "service:consul-agent-parser"
+    deploy:
+      resources:
+        limits:
+          memory: 1G
+        reservations:
+          memory: 512M
+
+  # Chunker Module (Optional - comment out if not needed for dev)
+  consul-agent-chunker:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-chunker-dev
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${CHUNKER_MODULE_REST_PORT:-39092}:39092"
+      - "${CHUNKER_MODULE_GRPC_PORT:-49092}:49092"
+    command: >
+      agent 
+      -node="chunker-sidecar-dev"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-dev-network
+
+  chunker-module:
+    image: ${CHUNKER_MODULE_IMAGE:-pipeline/chunker:latest}
+    container_name: chunker-module-dev
+    depends_on:
+      consul-agent-chunker:
+        condition: service_started
+    environment:
+      - MODULE_NAME=chunker
+      - MODULE_HOST=consul-agent-chunker
+      - MODULE_HTTP_PORT=39092
+      - MODULE_GRPC_PORT=49092
+      - QUARKUS_HTTP_PORT=39092
+      - QUARKUS_GRPC_SERVER_PORT=49092
+      - ENGINE_HOST=host.docker.internal
+      - ENGINE_PORT=49000
+      - QUARKUS_PROFILE=${PROFILE:-dev}
+      - JAVA_OPTS=-Xmx4g -Xms1g
+    network_mode: "service:consul-agent-chunker"
+    deploy:
+      resources:
+        limits:
+          memory: 4G
+        reservations:
+          memory: 2G
+
+  # Embedder Module (Optional - comment out if not needed for dev)
+  consul-agent-embedder:
+    image: hashicorp/consul:${CONSUL_VERSION:-1.21}
+    container_name: consul-agent-embedder-dev
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "${EMBEDDER_MODULE_REST_PORT:-39094}:39094"
+      - "${EMBEDDER_MODULE_GRPC_PORT:-49094}:49094"
+    command: >
+      agent 
+      -node="embedder-sidecar-dev"
+      -client=0.0.0.0 
+      -bind=0.0.0.0
+      -retry-join=consul-server
+      -log-level=info
+    environment:
+      - CONSUL_BIND_INTERFACE=eth0
+    networks:
+      - pipeline-dev-network
+
+  embedder-module:
+    image: ${EMBEDDER_MODULE_IMAGE:-pipeline/embedder:latest}
+    container_name: embedder-module-dev
+    depends_on:
+      consul-agent-embedder:
+        condition: service_started
+    environment:
+      - MODULE_NAME=embedder
+      - MODULE_HOST=consul-agent-embedder
+      - MODULE_HTTP_PORT=39094
+      - MODULE_GRPC_PORT=49094
+      - QUARKUS_HTTP_PORT=39094
+      - QUARKUS_GRPC_SERVER_PORT=49094
+      - ENGINE_HOST=host.docker.internal
+      - ENGINE_PORT=49000
+      - QUARKUS_PROFILE=${PROFILE:-dev}
+      - JAVA_OPTS=-Xmx8g -Xms2g
+    network_mode: "service:consul-agent-embedder"
+    deploy:
+      resources:
+        limits:
+          memory: 8G
+        reservations:
+          memory: 4G
+
+# ==========================================
+# NETWORKS & VOLUMES
+# ==========================================
+networks:
+  pipeline-dev-network:
+    driver: bridge
+
+volumes:
+  consul_data_dev:

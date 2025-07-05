@@ -11,16 +11,16 @@
 #
 # Then run the container using:
 #
-# docker run -i --rm -p 8080:8080 quarkus/echo-module-jvm
+# docker run -i --rm -p 39100:39100 quarkus/echo-module-jvm
 #
 # If you want to include the debug port into your docker image
-# you will have to expose the debug port (default 5005 being the default) like this :  EXPOSE 8080 5005.
-# Additionally you will have to set -e JAVA_DEBUG=true and -e JAVA_DEBUG_PORT=*:5005
+# you will have to expose the debug port (default 35100 for echo module) like this :  EXPOSE 39100 35100.
+# Additionally you will have to set -e JAVA_DEBUG=true and -e JAVA_DEBUG_PORT=*:35100
 # when running the container
 #
 # Then run the container using :
 #
-# docker run -i --rm -p 8080:8080 quarkus/echo-module-jvm
+# docker run -i --rm -p 39100:39100 -e JAVA_DEBUG=true -e JAVA_DEBUG_PORT=*:35100 -p 35100:35100 quarkus/echo-module-jvm
 #
 # This image uses the `run-java.sh` script to run the application.
 # This scripts computes the command line to execute your Java application, and
@@ -102,8 +102,8 @@ RUN echo '#!/bin/bash' > /deployments/pipeline && \
 # Set PATH to include the deployments directory
 ENV PATH="/deployments:${PATH}"
 
-EXPOSE 8080
-EXPOSE 9090
+# Unified server uses single port for both HTTP and gRPC
+EXPOSE 39100
 USER 185
 ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"

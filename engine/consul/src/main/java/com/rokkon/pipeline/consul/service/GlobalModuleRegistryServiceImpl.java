@@ -236,14 +236,19 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
                 serviceOptions.setCheckOptions(checkOptions);
                 
                 // Register the service
+                LOG.infof("Registering service with Consul: %s (ID: %s)", moduleName, moduleId);
                 return Uni.createFrom().completionStage(
                     client.registerService(serviceOptions).toCompletionStage()
                 )
                 .onItem().transformToUni(v -> {
+                    LOG.infof("Service registered with Consul, now storing metadata in KV");
                     // Store additional metadata in KV
                     return storeModuleMetadata(registration);
                 })
-                .onItem().transform(v -> registration);
+                .onItem().transform(v -> {
+                    LOG.infof("Module registration complete: %s", moduleId);
+                    return registration;
+                });
             })
             .onFailure().transform(t -> {
                 LOG.errorf(t, "Failed to register module %s", moduleName);
@@ -463,8 +468,8 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
     @Override
     public Uni<Void> enableModuleForCluster(String moduleId, String clusterName) {
         ConsulClient client = getConsulClient();
-        String kvKey = String.format("rokkon/clusters/%s/enabled-modules/%s", 
-                                    clusterName, moduleId);
+        String kvKey = String.format("%s/clusters/%s/enabled-modules/%s", 
+                                    kvPrefix, clusterName, moduleId);
         
         return Uni.createFrom().completionStage(
             client.putValue(kvKey, "true").toCompletionStage()
@@ -488,8 +493,8 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
     @Override
     public Uni<Void> disableModuleForCluster(String moduleId, String clusterName) {
         ConsulClient client = getConsulClient();
-        String kvKey = String.format("rokkon/clusters/%s/enabled-modules/%s", 
-                                    clusterName, moduleId);
+        String kvKey = String.format("%s/clusters/%s/enabled-modules/%s", 
+                                    kvPrefix, clusterName, moduleId);
         
         return Uni.createFrom().completionStage(
             client.deleteValue(kvKey).toCompletionStage()
@@ -506,7 +511,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
     @Override
     public Uni<Set<String>> listEnabledModulesForCluster(String clusterName) {
         ConsulClient client = getConsulClient();
-        String prefix = String.format("rokkon/clusters/%s/enabled-modules/", clusterName);
+        String prefix = String.format("%s/clusters/%s/enabled-modules/", kvPrefix, clusterName);
         
         return Uni.createFrom().completionStage(
             client.getKeys(prefix).toCompletionStage()
@@ -588,6 +593,8 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
         ConsulClient client = getConsulClient();
         String kvKey = kvPrefix + "/modules/registered/" + registration.moduleId();
         
+        LOG.infof("Storing module metadata to KV - prefix: %s, key: %s", kvPrefix, kvKey);
+        
         // Convert registration to JSON (simplified for now)
         String jsonValue = String.format("""
             {
@@ -626,13 +633,18 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
         )
         .onItem().transformToUni(success -> {
             if (success) {
-                LOG.debugf("Stored module metadata in KV: %s", kvKey);
+                LOG.infof("Successfully stored module metadata in KV: %s (success=%s)", kvKey, success);
                 return Uni.createFrom().voidItem();
             } else {
+                LOG.errorf("Failed to store module metadata in KV: %s (success=%s)", kvKey, success);
                 return Uni.createFrom().failure(
                     new RuntimeException("Failed to store module metadata")
                 );
             }
+        })
+        .onFailure().transform(t -> {
+            LOG.errorf(t, "Exception storing module metadata in KV: %s", kvKey);
+            return new RuntimeException("Failed to store module metadata", t);
         });
     }
     
@@ -1058,7 +1070,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
      * Scheduled cleanup task that runs periodically.
      * Timing is controlled by configuration properties that can be updated at runtime.
      */
-    @Scheduled(every = "{rokkon.consul.cleanup.interval}", 
+    @Scheduled(every = "{pipeline.consul.cleanup.interval:30m}", 
                delay = 1, 
                delayUnit = java.util.concurrent.TimeUnit.MINUTES)
     void scheduledCleanup() {

@@ -72,7 +72,7 @@ public class EchoServiceImpl implements PipeStepProcessor {
 
         // Build a more comprehensive registration response with metadata
         ServiceRegistrationResponse.Builder responseBuilder = ServiceRegistrationResponse.newBuilder()
-                .setModuleName("echo")
+                .setModuleName("echo-module")
                 .setVersion("1.0.0")
                 .setDisplayName("Echo Service")
                 .setDescription("A simple echo module that returns documents with added metadata")

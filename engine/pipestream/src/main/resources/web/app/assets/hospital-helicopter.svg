@@ -1,0 +1,44 @@
+<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+  <style>
+    .helicopter-body {
+      animation: hover 2s ease-in-out infinite;
+    }
+    .rotor {
+      animation: spin 0.3s linear infinite;
+      transform-origin: 12px 5px;
+    }
+    .cross-pulse {
+      animation: pulse-cross 1.5s ease-in-out infinite;
+    }
+    @keyframes hover {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-3px); }
+    }
+    @keyframes spin {
+      from { transform: rotate(0deg); }
+      to { transform: rotate(360deg); }
+    }
+    @keyframes pulse-cross {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+  </style>
+  <!-- Main rotor -->
+  <path d="M2 5h20" class="rotor"/>
+  <!-- Rotor mast -->
+  <path d="M12 5v3" class="helicopter-body"/>
+  <!-- Helicopter body -->
+  <path d="M5 11h14c1 0 2 1 2 2v4c0 1-1 2-2 2H5c-1 0-2-1-2-2v-4c0-1 1-2 2-2z" class="helicopter-body"/>
+  <!-- Cockpit window -->
+  <path d="M5 13h4" class="helicopter-body"/>
+  <!-- Landing skids -->
+  <path d="M6 19v2m12-2v2" class="helicopter-body"/>
+  <path d="M4 21h6m4 0h6" class="helicopter-body"/>
+  <!-- Medical cross -->
+  <rect x="11" y="13" width="4" height="4" rx="0.5" class="helicopter-body"/>
+  <path d="M13 14v2m-1-1h2" class="cross-pulse" stroke-width="1.5"/>
+  <!-- Tail -->
+  <path d="M19 13l3-2v-1l-3-2" class="helicopter-body"/>
+  <!-- Tail rotor -->
+  <circle cx="22" cy="10" r="1" class="rotor"/>
+</svg>

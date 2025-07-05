@@ -30,7 +30,7 @@ public class ModuleRegistrationServiceImpl extends MutinyModuleRegistrationServi
     @ConfigProperty(name = "engine.host", defaultValue = "localhost")
     String engineHost;
     
-    @ConfigProperty(name = "engine.port", defaultValue = "49000")
+    @ConfigProperty(name = "quarkus.http.port", defaultValue = "38082")
     int enginePort;
     
     @Inject

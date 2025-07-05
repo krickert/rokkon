@@ -7,11 +7,12 @@
 #
 # Then, build the image with:
 #
-# docker build -f src/main/docker/Dockerfile.jvm -t quarkus/parser-module-jvm .
+# docker build -f src/main/docker/Dockerfile.jvm -t pipeline/parser-module-jvm .
 #
 # Then run the container using:
 #
-# docker run -i --rm -p 8080:8080 quarkus/parser-module-jvm
+# docker run -i --rm -p 39100:39100 pipeline/parser-module-jvm
+# Note: In deployment, external port will be dynamically allocated
 #
 # If you want to include the debug port into your docker image
 # you will have to expose the debug port (default 5005 being the default) like this :  EXPOSE 8080 5005.
@@ -20,7 +21,7 @@
 #
 # Then run the container using :
 #
-# docker run -i --rm -p 8080:8080 quarkus/parser-module-jvm
+# docker run -i --rm -p 39100:39100 pipeline/parser-module-jvm
 #
 # This image uses the `run-java.sh` script to run the application.
 # This scripts computes the command line to execute your Java application, and
@@ -102,8 +103,8 @@ RUN echo '#!/bin/bash' > /deployments/pipeline && \
 # Set PATH to include the deployments directory
 ENV PATH="/deployments:${PATH}"
 
-EXPOSE 8080
-EXPOSE 9090
+# Standard internal module port
+EXPOSE 39100
 USER 185
 ENV JAVA_OPTS_APPEND="-Dquarkus.http.host=0.0.0.0 -Djava.util.logging.manager=org.jboss.logmanager.LogManager"
 ENV JAVA_APP_JAR="/deployments/quarkus-run.jar"

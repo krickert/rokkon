@@ -2,22 +2,24 @@ quarkus:
   application:
     name: pipeline-engine
 
+
   generate-code:
     grpc:
       scan-for-proto: com.rokkon.pipeline:protobuf,com.google.api.grpc:proto-google-common-protos
       codegen:
         type: mutiny
+        # Skip code generation if needed using property
+        skip: ${grpc.codegen.skip:false}
   http:
     port: ${QUARKUS_HTTP_PORT:38082}
     host: ${ENGINE_HOST:0.0.0.0}
 
   grpc:
     server:
-      port: ${QUARKUS_GRPC_SERVER_PORT:48082}
-      host: ${ENGINE_HOST:0.0.0.0}
+      # With unified server, gRPC uses the same port as HTTP
+      use-separate-server: false  # Use unified HTTP server (recommended)
       enable-reflection-service: true
       max-inbound-message-size: 419430400
-      use-separate-server: true  # Use separate gRPC server (default mode)
       health:
         enabled: true
 
@@ -53,14 +55,14 @@ quarkus:
 pipeline:
   consul:
     kv-prefix: pipeline  # This is the prefix for Consul KV store (default was 'rokkon')
-  
+
   # Cache configuration for gRPC channels
   cache:
     caffeine:
       "grpc-channels":
         expire-after-write: 10m
         maximum-size: 100
-    
+
   # Index external dependencies for CDI discovery
   index-dependency:
     engine-consul:
@@ -79,6 +81,10 @@ pipeline:
     rokkon-commons:
       group-id: com.rokkon.pipeline
       artifact-id: rokkon-commons
+    # Add interface module for OpenAPI models
+    commons-interface:
+      group-id: com.rokkon.pipeline
+      artifact-id: interface
 
   # Health check configuration
   health:
@@ -112,6 +118,40 @@ pipeline:
   devservices:
     enabled: true
 
+  # Observability configuration
+  observability:
+    enabled: true
+    dev-resources: true
+    # LGTM stack configuration
+    lgtm:
+      grafana:
+        port: 3000
+      provisioning:
+        enabled: true
+
+  otel:
+    enabled: true
+    traces:
+      enabled: true
+    metrics:
+      enabled: true
+    logs:
+      enabled: true
+
+  # Micrometer metrics configuration
+  micrometer:
+    enabled: true
+    export:
+      # Also expose metrics endpoint for direct Prometheus scraping
+      prometheus:
+        enabled: true
+    binder:
+      jvm: true
+      system: true
+      grpc:
+        server: true
+        client: true
+
 # Engine-specific configuration
 consul:
   host: ${CONSUL_HOST:localhost}
@@ -134,19 +174,19 @@ stork:
       type: consul
       consul-host: ${consul.host:localhost}
       consul-port: ${consul.port:8500}
-      # Register with gRPC port as primary
-      instance-port: ${quarkus.grpc.server.port:48082}
+      # Register with HTTP port (handles both REST and gRPC)
+      instance-port: ${quarkus.http.port:38082}
       # Additional metadata
       metadata:
         service-type: ENGINE
-        grpc-port: ${quarkus.grpc.server.port:48082}
-        http-port: ${quarkus.http.port:38082}
+        port: ${quarkus.http.port:38082}  # Single port for both protocols
+        unified-server: true
         version: ${quarkus.application.version:1.0.0}
       # Health check configuration
       check-type: grpc
       check-interval: 10s
       deregister-critical-service-after: 30s
-  
+
   # Default service discovery for all services
   default:
     service-discovery:
@@ -211,22 +251,58 @@ smallrye:
         enable: true
       category:
         "com.rokkon.pipeline":
-          level: DEBUG
-        "org.testcontainers":
           level: INFO
+        "org.testcontainers":
+          level: WARN
         "io.quarkus.devservices":
-          level: DEBUG
+          level: INFO
+        "jdk.event.security":
+          level: WARN
+        "jd.ev.security":
+          level: WARN
+        "io.quarkus":
+          level: INFO
+        "io.smallrye":
+          level: INFO
+        "io.vertx":
+          level: WARN
+        # Silence Apache HTTP client debug logs
+        "org.apache.hc":
+          level: WARN
+        "org.apache.http":
+          level: WARN
+        "org.apache.hc.client5.http.wire":
+          level: ERROR
+        # Silence Netty debug logs
+        "io.netty":
+          level: WARN
+        # Silence terminal/TTY warnings
+        "org.aesh":
+          level: ERROR
+        # Silence JSON provider logs
+        "jakarta.json.spi":
+          level: WARN
+        # Silence Docker client debug logs
+        "com.github.dockerjava":
+          level: WARN
+        # Silence web bundler debug logs
+        "io.quarkiverse.web.bundler":
+          level: INFO
+        "io.mvnpm.esbuild":
+          level: INFO
+        # Silence ProcessBuilder debug logs
+        "java.lang.ProcessBuilder":
+          level: WARN
+        # Silence compose dev services debug logs
+        "io.quarkus.devservices.deployment.compose":
+          level: INFO
+        "io.quarkus.deployment.util.ContainerRuntimeUtil":
+          level: INFO
 
     # HTTP configuration for dev mode
     http:
       host: 0.0.0.0  # Listen on all interfaces in container
-      port: 38090
-
-    # gRPC configuration for dev mode  
-    grpc:
-      server:
-        host: 0.0.0.0  # Listen on all interfaces in container
-        port: 49000
+      port: 38090  # Both REST and gRPC will use this port
 
     # Dev Services configuration
     devservices:
@@ -243,14 +319,28 @@ smallrye:
     dev:
       instrumentation: true
 
+    # Docker client configuration for dev mode
+    docker-client:
+      # Use the default Docker socket
+      docker-host: "unix:///var/run/docker.sock"
+      # Connection timeout
+      connection-timeout: 30s
+      # Read timeout  
+      read-timeout: 30s
+
     # In dev mode, enable Consul features if consul.host is configured
     consul-config:
       enabled: false
 
+    # Web bundler configuration for modern UI
+    web-bundler:
+      bundling:
+        watch: true  # Enable hot reload in dev mode
+
   # Consul configuration for dev mode
   consul:
-    host: ${CONSUL_HOST:consul-dev}  # Use container name in dev
-    port: ${CONSUL_PORT:8500}
+    host: ${CONSUL_HOST:localhost}  # Use localhost in dev
+    port: ${CONSUL_PORT:8501}
     enabled: true
 
   # Enable auto-start of Consul container in dev mode

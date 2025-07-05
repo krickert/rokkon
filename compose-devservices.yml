@@ -1,0 +1,126 @@
+# Dev service compose file for Pipeline engine development
+# Automatically detected and managed by Quarkus Dev Services
+
+services:
+  # Consul server for service discovery
+  consul-server:
+    image: hashicorp/consul:1.21
+    container_name: consul-server-dev
+    command: >
+      sh -c "
+      consul agent -server -ui -client=0.0.0.0 -bind=0.0.0.0 -bootstrap-expect=1 -dev &
+      sleep 5 &&
+      consul kv put config/application '
+      application:
+        name: pipeline-engine
+        version: 1.0.0
+        description: Pipeline Engine Development Configuration
+      
+      consul:
+        host: localhost
+        port: 8500
+      
+      engine:
+        host: host.docker.internal
+      
+      pipeline:
+        engine:
+          grpc-port: 49001
+          rest-port: 39001
+          debug: true
+          cluster-name: docker-dev-cluster
+          engine-name: engine-dev
+      ' &&
+      consul kv put config/dev 'dev: true' &&
+      wait
+      "
+    ports:
+      - "8500:8500"     # HTTP API & UI
+      - "8600:8600/udp" # DNS
+    environment:
+      CONSUL_BIND_INTERFACE: eth0
+    healthcheck:
+      test: ["CMD", "consul", "info"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  # Engine Consul sidecar - connects local engine to Consul
+  engine-sidecar:
+    image: hashicorp/consul:1.21
+    container_name: engine-sidecar-dev
+    command: agent -client=0.0.0.0 -bind=0.0.0.0 -retry-join=consul-server
+    ports:
+      - "8501:8500"  # Different port to avoid conflict
+    environment:
+      ENGINE_HOST_IP: ${ENGINE_HOST_IP:-host.docker.internal}
+    depends_on:
+      consul-server:
+        condition: service_healthy
+
+  # Echo Module Sidecar
+  echo-sidecar:
+    image: hashicorp/consul:1.21
+    container_name: echo-sidecar-dev
+    command: agent -client=0.0.0.0 -bind=0.0.0.0 -retry-join=consul-server
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "39090:39090"
+      - "49090:49090"
+
+  # Echo Module
+  echo-module:
+    image: rokkon/echo-module:latest
+    container_name: echo-module-dev
+    network_mode: "service:echo-sidecar"
+    depends_on:
+      echo-sidecar:
+        condition: service_started
+    environment:
+      MODULE_NAME: echo
+      MODULE_HOST: echo-sidecar
+      MODULE_HTTP_PORT: 39090
+      MODULE_GRPC_PORT: 49090
+      ENGINE_HOST: ${ENGINE_HOST_IP:-host.docker.internal}
+      ENGINE_PORT: 49001  # Dev port
+      QUARKUS_PROFILE: dev
+    # Add a startup delay to ensure engine is ready
+    command: sh -c "sleep 30 && java -jar /deployments/quarkus-run.jar"
+
+  # Test Module Sidecar
+  test-sidecar:
+    image: hashicorp/consul:1.21
+    container_name: test-sidecar-dev
+    command: agent -client=0.0.0.0 -bind=0.0.0.0 -retry-join=consul-server
+    depends_on:
+      consul-server:
+        condition: service_healthy
+    ports:
+      - "39095:39095"
+      - "49095:49095"
+
+  # Test Module
+  test-module:
+    image: rokkon/test-module:latest
+    container_name: test-module-dev
+    network_mode: "service:test-sidecar"
+    depends_on:
+      test-sidecar:
+        condition: service_started
+    environment:
+      MODULE_NAME: test
+      MODULE_HOST: test-sidecar
+      MODULE_HTTP_PORT: 39095
+      MODULE_GRPC_PORT: 49095
+      ENGINE_HOST: ${ENGINE_HOST_IP:-host.docker.internal}
+      ENGINE_PORT: 49001  # Dev port
+      QUARKUS_PROFILE: dev
+    # Add a startup delay to ensure engine is ready
+    command: sh -c "sleep 30 && java -jar /deployments/quarkus-run.jar"
+
+networks:
+  default:
+    name: pipeline-dev
+    driver: bridge
