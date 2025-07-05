@@ -377,8 +377,12 @@ export class PipelineBuilder extends LitElement {
   }
 
   handleModuleDragStart(e, module) {
+    console.log('Drag start for module:', module);
     e.dataTransfer.effectAllowed = 'copy';
-    e.dataTransfer.setData('module', JSON.stringify(module));
+    // Use text/plain to ensure compatibility
+    e.dataTransfer.setData('text/plain', JSON.stringify(module));
+    // Store in instance for backup
+    this.draggedModule = module;
   }
 
   handleCanvasDragOver(e) {
@@ -388,14 +392,34 @@ export class PipelineBuilder extends LitElement {
 
   handleCanvasDrop(e) {
     e.preventDefault();
-    const moduleData = e.dataTransfer.getData('module');
-    if (moduleData) {
-      const module = JSON.parse(moduleData);
+    // Try text/plain first
+    let moduleData = e.dataTransfer.getData('text/plain');
+    console.log('Drop event - module data:', moduleData);
+    
+    // If no data, try using the stored module
+    if (!moduleData && this.draggedModule) {
+      console.log('Using stored module:', this.draggedModule);
       const rect = this.shadowRoot.querySelector('.canvas-svg').getBoundingClientRect();
       const x = (e.clientX - rect.left - this.panX) / this.zoom;
       const y = (e.clientY - rect.top - this.panY) / this.zoom;
       
-      this.addNode(module, x, y);
+      this.addNode(this.draggedModule, x, y);
+      this.draggedModule = null;
+      return;
+    }
+    
+    if (moduleData) {
+      try {
+        const module = JSON.parse(moduleData);
+        const rect = this.shadowRoot.querySelector('.canvas-svg').getBoundingClientRect();
+        const x = (e.clientX - rect.left - this.panX) / this.zoom;
+        const y = (e.clientY - rect.top - this.panY) / this.zoom;
+        
+        console.log('Adding node at:', x, y, 'for module:', module);
+        this.addNode(module, x, y);
+      } catch (err) {
+        console.error('Error parsing module data:', err);
+      }
     }
   }
 
@@ -417,7 +441,7 @@ export class PipelineBuilder extends LitElement {
       nodes: [...this.pipeline.nodes, node]
     };
 
-    this.validatePipeline();
+    this.notifyPipelineChanged();
   }
 
   handleNodeMouseDown(e, node) {
