@@ -68,13 +68,13 @@ graph TD
     *   A pipeline step represents a single stage of processing within a pipeline.
     *   Each step is configured to use a specific *type* of registered module (e.g., "parser-v1", "sentence-embedder-mpnet").
     *   Key attributes of a pipeline step configuration include:
-        *   `step_id`: Unique identifier within the pipeline.
-        *   `module_type`: The type of module to execute this step (maps to a registered module's service name or type).
-        *   `module_config`: Specific configuration parameters passed to the module instance(s) executing this step (e.g., embedding model name, chunk size, API keys).
-        *   `input_kafka_topic` / `input_grpc_source_step_ids`: Specifies where this step receives its input.
-        *   `output_kafka_topics` / `output_grpc_target_step_ids`: Specifies where this step sends its output. This enables fan-out.
-        *   `retry_policy`: Configuration for handling transient errors.
-        *   `dead_letter_queue_topic`: Kafka topic for messages that fail processing after retries.
+        *   **`stepName`**: Unique identifier for the step within the pipeline.
+        *   **`stepType`**: The type of step (e.g., `INITIAL_PIPELINE`, `PIPELINE`, `SINK`).
+        *   **`processorInfo`**: Specifies the executor for this step. This can be either an external gRPC module (`grpcServiceName`) or an internal CDI bean (`internalProcessorBeanName`).
+        *   **`kafkaInputs`**: A list of Kafka topics this step consumes from. This is how a step can be triggered asynchronously.
+        *   **`outputs`**: A map defining where the output of this step should be routed. Each output specifies a `targetStepName` and a `transportType` (gRPC or Kafka), enabling fan-out.
+        *   **`customConfig`**: Step-specific configuration parameters passed to the module.
+        *   **Retry and Timeout Policies**: Fields like `maxRetries` and `stepTimeoutMs` for controlling resilience.
     *   Multiple steps in the same or different pipelines can use the same module type but with different configurations.
 
 4.  **Modules (Registered gRPC Services):**
@@ -134,12 +134,14 @@ sequenceDiagram
 
 ## Making Connectors, Sinks, and Pipeline Steps
 
-Modules (connectors, sinks, pipeline steps) are fundamentally gRPC services that adhere to specific interfaces defined by Rokkon's Protocol Buffers (protobufs). This allows them to be integrated into the Rokkon Engine.
+Modules (connectors, sinks, pipeline steps) are fundamentally gRPC services that adhere to specific interfaces defined by Pipeline's Protocol Buffers (protobufs). This allows them to be integrated into the Pipeline Engine.
 
 ### Core Protobuf Definitions (`commons/protobuf`)
 
 The `commons/protobuf` project defines the contracts for module communication. Key services and messages include:
 
+*   **`PipeStream`**: The main message that flows through the system. It acts as an envelope containing the document being processed and metadata about the pipeline execution itself, such as the `stream_id` and history.
+*   **`PipeDoc`**: The actual document being processed. It contains the content (e.g., text, binary data) and semantic information like chunks and embeddings. A `PipeStream` always contains a `PipeDoc`.
 *   **`PipeStepProcessor.proto`:** Defines the primary service that processing modules (steps, connectors, sinks) must implement.
     ```protobuf
     // Located in commons/protobuf/src/main/proto/services/pipe_step_processor.proto
@@ -239,7 +241,7 @@ def serve():
     print(f"Chunker module listening on port {module_port}")
     server.start()
 
-    # Registration with Rokkon Engine (via CLI tool or library) would happen here
+    # Registration with Pipeline Engine (via CLI tool or library) would happen here
     # Example: os.system(f"rokkon-cli register --module-type python-chunker --port 9090 ...")
 
     try:
@@ -319,7 +321,7 @@ public class EmbedderModule extends PipeStepProcessorImplBase {
 
 **Power of Protobufs:**
 
-1.  **Language Agnostic Contracts:** As seen, Python and Java modules implement the same `service PipeStepProcessor` contract. This allows the Rokkon Engine (likely Java-based) to communicate with them seamlessly.
+1.  **Language Agnostic Contracts:** As seen, Python and Java modules implement the same `service PipeStepProcessor` contract. This allows the Pipeline Engine (likely Java-based) to communicate with them seamlessly.
 2.  **Code Generation:** Protobuf compilers generate client and server stub code in various languages, significantly reducing boilerplate for developers.
 3.  **Strong Typing & Schema Evolution:** Data structures are well-defined, reducing integration errors. Protobufs have rules for evolving schemas (adding fields, deprecating old ones) in a backward-compatible way.
 4.  **Efficiency:** Protobufs serialize to a compact binary format, making data transmission efficient.

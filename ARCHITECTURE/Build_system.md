@@ -6,15 +6,16 @@ The Pipeline Engine project and its associated modules primarily use Gradle as t
 
 The Pipeline ecosystem is composed of several sub-projects, each with its own `build.gradle.kts` file. A top-level `settings.gradle.kts` file defines these sub-projects and their relationships.
 
-Key sub-projects typically include:
-
-*   **`pipeline-engine`:** The core engine application (Quarkus based).
+*   **`engine/pipestream`:** The core engine application (Quarkus based).
 *   **`engine/consul`:** Handles all write operations to Consul.
-*   **`commons/interface`:** Contains shared data models (POJOs, potentially generated from Protobufs).
 *   **`engine/validators`:** Provides validation logic for configurations and data.
+*   **`engine/dynamic-grpc`:** Provides dynamic gRPC client management and service discovery.
 *   **`cli/register-module`:** The command-line tool for module registration.
+*   **`cli/seed-engine-consul-config`:** Utility to seed initial configurations into Consul.
+*   **`commons/interface`:** Contains shared data models and interfaces.
 *   **`commons/protobuf`:** Contains all Protocol Buffer definitions and generates gRPC stubs.
 *   **`commons/util`:** Shared utility classes and libraries.
+*   **`commons/data-util`:** Utilities for sample data creation and loading.
 *   **`modules/` directory:**
     *   `modules/test-module`
     *   `modules/parser`
@@ -22,76 +23,118 @@ Key sub-projects typically include:
     *   `modules/embedder`
     *   `modules/echo`
     *   `modules/proxy-module`
+    *   `modules/connectors/filesystem-crawler`
     *   (Each module is its own Gradle sub-project, often a Quarkus application if Java-based, or a simple project if in another language but still managed under the Gradle umbrella for build/Docker tasks).
-*   **`pipeline-bom` (Bill of Materials):** Manages dependency versions across projects.
+*   **`bom/base`:** Base Bill of Materials.
+*   **`bom/cli`:** BOM for CLI applications.
+*   **`bom/library`:** BOM for shared libraries.
+*   **`bom/module`:** BOM for pipeline modules.
+*   **`bom/server`:** BOM for full server applications.
 *   **`testing/util`:** Common code and resources for testing.
+*   **`testing/server-util`:** Utilities for testing server components.
+*   **`testing/integration`:** Integration tests for the entire system.
 
 ```mermaid
-graph TD
+graph LR
     RootProject["Root Gradle Project <br> (settings.gradle.kts, build.gradle.kts)"]
 
     subgraph "Core Engine Projects"
-        Engine[pipeline-engine]
+        Engine[engine/pipestream]
         EngineConsul[engine/consul]
         EngineValidators[engine/validators]
-        EngineCLI[cli/register-module]
+        EngineDynamicGrpc[engine/dynamic-grpc]
+        EngineCLIRegister[cli/register-module]
+        EngineCLISeed[cli/seed-engine-consul-config]
     end
 
     subgraph "Shared Libraries"
         Protobuf[commons/protobuf]
-        Commons[commons/util]
-        Interface[commons/interface]
-        BOM[pipeline-bom]
+        CommonsUtil[commons/util]
+        CommonsInterface[commons/interface]
+        CommonsDataUtil[commons/data-util]
+        BOMBase[bom/base]
+        BOMCLI[bom/cli]
+        BOMLibrary[bom/library]
+        BOMModule[bom/module]
+        BOMServer[bom/server]
         TestUtils[testing/util]
+        TestServerUtils[testing/server-util]
+        TestIntegration[testing/integration]
     end
 
-    subgraph "Pipeline Modules (Examples)"
+    subgraph "Pipeline Modules"
         direction LR
         ModuleTest[modules/test-module]
         ModuleParser[modules/parser]
         ModuleChunker[modules/chunker]
-        %% Add other modules as needed
+        ModuleEmbedder[modules/embedder]
+        ModuleEcho[modules/echo]
+        ModuleProxy[modules/proxy-module]
+        ModuleFilesystemCrawler[modules/connectors/filesystem-crawler]
     end
 
     RootProject --> Engine
     RootProject --> EngineConsul
     RootProject --> EngineValidators
-    RootProject --> EngineCLI
+    RootProject --> EngineDynamicGrpc
+    RootProject --> EngineCLIRegister
+    RootProject --> EngineCLISeed
     RootProject --> Protobuf
-    RootProject --> Commons
-    RootProject --> Interface
-    RootProject --> BOM
+    RootProject --> CommonsUtil
+    RootProject --> CommonsInterface
+    RootProject --> CommonsDataUtil
+    RootProject --> BOMBase
+    RootProject --> BOMCLI
+    RootProject --> BOMLibrary
+    RootProject --> BOMModule
+    RootProject --> BOMServer
     RootProject --> TestUtils
+    RootProject --> TestServerUtils
+    RootProject --> TestIntegration
     RootProject --> ModuleTest
     RootProject --> ModuleParser
     RootProject --> ModuleChunker
+    RootProject --> ModuleEmbedder
+    RootProject --> ModuleEcho
+    RootProject --> ModuleProxy
+    RootProject --> ModuleFilesystemCrawler
 
     %% Dependencies (Illustrative)
     Engine --> EngineConsul
     Engine --> EngineValidators
+    Engine --> EngineDynamicGrpc
+    Engine --> CommonsInterface
+    Engine --> CommonsUtil
     Engine --> Protobuf
-    Engine --> Commons
-    EngineConsul --> Interface
-    Interface -- Generated from --> Protobuf
+    EngineCLIRegister --> Protobuf
+    EngineCLISeed --> Protobuf
+    EngineCLISeed --> CommonsUtil
+    EngineCLISeed --> CommonsInterface
 
     ModuleTest --> Protobuf
-    ModuleTest --> Commons
-    ModuleParser --> Protobuf
+    ModuleTest --> CommonsUtil
+    ModuleTest --> CommonsInterface
+    ModuleTest --> CommonsDataUtil
 
-    %% All projects implicitly depend on BOM for version management
-    Engine -.-> BOM
-    Protobuf -.-> BOM
-    ModuleTest -.-> BOM
+    %% BOM dependencies
+    BOMCLI --> BOMBase
+    BOMLibrary --> BOMBase
+    BOMModule --> BOMBase
+    BOMServer --> BOMBase
+    BOMModule --> CommonsInterface
+    BOMModule --> CommonsUtil
+    BOMModule --> CommonsDataUtil
+    BOMModule --> Protobuf
 
     classDef root fill:#aaa,stroke:#333,stroke-width:2px;
     classDef core fill:#lightblue,stroke:#333,stroke-width:2px;
     classDef shared fill:#lightgreen,stroke:#333,stroke-width:2px;
     classDef module fill:#lightcoral,stroke:#333,stroke-width:2px;
 
-    class RootProject root;
-    class Engine,EngineConsul,EngineValidators,EngineCLI core;
-    class Protobuf,Commons,Interface,BOM,TestUtils shared;
-    class ModuleTest,ModuleParser,ModuleChunker module;
+    class Engine,EngineConsul,EngineValidators,EngineDynamicGrpc,EngineCLIRegister,EngineCLISeed core;
+    class Protobuf,CommonsUtil,CommonsInterface,CommonsDataUtil,BOMBase,BOMCLI,BOMLibrary,BOMModule,BOMServer,TestUtils,TestServerUtils,TestIntegration shared;
+    class ModuleTest,ModuleParser,ModuleChunker,ModuleEmbedder,ModuleEcho,ModuleProxy,ModuleFilesystemCrawler module;
+
 ```
 
 ## Standard Gradle Tasks and Build Lifecycle

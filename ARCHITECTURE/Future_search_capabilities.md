@@ -14,7 +14,7 @@ The vision is not for Pipeline Engine itself to become a search engine, but to:
 *   **Purpose:** To understand how users are interacting with the search results derived from Pipeline-processed data.
 *   **Mechanism:**
     *   Search applications built on top of Pipeline-populated data stores (e.g., an OpenSearch cluster fed by a Pipeline pipeline) should log search events (queries, clicks, impressions, user feedback like "relevant/not relevant").
-    *   These logs can be ingested (potentially by another Pipeline pipeline) into analytics platforms (e.g., ELK stack, custom databases, Google Analytics if applicable).
+    *   These logs can be ingested (potentially by another Pipeline pipeline) into the Rokkon Analytics Platform (a separate component within the Rokkon project).
     *   Pipeline could provide standardized logging formats or schemas for these search interaction events to simplify analytics.
 *   **Benefits:**
     *   Identify popular queries and content.
@@ -33,7 +33,7 @@ graph TD
         SearchUI -- "Logs Search Events (Queries, Clicks)" --> SearchEventLogger
     end
 
-    AnalyticsPlatform["Analytics Platform <br> (e.g., ELK, Data Warehouse)"]
+    AnalyticsPlatform["Analytics Platform <br> (Rokkon Component)"]
     SearchEventLogger -- "Search Interaction Data" --> AnalyticsPlatform
 
     subgraph "Pipeline Ecosystem"
