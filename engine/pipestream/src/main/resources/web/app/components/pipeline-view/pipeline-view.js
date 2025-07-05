@@ -290,22 +290,54 @@ export class PipelineView extends LitElement {
 
   async savePipeline(pipeline) {
     try {
-      const method = this.editingPipeline ? 'PUT' : 'POST';
-      const url = this.editingPipeline 
-        ? `/api/v1/pipelines/definitions/${this.editingPipeline.id}`
-        : '/api/v1/pipelines/definitions';
+      // When editing, use the edit mode (DESIGN validation)
+      // For new pipelines, start with DESIGN mode for easier creation
+      const validationMode = 'DESIGN';
       
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(pipeline)
-      });
+      if (this.editingPipeline) {
+        // Update existing pipeline
+        const response = await fetch(`/api/v1/pipelines/definitions/${this.editingPipeline.id}?validationMode=${validationMode}`, {
+          method: 'PUT',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(this.editingPipeline) // Use full pipeline config, not just DTO
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to update pipeline');
+        }
+        
+        const result = await response.json();
+        if (result.warnings && result.warnings.length > 0) {
+          this.showToast(`Pipeline updated with warnings: ${result.warnings.join(', ')}`, 'warning');
+        } else {
+          this.showToast('Pipeline updated successfully', 'success');
+        }
+      } else {
+        // Create new pipeline using the DTO endpoint
+        const response = await fetch(`/api/v1/pipelines/definitions?validationMode=${validationMode}`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify(pipeline)
+        });
+        
+        if (!response.ok) {
+          const error = await response.json();
+          throw new Error(error.message || 'Failed to create pipeline');
+        }
+        
+        const result = await response.json();
+        if (result.warnings && result.warnings.length > 0) {
+          this.showToast(`Pipeline created with warnings: ${result.warnings.join(', ')}`, 'warning');
+        } else {
+          this.showToast('Pipeline created successfully', 'success');
+        }
+      }
       
-      if (!response.ok) throw new Error('Failed to save pipeline');
-      
-      this.showToast('Pipeline saved successfully', 'success');
       this.closeModal();
       this.fetchPipelines();
     } catch (err) {

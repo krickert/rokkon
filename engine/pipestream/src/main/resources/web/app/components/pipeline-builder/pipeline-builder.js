@@ -42,6 +42,21 @@ export class PipelineBuilder extends LitElement {
       border-bottom: 1px solid #e0e0e0;
     }
 
+    .pipeline-name-input {
+      width: 100%;
+      padding: 8px 12px;
+      margin-bottom: 12px;
+      border: 1px solid #e0e0e0;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 500;
+    }
+
+    .pipeline-name-input:focus {
+      outline: none;
+      border-color: #1976d2;
+    }
+
     .sidebar-title {
       font-size: 16px;
       font-weight: 600;
@@ -303,6 +318,58 @@ export class PipelineBuilder extends LitElement {
   connectedCallback() {
     super.connectedCallback();
     this.fetchAvailableModules();
+    
+    // If we have an existing pipeline, convert it to visual format
+    if (this.pipeline && this.pipeline.pipelineSteps) {
+      this.loadExistingPipeline();
+    }
+  }
+
+  loadExistingPipeline() {
+    // Convert backend pipeline format to visual nodes and connections
+    const nodes = [];
+    const connections = [];
+    const nodeMap = new Map();
+    
+    // Create nodes from pipeline steps
+    Object.entries(this.pipeline.pipelineSteps || {}).forEach(([stepName, stepConfig], index) => {
+      const node = {
+        id: `node-${stepName}`,
+        module: stepConfig.processorInfo?.processorId || stepName,
+        type: stepConfig.stepType || 'PIPELINE',
+        x: 100 + (index % 3) * 200,
+        y: 100 + Math.floor(index / 3) * 100,
+        width: 150,
+        height: 60,
+        inputs: 1,
+        outputs: 1
+      };
+      nodes.push(node);
+      nodeMap.set(stepName, node);
+    });
+    
+    // Create connections based on outputs configuration
+    Object.entries(this.pipeline.pipelineSteps || {}).forEach(([stepName, stepConfig]) => {
+      const fromNode = nodeMap.get(stepName);
+      if (fromNode && stepConfig.outputs) {
+        Object.values(stepConfig.outputs).forEach(outputStep => {
+          const toNode = nodeMap.get(outputStep);
+          if (toNode) {
+            connections.push({
+              id: `conn-${fromNode.id}-${toNode.id}`,
+              from: fromNode.id,
+              to: toNode.id
+            });
+          }
+        });
+      }
+    });
+    
+    this.pipeline = {
+      name: this.pipeline.name || 'Untitled Pipeline',
+      nodes,
+      connections
+    };
   }
 
   async fetchAvailableModules() {
@@ -588,12 +655,87 @@ export class PipelineBuilder extends LitElement {
   }
 
   savePipeline() {
+    // Convert our visual pipeline to the DTO format expected by the API
+    const pipelineDTO = this.convertToPipelineDTO();
+    
     const event = new CustomEvent('save-pipeline', {
-      detail: { pipeline: this.pipeline },
+      detail: { pipeline: pipelineDTO },
       bubbles: true,
       composed: true
     });
     this.dispatchEvent(event);
+  }
+
+  convertToPipelineDTO() {
+    // Create a map of node connections for easy lookup
+    const nodeConnections = new Map();
+    this.pipeline.nodes.forEach(node => {
+      nodeConnections.set(node.id, {
+        inputs: [],
+        outputs: []
+      });
+    });
+    
+    // Build connection map
+    this.pipeline.connections.forEach(conn => {
+      nodeConnections.get(conn.from).outputs.push(conn.to);
+      nodeConnections.get(conn.to).inputs.push(conn.from);
+    });
+    
+    // Convert nodes to steps in topological order
+    const steps = this.getTopologicalOrder().map((node, index) => {
+      return {
+        name: `step-${index + 1}-${node.module}`,
+        module: node.module,
+        config: {
+          // Add any node-specific configuration here
+          position: { x: node.x, y: node.y },
+          nodeId: node.id
+        }
+      };
+    });
+    
+    return {
+      name: this.pipeline.name,
+      description: `Pipeline with ${this.pipeline.nodes.length} modules`,
+      steps: steps
+    };
+  }
+
+  getTopologicalOrder() {
+    // Perform topological sort to get proper execution order
+    const visited = new Set();
+    const result = [];
+    
+    const visit = (nodeId) => {
+      if (visited.has(nodeId)) return;
+      visited.add(nodeId);
+      
+      const node = this.pipeline.nodes.find(n => n.id === nodeId);
+      if (!node) return;
+      
+      // Visit all nodes that this node depends on first
+      const incomingConnections = this.pipeline.connections
+        .filter(c => c.to === nodeId)
+        .map(c => c.from);
+      
+      incomingConnections.forEach(visit);
+      
+      result.push(node);
+    };
+    
+    // Start with nodes that have no incoming connections
+    this.pipeline.nodes.forEach(node => {
+      const hasIncoming = this.pipeline.connections.some(c => c.to === node.id);
+      if (!hasIncoming) {
+        visit(node.id);
+      }
+    });
+    
+    // Visit any remaining nodes (in case of disconnected components)
+    this.pipeline.nodes.forEach(node => visit(node.id));
+    
+    return result;
   }
 
   renderNode(node) {
@@ -682,6 +824,12 @@ export class PipelineBuilder extends LitElement {
       <div class="builder-container">
         <div class="sidebar">
           <div class="sidebar-header">
+            <input 
+              type="text"
+              class="pipeline-name-input"
+              placeholder="Pipeline Name"
+              .value=${this.pipeline.name}
+              @input=${(e) => this.pipeline = {...this.pipeline, name: e.target.value}}>
             <div class="sidebar-title">Available Modules</div>
             <div style="font-size: 12px; color: #666;">Drag modules to canvas</div>
           </div>
