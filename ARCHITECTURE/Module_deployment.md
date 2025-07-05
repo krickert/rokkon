@@ -127,9 +127,9 @@ As outlined in `DEVELOPER_NOTES/modules/README-registration.md`, an automated re
         *   Tags (e.g., `module-type:parser`, `version:1.2`, `pipeline-module`).
         *   Health Check Configuration for Consul (e.g., a gRPC health check pointing to the module's health service).
 
-5.  **Direct Consul Registration (Alternative/Complementary):**
-    *   In some setups, particularly if the `pipeline-cli` is not used or for non-containerized modules, modules might register themselves *directly* with Consul using Consul's HTTP API or a Consul client library.
-    *   However, the described architecture (`pipeline-engine/README.md`, `engine/consul/README.md`) emphasizes that the **Pipeline Engine (via `engine-consul`) is the sole writer to Consul** to maintain control and consistency. The `pipeline-cli` calling the engine to perform the registration aligns with this principle. The CLI acts on behalf of the container to initiate the process with the central engine.
+5.  **Direct Consul Registration (Discovery Path):**
+    *   Modules or operators can also register services *directly* with Consul using Consul's HTTP API or a Consul client library. This path makes the module discoverable by Consul, but it **bypasses the Pipeline Engine's `ModuleRegistrationService` validation and acceptance process.** Such modules are visible in Consul but are not automatically integrated into the Pipeline Engine's active set of processing units.
+    *   **Dashboard Onboarding for Acceptance:** For modules discovered via direct Consul registration, the Pipeline Engine dashboard provides an option to "onboard" or "accept" them into the running application. This process involves registering the module's necessary metadata (e.g., schema, capabilities) with the Pipeline Engine's configuration. Only after this explicit onboarding step will the module be considered an active and validated participant in pipeline execution.
 
 **Diagram of Registration Flow (Engine-Mediated):**
 
@@ -151,6 +151,7 @@ sequenceDiagram
     end
     note right of EntrypointScript: Loop breaks once module is healthy
     EntrypointScript ->> PipelineCLI: Execute `register` command with module details
+    note right of PipelineCLI: This flow represents the default module registration process.
     PipelineCLI ->> PipelineEngine: gRPC Call: RegisterModuleRequest (module IP, port, type, etc.)
 
     PipelineEngine ->> ModuleApp: gRPC Call: RegistrationCheckRequest (callback to module)

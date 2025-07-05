@@ -282,3 +282,64 @@ While not explicitly detailed, a typical CI/CD pipeline for Pipeline would lever
     *   Run `seed-config` utility if configuration schema changes or new default configurations are needed.
 
 The Gradle build system, with its multi-project structure, Quarkus integration, and supporting shell scripts, provides a comprehensive foundation for building, testing, and packaging the entire Pipeline Engine ecosystem.
+
+## Development Mode (`./dev.sh` and `./gradlew dev`)
+
+For local development, the Pipeline Engine provides a streamlined "development mode" that offers live reloading and an integrated environment with essential services like Consul and optional modules. This mode is primarily orchestrated by the `./dev.sh` script located in the project root.
+
+### How it Works
+
+The `./dev.sh` script automates the setup of your local development environment:
+
+1.  **Stops Existing Containers:** Ensures a clean slate by stopping and removing any previously running Consul or module Docker containers.
+2.  **Starts Consul:** Launches a Consul Docker container, which serves as the service discovery and configuration store for the Pipeline Engine and its modules.
+3.  **Seeds Consul Configuration:** Uses the `cli/seed-engine-consul-config` utility to push initial configurations (e.g., default pipeline definitions) into Consul's Key-Value store.
+4.  **Registers Engine Service:** Registers the Pipeline Engine itself with Consul, making it discoverable by modules.
+5.  **Builds Dependencies:** Compiles necessary shared libraries and CLI tools (e.g., `commons`, `cli/register-module`).
+6.  **Starts Pipeline Engine in Dev Mode:** Executes `./gradlew :engine:pipestream:quarkusDev`. This Gradle task starts the core Pipeline Engine application with Quarkus's development mode features enabled, including:
+    *   **Live Reload:** Automatically recompiles and reloads code changes without needing to restart the application, significantly speeding up development.
+    *   **Developer UI:** Provides a web-based interface for inspecting application state, configurations, and extensions (typically at `http://localhost:8080` or the configured HTTP port).
+7.  **Deploys Optional Modules (if specified):** If modules are requested, the script builds their Docker images (if not already built) and deploys them as Docker containers. It then uses the `cli/register-module` to register these modules with the running Pipeline Engine.
+
+### Usage
+
+The `./dev.sh` script supports various modes:
+
+*   **Run Engine in Dev Mode (Default):**
+    ```bash
+    ./dev.sh
+    ```
+    This will start Consul, seed configuration, and launch the Pipeline Engine with live reload.
+
+*   **Run Engine with Default Modules:**
+    ```bash
+    ./dev.sh --with-modules
+    ```
+    In addition to the engine, this will deploy and register a default set of modules (e.g., `echo`, `chunker`, `parser`, `embedder`) as Docker containers.
+
+*   **Run Engine with Specific Modules:**
+    ```bash
+    ./dev.sh --module echo --module chunker
+    ```
+    This allows you to specify which modules you want to deploy alongside the engine.
+
+*   **Run Modules Only (Engine must be running separately):**
+    ```bash
+    ./dev.sh --modules-only --module parser
+    ```
+    Useful if you have the engine running in a separate terminal or environment and only want to deploy specific modules.
+
+*   **Stop All Running Components:**
+    ```bash
+    ./dev.sh --stop
+    ```
+    This will stop and remove all Docker containers started by the script and kill any running Gradle daemons.
+
+### Key Features of Development Mode
+
+*   **Live Reload:** Rapid iteration on engine code changes.
+*   **Integrated Environment:** Consul and modules are automatically set up for a complete testing environment.
+*   **Service Discovery & Health Checks:** Modules register with Consul, and the engine uses Consul for service discovery and health monitoring.
+*   **Accessible Endpoints:** The script outputs URLs for the Engine's HTTP and gRPC endpoints, as well as the Consul UI.
+
+This development mode significantly simplifies the process of running and testing the Pipeline Engine and its modules locally.

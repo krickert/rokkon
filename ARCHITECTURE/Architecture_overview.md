@@ -2,7 +2,7 @@
 
 ## Introduction
 
-The Pipeline Engine is a powerful and flexible data processing system designed for building complex, scalable, and language-agnostic data workflows. It excels at document extraction and manipulation, making it an ideal foundation for creating sophisticated search engine pipelines. Out of the box, the system allows you to define multiple pipelines that can ingest data from various sources (like websites, file systems, or databases), process it through a series of transformation steps (like parsing, chunking, and embedding), and load it into search backends like OpenSearch.
+The Pipeline Engine is a powerful and flexible data processing system designed for building complex, scalable, and language-agnostic data workflows. It excels at document extraction and manipulation, making it an ideal foundation for creating sophisticated search engine pipelines. Out of the box, the system allows you to define multiple data processing pipelines that can ingest data from various sources (like websites, file systems, or databases), process it through a series of transformation steps (like parsing, chunking, and embedding), and load it into search backends like OpenSearch.
 
 ### The Core Principle: The Engine is the Orchestrator
 
@@ -30,7 +30,7 @@ A key design principle of the engine is its dynamic nature. Pipeline definitions
 | :--- | :--- | :--- | :--- |
 | **Pipeline Engine** | **Orchestrator** | Java (Quarkus) | The central brain of the system. It reads pipeline configurations, discovers modules, and routes data between them using either gRPC for synchronous calls or Kafka for asynchronous messaging. |
 | **Modules** | **Workers** | Any (gRPC) | Standalone gRPC services that perform a single, specific task, such as parsing a document, chunking text, or generating embeddings. They are language-agnostic. |
-| **Consul** | **Service Registry & Config Store** | HashiCorp Consul | Used for service discovery (so the Engine can find modules) and as a Key-Value store for all pipeline configurations. |
+| **Consul** | **Service Registry & Config Store** | HashiCorp Consul | Used for service discovery (so the Pipeline Engine can find modules) and as a Key-Value store for all pipeline configurations. |
 | **MongoDB** | **Document Storage** | MongoDB | The initial implementation for storing document state and metadata. This will evolve into a generic document storage interface. |
 | **Kafka** | **Message Bus (Optional)** | Apache Kafka | An optional but recommended transport for asynchronous communication between steps. It provides buffering, durability, and decoupling for high-throughput workflows. |
 | **Prometheus** | **Metrics (Optional)** | Prometheus | An optional but recommended component for collecting metrics from the Engine and modules for monitoring. |
@@ -202,15 +202,15 @@ sequenceDiagram
 sequenceDiagram
     participant Engine
     participant KafkaTopic as "Kafka Topic (e.g., step-b-input)"
-    participant ModuleB as "Module B (gRPC Service)"
+    participant Module as "Module (gRPC Service)"
 
-    Note over Engine, ModuleB: Module B is configured to listen on the Kafka topic.
+    Note over Engine, Module: Module is configured to listen on the Kafka topic.
 
     Engine->>KafkaTopic: 1. Publishes data to topic
-    KafkaTopic->>ModuleB: 2. Consumes data from topic
-    Note over ModuleB: Processes the data...
-    ModuleB->>+Engine: 3. Sends result back via gRPC call
-    Engine-->>-ModuleB: gRPC Response
+    KafkaTopic->>Module: 2. Consumes data from topic
+    Note over Module: Processes the data...
+    Module->>+Engine: 3. Sends result back via gRPC call
+    Engine-->>-Module: gRPC Response
 ```
 
 By managing the transport layer, the Engine provides flexibility and resilience. Developers creating modules don't need to worry about Kafka integration; they only need to implement the standard gRPC `PipeStepProcessor` service. This keeps modules simple and focused, while the Engine handles the complex orchestration and routing logic.

@@ -168,7 +168,7 @@ Modules expose health endpoints:
 
 ## Comparison with Production
 
-This dev mode setup closely mimics production deployment:
+This dev mode setup closely mimics production deployment patterns, particularly in its use of sidecars for service discovery. The core `pipeline-cli` registration mechanism remains consistent, with the invocation method adapting to the deployment environment.
 
 | Aspect | Dev Mode | Production |
 |--------|----------|------------|

@@ -260,9 +260,9 @@ if __name__ == '__main__':
 // EmbedderModule.java (Quarkus gRPC Service)
 package com.rokkon.modules.embedder;
 
-import com.rokkon.proto.common.Common.*; // Assuming PipeDoc is here
-import com.rokkon.proto.services.PipeStepProcessor.*; // For service messages
-import com.rokkon.proto.services.PipeStepProcessorServiceGrpc.*; // For service base class
+import com.pipeline.proto.common.Common.*; // Assuming PipeDoc is here
+import com.pipeline.proto.services.PipeStepProcessor.*; // For service messages
+import com.pipeline.proto.services.PipeStepProcessorServiceGrpc.*; // For service base class
 
 import io.quarkus.grpc.GrpcService;
 import io.smallrye.mutiny.Uni;
