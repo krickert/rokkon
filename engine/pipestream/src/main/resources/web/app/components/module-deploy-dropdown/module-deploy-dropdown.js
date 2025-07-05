@@ -110,12 +110,17 @@ export class ModuleDeployDropdown extends LitElement {
     }
 
     .module-item.disabled {
-      opacity: 0.5;
+      opacity: 0.4;
       cursor: not-allowed;
+      background: #fafafa;
     }
 
     .module-item.disabled:hover {
-      background: transparent;
+      background: #fafafa;
+    }
+    
+    .module-item.disabled .module-name {
+      color: #999;
     }
 
     .module-name {
@@ -200,6 +205,7 @@ export class ModuleDeployDropdown extends LitElement {
 
   connectedCallback() {
     super.connectedCallback();
+    console.log('ModuleDeployDropdown v2 - with sorting');
     // Close dropdown when clicking outside
     this.boundCloseDropdown = this.closeDropdown.bind(this);
     document.addEventListener('click', this.boundCloseDropdown);
@@ -233,12 +239,23 @@ export class ModuleDeployDropdown extends LitElement {
   }
 
   get filteredModules() {
-    if (!this.searchTerm) return this.availableModules;
+    let modules = this.availableModules;
     
-    return this.availableModules.filter(module => 
-      module.name.toLowerCase().includes(this.searchTerm) ||
-      module.type.toLowerCase().includes(this.searchTerm)
-    );
+    if (this.searchTerm) {
+      modules = modules.filter(module => 
+        module.name.toLowerCase().includes(this.searchTerm) ||
+        module.type.toLowerCase().includes(this.searchTerm)
+      );
+    }
+    
+    // Sort modules: undeployed first, then deployed
+    return modules.sort((a, b) => {
+      const aDeployed = this.isModuleDeployed(a.name);
+      const bDeployed = this.isModuleDeployed(b.name);
+      
+      if (aDeployed === bDeployed) return 0;
+      return aDeployed ? 1 : -1;
+    });
   }
 
   isModuleDeployed(moduleName) {
@@ -247,8 +264,8 @@ export class ModuleDeployDropdown extends LitElement {
     );
   }
 
-  async deployModule(module) {
-    if (this.loading || this.isModuleDeployed(module.name)) return;
+  async deployModule(module, isDeployed) {
+    if (this.loading || isDeployed) return;
 
     this.loading = true;
     this.selectedModule = module.name;
@@ -312,7 +329,7 @@ export class ModuleDeployDropdown extends LitElement {
             return html`
               <div 
                 class="module-item ${isDeployed ? 'disabled' : ''}"
-                @click=${() => this.deployModule(module)}>
+                @click=${() => this.deployModule(module, isDeployed)}>
                 <div class="module-name">${module.name}</div>
                 <div class="module-info">
                   <div>

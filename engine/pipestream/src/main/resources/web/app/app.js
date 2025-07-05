@@ -414,9 +414,14 @@ class PipelineDashboard extends LitElement {
 
   async fetchDeployedModules() {
     try {
-      const response = await fetch('/api/v1/dev/modules/deployed');
+      // Get deployed modules from the registered modules list
+      const response = await fetch('/api/v1/module-management/registered');
       if (response.ok) {
-        this.deployedModules = await response.json();
+        const registeredModules = await response.json();
+        // Extract unique module names from registered modules
+        const deployedNames = [...new Set(registeredModules.map(m => m.module_name))];
+        // Convert to the format expected by the dropdown
+        this.deployedModules = deployedNames.map(name => ({ name }));
         console.log('Deployed modules updated:', this.deployedModules);
         // Force update of child components
         this.requestUpdate();
