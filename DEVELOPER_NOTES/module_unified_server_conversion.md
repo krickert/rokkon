@@ -2,13 +2,46 @@
 
 This guide documents the steps taken to convert the echo module from separate gRPC and HTTP servers to a unified server configuration. Follow these steps for other modules.
 
+## Dev Mode vs Production
+
+This guide covers both development and production configurations. Key differences:
+
+**Development Mode** (`quarkusDev`):
+- Modules deployed as Docker containers locally
+- Dynamic port allocation (39100-39800 range)
+- Auto-registration enabled by default
+- Docker-based operations available at `/api/v1/dev/modules`
+- Cleanup and orphan management features
+- Direct module deployment from UI
+
+**Production Mode**:
+- Modules deployed via orchestration (Kubernetes, etc.)
+- Ports configured by deployment manifests
+- Registration handled by sidecars
+- No Docker operations available
+- Registry-only operations at `/api/v1/module-management`
+
 ## Recent Updates (Session Summary)
 
-### Orphaned Module Management
+### API Separation for Dev/Prod Environments
+- Created separate `ModuleDevManagementResource` for all Docker-based operations **(DEV MODE ONLY)**
+- Dev-specific endpoints at `/api/v1/dev/modules` path **(DEV MODE ONLY)**:
+  - Module deployment/undeployment
+  - Container management (stop, scale-up, logs)
+  - Orphaned module operations
+  - Docker-specific cleanup
+- `ModuleManagementResource` at `/api/v1/module-management` **(AVAILABLE IN BOTH DEV AND PROD)**:
+  - Module registry queries (list registered modules)
+  - Module health checks
+  - Enable/disable operations
+  - Deregistration (from registry only, no container operations)
+- Frontend automatically detects dev mode and uses appropriate API paths
+
+### Orphaned Module Management **(DEV MODE ONLY)**
 - Implemented orphaned module detection and redeployment functionality
 - Added "Re-deploy" button in UI for orphaned modules (containers running but not registered)
 - Created comprehensive cleanup method `cleanupModuleCompletely()` that removes containers and Consul registrations
-- Added REST endpoint: `DELETE /api/v1/module-management/{moduleName}/cleanup`
+- Added REST endpoint: `DELETE /api/v1/dev/modules/{moduleName}/cleanup`
 
 ### Module Naming Clarification
 - Module names should NOT have "-module" appended/removed as a convention
@@ -20,13 +53,16 @@ This guide documents the steps taken to convert the echo module from separate gR
 - Fixed PipelineModule enum: TEST module name changed from "test" to "test-module"
 - Updated UI to use "Re-deploy" instead of "Re-register" for orphaned modules
 - Redeploy functionality now properly cleans up orphaned containers before deploying fresh
+- Removed port values from PipelineModule enum to eliminate confusion
+- Separated dev-specific API endpoints to `/api/v1/dev/modules` path
+- ModuleManagementResource now only contains production-safe operations
 
 ## Important: Understanding Module Ports
 
 ### CRITICAL: All Modules Use Port 39100 Internally
-**DO NOT** use the port numbers from PipelineModule.java for internal configuration!
+**DO NOT** use any port numbers from PipelineModule.java for internal configuration!
 
-The ports defined in PipelineModule.java (39100, 39101, 39102, 39103, etc.) are **NOT** internal ports - they are just default values or documentation. All modules should use the **same internal port: 39100**.
+**Important Update**: The PipelineModule enum no longer contains port values - they have been removed to prevent confusion. All modules should use the **same internal port: 39100**.
 
 ### Internal Container Ports vs External Host Ports
 - **Internal Container Port**: The port the application listens on INSIDE the container (configured in application.yml and Dockerfile)
@@ -43,11 +79,17 @@ The ports defined in PipelineModule.java (39100, 39101, 39102, 39103, etc.) are 
   - `Dockerfile.jvm`: `EXPOSE 39100`
 - Since each module runs in its own container, there's no conflict
 
-**External Host Ports (OUTSIDE container - dynamically allocated):**
-- First instance: 39101 (maps to internal 39100)
-- Second instance: 39102 (maps to internal 39100)
-- Third instance: 39103 (maps to internal 39100)
-- etc.
+**External Host Ports (OUTSIDE container):**
+- **DEV MODE**: ModuleDeploymentService dynamically allocates ports in the range 39100-39800
+  - First available port is allocated (starting from 39100 if free)
+  - Each instance of any module gets the next available port
+  - This range allows for up to 700 module instances
+  - Example allocation:
+    - echo-module-1: 39100 (maps to internal 39100)
+    - parser-module-1: 39101 (maps to internal 39100)
+    - chunker-module-1: 39102 (maps to internal 39100)
+    - echo-module-2: 39103 (maps to internal 39100)
+- **PRODUCTION**: External ports are configured by your orchestration platform (Kubernetes, etc.)
 
 ### Example Configuration
 ✅ **CORRECT** (all modules use 39100 internally):
@@ -68,12 +110,12 @@ quarkus:
     port: 39100  # Standard internal module port
 ```
 
-❌ **INCORRECT** (using PipelineModule ports):
+❌ **INCORRECT** (using different internal ports):
 ```yaml
 # chunker/application.yml
 quarkus:
   http:
-    port: 39103  # WRONG! Don't use PipelineModule.java ports
+    port: 39103  # WRONG! All modules must use 39100 internally
 ```
 
 **Example Docker mapping:**
@@ -205,6 +247,8 @@ Check your service implementation (e.g., EchoServiceImpl.java) and ensure the mo
 .setModuleName("echo-module")  // Should match quarkus.application.name
 ```
 
+**Note**: Most modules already have the correct `getServiceRegistration` method implemented. For example, the chunker module already had this method properly implemented, so no changes were needed. Always check first before adding a duplicate method!
+
 ### 5. Update Entrypoint Script
 
 Update `src/main/bash/module-entrypoint.sh`:
@@ -240,6 +284,10 @@ echo "Executing: $cli_cmd"
 
 #### Add auto-registration control:
 ```bash
+# Auto-registration behavior differs between dev and production
+# DEV MODE: AUTO_REGISTER defaults to true for automatic registration
+# PRODUCTION: Set AUTO_REGISTER=false when using sidecars for registration
+
 # Check if auto-registration is enabled
 if [ "$AUTO_REGISTER" = "false" ]; then
   echo "Auto-registration disabled (AUTO_REGISTER=false). Module running without registration."
@@ -354,6 +402,9 @@ docker images | grep [module-name]
 
 **Note**: The `imageBuild` task uses the Quarkus container-image extension. The image name comes from the `quarkus.container-image.image` property in application.yml.
 
+**DEV MODE**: Images are built and deployed locally  
+**PRODUCTION**: Images should be pushed to your container registry and deployed via your orchestration platform
+
 ## Benefits of Unified Server
 
 1. **Single Port**: Both REST and gRPC traffic use the same port (39100 internally)
@@ -432,3 +483,37 @@ After conversion, verify:
 6. Metrics are exposed at `/q/metrics`
 7. OpenAPI/Swagger UI is accessible at `/q/swagger-ui`
 8. Module can be deployed and registered in dev mode
+
+## Troubleshooting
+
+### Module Shows as Orphaned After Deployment **(DEV MODE)**
+If a module shows as orphaned (container running but not registered):
+1. Check the registrar sidecar logs: `docker logs [module-name]-registrar`
+2. Verify the module is healthy: `docker logs [module-name]-module-app`
+3. Ensure `AUTO_REGISTER=true` is set (default in dev mode)
+4. Check that the module name in PipelineModule.java matches the service registration
+
+### Registration Fails
+Common causes:
+1. Module name mismatch between PipelineModule enum and service implementation (DEV MODE)
+2. Health check endpoint not accessible
+3. Engine not reachable from the module container
+4. Port configuration issues (ensure internal port is 39100)
+5. In production: Check sidecar configuration and network policies
+
+### Port Already in Use **(DEV MODE)**
+If deployment fails with "port already in use":
+1. Check for orphaned containers: `docker ps -a | grep module`
+2. Use the cleanup endpoint: `DELETE /api/v1/dev/modules/{moduleName}/cleanup`
+3. The deployment service will automatically find the next available port
+
+### Module Not Appearing in UI
+**DEV MODE**:
+1. Ensure the module is added to the PipelineModule enum
+2. Restart the engine in dev mode to pick up the new module
+3. Check browser console for any API errors
+
+**PRODUCTION**:
+1. Verify module is registered in the registry
+2. Check module health status
+3. Verify network connectivity between UI and registry

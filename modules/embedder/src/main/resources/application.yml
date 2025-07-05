@@ -2,13 +2,13 @@ quarkus:
   application:
     name: embedder-module
   http:
-    port: 39094
+    port: 39100  # Standard internal module port
   generate-code:
     grpc:
       scan-for-proto: com.rokkon.pipeline:protobuf,com.google.api.grpc:proto-google-common-protos
   grpc:
     server:
-      port: 49094  # Different port from parser (49093) and chunker (49092)
+      use-separate-server: false  # Unified server mode
       host: 0.0.0.0
       enable-reflection-service: true
       max-inbound-message-size: 1073741824  # 1GB
@@ -27,7 +27,7 @@ quarkus:
     registry: "registry.rokkon.com:8443"
     image: "pipeline/embedder:${quarkus.application.version}"
     dockerfile-jvm-path: src/main/docker/Dockerfile.jvm
-    group: rokkon
+    group: pipeline
     # Credentials should be provided via environment variables:
     # QUARKUS_CONTAINER_IMAGE_USERNAME
     # QUARKUS_CONTAINER_IMAGE_PASSWORD
@@ -36,17 +36,37 @@ quarkus:
   smallrye-health:
     root-path: /health
   micrometer:
+    enabled: true
     export:
       prometheus:
+        enabled: true
         path: /metrics
+    binder:
+      jvm: true
+      system: true
+      grpc:
+        server: true
+        client: true
 
   # OpenTelemetry configuration
-  opentelemetry:
+  otel:
     enabled: true
-    tracer:
-      exporter:
-        otlp:
-          endpoint: http://${OTEL_COLLECTOR_HOST:localhost}:${OTEL_COLLECTOR_PORT:4317}
+    traces:
+      enabled: true
+    metrics:
+      enabled: true
+    logs:
+      enabled: true
+    exporter:
+      otlp:
+        # In production, this will be set via environment variable to the sidecar collector
+        endpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:http://localhost:4317}
+        protocol: ${OTEL_EXPORTER_OTLP_PROTOCOL:grpc}
+    resource:
+      attributes:
+        service.name: embedder-module
+        service.namespace: pipeline
+        deployment.environment: ${quarkus.profile:prod}
 
 # DJL configuration for ML models
 djl:
@@ -78,6 +98,11 @@ processing:
       clients:
         embedderService:
           max-inbound-message-size: 1073741824  # 1GB
+    # Disable OpenTelemetry in tests
+    otel:
+      enabled: false
+      sdk:
+        disabled: true
   processing:
     buffer:
       enabled: true

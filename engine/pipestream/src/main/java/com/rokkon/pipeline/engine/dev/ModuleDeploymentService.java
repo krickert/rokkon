@@ -45,7 +45,7 @@ public class ModuleDeploymentService {
     
     // External port range for dynamic allocation
     private static final int EXTERNAL_PORT_START = 39100;
-    private static final int EXTERNAL_PORT_END = 39200;
+    private static final int EXTERNAL_PORT_END = 39800;
     
     @Inject
     DockerClient dockerClient;
