@@ -2,6 +2,25 @@
 
 This guide documents the steps taken to convert the echo module from separate gRPC and HTTP servers to a unified server configuration. Follow these steps for other modules.
 
+## Recent Updates (Session Summary)
+
+### Orphaned Module Management
+- Implemented orphaned module detection and redeployment functionality
+- Added "Re-deploy" button in UI for orphaned modules (containers running but not registered)
+- Created comprehensive cleanup method `cleanupModuleCompletely()` that removes containers and Consul registrations
+- Added REST endpoint: `DELETE /api/v1/module-management/{moduleName}/cleanup`
+
+### Module Naming Clarification
+- Module names should NOT have "-module" appended/removed as a convention
+- "test-module" is the full module name (not "test" with "-module" added)
+- Container naming follows: `{moduleName}-module-app` (e.g., "test-module-module-app")
+- No naming restrictions for production modules - only dev mode has conventions
+
+### Key Fixes
+- Fixed PipelineModule enum: TEST module name changed from "test" to "test-module"
+- Updated UI to use "Re-deploy" instead of "Re-register" for orphaned modules
+- Redeploy functionality now properly cleans up orphaned containers before deploying fresh
+
 ## Important: Understanding Module Ports
 
 ### Internal Container Ports vs External Host Ports
@@ -341,12 +360,39 @@ The parser module conversion revealed several important improvements that should
 - In production, the OTEL endpoint will be configured via environment variable to point to the sidecar collector
 - Use `AUTO_REGISTER=false` when deploying with sidecars to prevent registration conflicts
 
+## Chunker Module Specific Notes
+
+### Special Considerations for Chunker Module
+1. **Memory Requirements**: The chunker module requires 4GB of memory due to NLP processing
+2. **Port Assignment**: Internal port should be 39100 (like all modules), external port will be dynamically allocated
+3. **Module Name**: The module name in PipelineModule.java is "chunker" (not "chunker-module")
+4. **NLP Dependencies**: May need larger message sizes if processing large documents with NLP models
+5. **Docker Image**: Should be named `pipeline/chunker:latest` following the new convention
+
+### Files to Update for Chunker
+1. `/modules/chunker/src/main/resources/application.yml` - Main configuration changes
+2. `/modules/chunker/src/main/bash/module-entrypoint.sh` - Startup script updates
+3. `/modules/chunker/src/main/docker/Dockerfile.jvm` - Port exposure changes
+4. `/modules/chunker/src/main/java/com/rokkon/chunker/ChunkerServiceImpl.java` - Check module name in getServiceRegistration()
+
+### Common Issues to Avoid
+1. **Module Names**: Ensure consistency between:
+   - PipelineModule enum entry ("chunker")
+   - Service registration in ChunkerServiceImpl
+   - application.yml (`quarkus.application.name`)
+   - Docker container labels
+2. **Port Confusion**: Remember internal port (39100) vs external port (dynamically allocated)
+3. **Image Names**: Change from `rokkon/chunker` to `pipeline/chunker`
+4. **Build Process**: Always use `./gradlew :modules:chunker:imageBuild` instead of direct docker build
+
 ## Verification
 
 After conversion, verify:
-1. Tests pass
-2. Module builds successfully
-3. gRPC services are accessible on the HTTP port
-4. REST endpoints continue to work
-5. Metrics are exposed at `/q/metrics`
-6. OpenAPI/Swagger UI is accessible at `/q/swagger-ui`
+1. Tests pass: `./gradlew :modules:chunker:test`
+2. Module builds successfully: `./gradlew :modules:chunker:build`
+3. Docker image created: `./gradlew :modules:chunker:imageBuild`
+4. gRPC services are accessible on the HTTP port
+5. REST endpoints continue to work
+6. Metrics are exposed at `/q/metrics`
+7. OpenAPI/Swagger UI is accessible at `/q/swagger-ui`
+8. Module can be deployed and registered in dev mode

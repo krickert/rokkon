@@ -828,4 +828,132 @@ public class ModuleManagementResource {
         })
         .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
     }
+    
+    @DELETE
+    @Path("/{moduleName}/cleanup")
+    @Operation(
+        summary = "Completely clean up a module",
+        description = "Removes all containers and Consul registrations for a module (dev mode only)"
+    )
+    @APIResponses({
+        @APIResponse(
+            responseCode = "200",
+            description = "Module cleaned up successfully",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON,
+                schema = @Schema(implementation = ModuleOperationResponse.class)
+            )
+        ),
+        @APIResponse(
+            responseCode = "503",
+            description = "Service not available (not in dev mode)"
+        )
+    })
+    public Uni<Response> cleanupModule(
+            @Parameter(description = "Module name", required = true, example = "test-module")
+            @PathParam("moduleName") String moduleName) {
+        
+        LOG.infof("Request to completely clean up module: %s", moduleName);
+        
+        // Check if deployment service is available (only in dev mode)
+        if (!deploymentService.isResolvable()) {
+            return Uni.createFrom().item(
+                Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Module cleanup is only available in dev mode", null))
+                    .build()
+            );
+        }
+        
+        return Uni.createFrom().item(() -> {
+            try {
+                deploymentService.get().cleanupModuleCompletely(moduleName);
+                
+                return Response.ok(new ModuleOperationResponse(true, 
+                    String.format("Module %s cleaned up completely", moduleName), 
+                    Map.of("module", moduleName, "status", "cleaned")))
+                    .build();
+            } catch (Exception e) {
+                LOG.errorf("Failed to clean up module: %s", e.getMessage(), e);
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Failed to clean up module: " + e.getMessage(), null))
+                    .build();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+    }
+    
+    @POST
+    @Path("/orphaned/{containerId}/redeploy")
+    @Operation(
+        summary = "Redeploy an orphaned module",
+        description = "Removes orphaned module containers and deploys fresh with the existing deployment logic (dev mode only)"
+    )
+    @APIResponses({
+        @APIResponse(
+            responseCode = "202",
+            description = "Redeployment initiated",
+            content = @Content(
+                mediaType = MediaType.APPLICATION_JSON,
+                schema = @Schema(implementation = ModuleOperationResponse.class)
+            )
+        ),
+        @APIResponse(
+            responseCode = "404",
+            description = "Container not found"
+        ),
+        @APIResponse(
+            responseCode = "503",
+            description = "Service not available (not in dev mode)"
+        )
+    })
+    public Uni<Response> redeployOrphanedModule(
+            @Parameter(description = "Container ID", required = true)
+            @PathParam("containerId") String containerId) {
+        
+        LOG.infof("Request to redeploy orphaned module container: %s", containerId);
+        
+        // Check if deployment service is available (only in dev mode)
+        if (!deploymentService.isResolvable()) {
+            return Uni.createFrom().item(
+                Response.status(Response.Status.SERVICE_UNAVAILABLE)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Orphaned module redeployment is only available in dev mode", null))
+                    .build()
+            );
+        }
+        
+        return Uni.createFrom().item(() -> {
+            try {
+                ModuleDeploymentService.ModuleDeploymentResult result = 
+                    deploymentService.get().redeployOrphanedModule(containerId);
+                
+                if (result.success()) {
+                    return Response.status(Response.Status.ACCEPTED)
+                        .entity(new ModuleOperationResponse(true, 
+                            result.message(), 
+                            Map.of(
+                                "status", "redeployed",
+                                "port", result.allocatedPort(),
+                                "containerId", result.moduleContainerId(),
+                                "instanceNumber", result.instanceNumber()
+                            )))
+                        .build();
+                } else {
+                    return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                        .entity(new ModuleOperationResponse(false, 
+                            result.message(), null))
+                        .build();
+                }
+            } catch (Exception e) {
+                LOG.errorf("Failed to redeploy orphaned module: %s", e.getMessage(), e);
+                return Response.status(Response.Status.INTERNAL_SERVER_ERROR)
+                    .entity(new ModuleOperationResponse(false, 
+                        "Failed to redeploy module: " + e.getMessage(), null))
+                    .build();
+            }
+        })
+        .runSubscriptionOn(Infrastructure.getDefaultWorkerPool());
+    }
 }

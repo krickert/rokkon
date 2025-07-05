@@ -14,7 +14,9 @@ export class DashboardGrid extends LitElement {
     deployingModules: { type: Array },
     undeployingModules: { type: Array },
     healthCheckingModules: { type: Array },
-    cleaningZombies: { type: Boolean }
+    cleaningZombies: { type: Boolean },
+    orphanedModules: { type: Array },
+    registeringModules: { type: Array }
   };
 
   static styles = css`
@@ -230,6 +232,125 @@ export class DashboardGrid extends LitElement {
       height: 18px;
     }
 
+    .orphaned-section {
+      background: #fff3e0;
+      border: 1px solid #ffb74d;
+      border-radius: 8px;
+      padding: 20px;
+      margin-bottom: 30px;
+    }
+
+    .orphaned-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 16px;
+    }
+
+    .orphaned-icon {
+      width: 24px;
+      height: 24px;
+      fill: #f57c00;
+    }
+
+    .orphaned-title {
+      font-size: 18px;
+      font-weight: 600;
+      color: #e65100;
+    }
+
+    .orphaned-description {
+      color: #bf360c;
+      font-size: 14px;
+      margin-bottom: 16px;
+    }
+
+    .orphaned-modules-list {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+      gap: 16px;
+    }
+
+    .orphaned-module-card {
+      background: white;
+      border: 1px solid #ffb74d;
+      border-radius: 6px;
+      padding: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .orphaned-module-info {
+      flex: 1;
+    }
+
+    .orphaned-module-name {
+      font-weight: 600;
+      color: #333;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    
+    .container-type-badge {
+      background: #f0f0f0;
+      color: #666;
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 11px;
+      font-weight: 500;
+      text-transform: uppercase;
+    }
+    
+    .container-type-badge.module {
+      background: #e3f2fd;
+      color: #1976d2;
+    }
+    
+    .container-type-badge.sidecar {
+      background: #f3e5f5;
+      color: #7b1fa2;
+    }
+    
+    .container-type-badge.registrar {
+      background: #fff3e0;
+      color: #f57c00;
+    }
+
+    .orphaned-module-details {
+      font-size: 12px;
+      color: #666;
+    }
+
+    .register-button {
+      background: #ff6f00;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 8px 16px;
+      font-size: 14px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: background 0.2s;
+    }
+
+    .register-button:hover {
+      background: #e65100;
+    }
+
+    .register-button:disabled {
+      background: #ccc;
+      cursor: not-allowed;
+    }
+
+    .register-button.registering {
+      background: #4caf50;
+    }
+
     .deploying-card {
       background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
       border-radius: 12px;
@@ -406,6 +527,8 @@ export class DashboardGrid extends LitElement {
     this.undeployingModules = [];
     this.healthCheckingModules = [];
     this.cleaningZombies = false;
+    this.orphanedModules = [];
+    this.registeringModules = [];
   }
 
   connectedCallback() {
@@ -629,6 +752,50 @@ export class DashboardGrid extends LitElement {
     this.dispatchEvent(event);
   }
 
+  async redeployOrphanedModule(containerId, moduleName) {
+    // Add to registering list
+    this.registeringModules = [...this.registeringModules, containerId];
+    this.requestUpdate();
+
+    try {
+      const response = await fetch(`/api/v1/module-management/orphaned/${containerId}/redeploy`, {
+        method: 'POST'
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        
+        // Show success toast
+        this.dispatchEvent(new CustomEvent('show-toast', {
+          detail: { message: `Started redeployment for ${moduleName}`, type: 'success' },
+          bubbles: true,
+          composed: true
+        }));
+
+        // Remove from orphaned list
+        this.orphanedModules = this.orphanedModules.filter(m => (m.container_id || m.containerId) !== containerId);
+        
+        // Refresh data after a moment to see the redeployed module
+        setTimeout(() => {
+          this.refreshData();
+        }, 3000);
+      } else {
+        throw new Error('Redeployment failed');
+      }
+    } catch (error) {
+      console.error('Failed to redeploy orphaned module:', error);
+      this.dispatchEvent(new CustomEvent('show-toast', {
+        detail: { message: `Failed to redeploy ${moduleName}`, type: 'error' },
+        bubbles: true,
+        composed: true
+      }));
+    } finally {
+      // Remove from registering list
+      this.registeringModules = this.registeringModules.filter(id => id !== containerId);
+      this.requestUpdate();
+    }
+  }
+
   handleDeployModule(event) {
     // Forward the event to parent
     this.dispatchEvent(new CustomEvent('deploy-module', {
@@ -694,6 +861,59 @@ export class DashboardGrid extends LitElement {
           <div class="stat-label">Zombie Services</div>
         </div>
       </div>
+
+      ${this.orphanedModules && this.orphanedModules.length > 0 && this.isDevMode ? html`
+        <div class="orphaned-section">
+          <div class="orphaned-header">
+            <svg class="orphaned-icon" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-4h2v2h-2zm0-8h2v6h-2z"/>
+            </svg>
+            <h3 class="orphaned-title">Orphaned Modules</h3>
+          </div>
+          <p class="orphaned-description">
+            These modules are running in Docker but not registered in the pipeline. 
+            You can re-register them to make them available again.
+          </p>
+          <div class="orphaned-modules-list">
+            ${this.orphanedModules.map(module => html`
+              <div class="orphaned-module-card">
+                <div class="orphaned-module-info">
+                  <div class="orphaned-module-name">
+                    ${module.module_name || module.moduleName}
+                    <span class="container-type-badge ${module.container_type || module.containerType || 'module'}">
+                      ${module.container_type || module.containerType || 'module'}
+                    </span>
+                  </div>
+                  <div class="orphaned-module-details">
+                    Container: ${module.container_name || module.containerName}<br>
+                    Port: ${module.port || 'Unknown'}<br>
+                    Instance: #${module.instance}
+                  </div>
+                </div>
+                <button 
+                  class="register-button ${this.registeringModules.includes(module.containerId) ? 'registering' : ''}"
+                  ?disabled=${this.registeringModules.includes(module.container_id || module.containerId)}
+                  @click=${() => this.redeployOrphanedModule(module.container_id || module.containerId, module.module_name || module.moduleName)}
+                >
+                  ${this.registeringModules.includes(module.container_id || module.containerId) ? html`
+                    <svg class="button-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                      <circle cx="12" cy="12" r="10" stroke-dasharray="60" stroke-dashoffset="0">
+                        <animate attributeName="stroke-dashoffset" from="0" to="-60" dur="2s" repeatCount="indefinite"/>
+                      </circle>
+                    </svg>
+                    Redeploying...
+                  ` : html`
+                    <svg class="button-icon" viewBox="0 0 20 20" fill="currentColor">
+                      <path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd"/>
+                    </svg>
+                    Re-deploy
+                  `}
+                </button>
+              </div>
+            `)}
+          </div>
+        </div>
+      ` : ''}
 
       <div class="service-section">
         <div class="section-header">

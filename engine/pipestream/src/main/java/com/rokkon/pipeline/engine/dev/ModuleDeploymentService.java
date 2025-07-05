@@ -6,6 +6,7 @@ import com.github.dockerjava.api.command.CreateNetworkResponse;
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.exception.ConflictException;
 import com.github.dockerjava.api.model.*;
+import com.github.dockerjava.api.model.Ports;
 import io.quarkus.arc.profile.IfBuildProfile;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
@@ -1324,18 +1325,48 @@ public class ModuleDeploymentService {
         List<OrphanedModule> orphaned = new ArrayList<>();
         
         try {
-            // Get all containers with pipeline.module label
-            List<Container> containers = dockerClient.listContainersCmd()
-                .withShowAll(true)  // Include stopped containers
-                .withLabelFilter(Map.of("pipeline.type", "module"))
+            // Get all containers with pipeline labels (module, registrar, sidecar)
+            List<Container> allContainers = dockerClient.listContainersCmd()
+                .withShowAll(false)  // Only running containers
                 .exec();
                 
+            // Filter for containers that have pipeline labels
+            List<Container> containers = allContainers.stream()
+                .filter(c -> {
+                    Map<String, String> labels = c.getLabels();
+                    return labels != null && 
+                           (labels.containsKey("pipeline.module") || 
+                            labels.containsKey("pipeline.module.name") ||
+                            labels.containsKey("pipeline.type"));
+                })
+                .collect(Collectors.toList());
+                
             // Get registered modules from the global registry
-            Set<String> registeredModuleIds = new HashSet<>();
+            Set<String> registeredModuleNames = new HashSet<>();
+            Map<String, Set<Integer>> registeredModuleInstances = new HashMap<>();
             try {
                 Set<GlobalModuleRegistryService.ModuleRegistration> registrations = 
                     moduleRegistry.listRegisteredModules().await().atMost(Duration.ofSeconds(5));
-                registrations.forEach(reg -> registeredModuleIds.add(reg.moduleId()));
+                registrations.forEach(reg -> {
+                    // Extract module name from moduleId (e.g., "test-module-abc123" -> "test")
+                    String moduleId = reg.moduleId();
+                    String moduleName = reg.moduleName();
+                    if (moduleName != null) {
+                        registeredModuleNames.add(moduleName);
+                        // Track instances for each module
+                        registeredModuleInstances.computeIfAbsent(moduleName, k -> new HashSet<>());
+                        // Try to extract instance number from moduleId
+                        if (moduleId.matches(".*-\\d+$")) {
+                            String[] parts = moduleId.split("-");
+                            try {
+                                int instance = Integer.parseInt(parts[parts.length - 1]);
+                                registeredModuleInstances.get(moduleName).add(instance);
+                            } catch (NumberFormatException e) {
+                                // Ignore
+                            }
+                        }
+                    }
+                });
             } catch (Exception e) {
                 LOG.warnf("Failed to get registered modules: %s", e.getMessage());
             }
@@ -1344,22 +1375,126 @@ public class ModuleDeploymentService {
             for (Container container : containers) {
                 Map<String, String> labels = container.getLabels();
                 if (labels != null) {
+                    // Support both old and new label formats
                     String moduleName = labels.get("pipeline.module.name");
+                    if (moduleName == null) {
+                        moduleName = labels.get("pipeline.module");
+                    }
+                    
                     String modulePort = labels.get("pipeline.port");
                     String instanceStr = labels.get("pipeline.instance");
                     
                     if (moduleName != null) {
                         boolean isRunning = "running".equals(container.getState());
-                        boolean isRegistered = registeredModuleIds.contains(container.getId());
+                        String containerName = container.getNames()[0].replaceFirst("^/", "");
                         
-                        // Only show running containers that aren't registered
-                        if (isRunning && !isRegistered) {
+                        // Check if this specific module instance is registered
+                        // Only show module containers (not sidecars/registrars) that aren't registered
+                        String containerType = labels.get("pipeline.type");
+                        boolean isModuleContainer = "module".equals(containerType);
+                        
+                        // For module containers, check if they're registered
+                        boolean isRegistered = false;
+                        if (isModuleContainer && registeredModuleNames.contains(moduleName)) {
+                            // Check if this specific instance is registered
+                            int thisInstance = 1;
+                            if (instanceStr != null) {
+                                thisInstance = Integer.parseInt(instanceStr);
+                            } else {
+                                // Try to extract from container name
+                                if (containerName.matches(".*-\\d+$")) {
+                                    String[] parts = containerName.split("-");
+                                    try {
+                                        thisInstance = Integer.parseInt(parts[parts.length - 1]);
+                                    } catch (NumberFormatException e) {
+                                        // Keep default
+                                    }
+                                }
+                            }
+                            Set<Integer> instances = registeredModuleInstances.get(moduleName);
+                            isRegistered = instances != null && (instances.contains(thisInstance) || instances.isEmpty());
+                        }
+                        
+                        // Only show module containers that are running but not registered
+                        if (isRunning && isModuleContainer && !isRegistered) {
+                            // First check if we can get the actual port from Docker
+                            int port = 0;
+                            
+                            // Try to get from label first
+                            if (modulePort != null) {
+                                port = Integer.parseInt(modulePort);
+                            } else {
+                                // Try to get port from container's port bindings
+                                ContainerPort[] ports = container.getPorts();
+                                if (ports != null && ports.length > 0) {
+                                    for (ContainerPort p : ports) {
+                                        // Look for the module's unified port (usually 39xxx)
+                                        if (p.getPublicPort() != null && 
+                                            p.getPublicPort() >= 39000 && 
+                                            p.getPublicPort() < 40000) {
+                                            port = p.getPublicPort();
+                                            LOG.debugf("Found port %d for container %s from port bindings", port, containerName);
+                                            break;
+                                        }
+                                    }
+                                }
+                                
+                                // If still no port, try to call the module's gRPC service
+                                if (port == 0) {
+                                    try {
+                                        // Use the container's internal port (known from module name)
+                                        PipelineModule module = PipelineModule.fromName(moduleName);
+                                        int internalPort = module.getUnifiedPort();
+                                        
+                                        // Try to connect to localhost with various port mappings
+                                        // This would need actual gRPC client implementation
+                                        LOG.debugf("Would try to call GetServiceRegistration on %s at port %d", 
+                                                  containerName, internalPort);
+                                        
+                                        // For now, use the default port
+                                        port = internalPort;
+                                    } catch (Exception e) {
+                                        LOG.debugf("Could not determine port for module %s: %s", moduleName, e.getMessage());
+                                    }
+                                }
+                            }
+                            
+                            // Determine instance from container name
+                            int instance = 1;
+                            if (instanceStr != null) {
+                                instance = Integer.parseInt(instanceStr);
+                            } else {
+                                // Use the containerName already defined earlier
+                                if (containerName.matches(".*-\\d+$")) {
+                                    String[] parts = containerName.split("-");
+                                    try {
+                                        instance = Integer.parseInt(parts[parts.length - 1]);
+                                    } catch (NumberFormatException e) {
+                                        // Keep default
+                                    }
+                                }
+                            }
+                            
+                            // Re-determine container type if needed (already declared above)
+                            if (containerType == null || containerType.isEmpty()) {
+                                // Try to infer from container name
+                                String containerNameLower = containerName.toLowerCase();
+                                if (containerNameLower.contains("registrar")) {
+                                    containerType = "registrar";
+                                } else if (containerNameLower.contains("sidecar") || containerNameLower.contains("consul")) {
+                                    containerType = "sidecar";
+                                } else {
+                                    containerType = "module";
+                                }
+                            }
+                            
                             orphaned.add(new OrphanedModule(
                                 container.getId(),
                                 container.getNames()[0].replaceFirst("^/", ""),
                                 moduleName,
-                                modulePort != null ? Integer.parseInt(modulePort) : 0,
-                                instanceStr != null ? Integer.parseInt(instanceStr) : 1,
+                                containerType,
+                                port,
+                                instance,
                                 container.getState(),
                                 container.getStatus(),
                                 labels
@@ -1376,9 +1511,138 @@ public class ModuleDeploymentService {
     }
     
     /**
+     * Redeploys an orphaned module by cleaning it up and deploying fresh
+     */
+    public ModuleDeploymentResult redeployOrphanedModule(String containerId) {
+        LOG.infof("Attempting to redeploy orphaned module with container ID: %s", containerId);
+        try {
+            // Inspect the container to get its details
+            InspectContainerResponse containerInfo = dockerClient.inspectContainerCmd(containerId).exec();
+            
+            if (containerInfo == null) {
+                LOG.warnf("Container not found: %s", containerId);
+                return new ModuleDeploymentResult(false, "Container not found");
+            }
+            
+            Map<String, String> labels = containerInfo.getConfig().getLabels();
+            if (labels == null) {
+                LOG.warnf("Container has no labels: %s", containerId);
+                return new ModuleDeploymentResult(false, "Container has no labels");
+            }
+            
+            String containerType = labels.get("pipeline.type");
+            if (!"module".equals(containerType)) {
+                LOG.warnf("Container is not a module (type=%s): %s", containerType, containerId);
+                return new ModuleDeploymentResult(false, "Container is not a module");
+            }
+            
+            String moduleName = labels.get("pipeline.module.name");
+            if (moduleName == null) {
+                moduleName = labels.get("pipeline.module");
+            }
+            
+            if (moduleName == null) {
+                LOG.warnf("Container missing module name label: %s", containerId);
+                return new ModuleDeploymentResult(false, "Cannot determine module name");
+            }
+            
+            // Find the PipelineModule enum for this module
+            PipelineModule module;
+            try {
+                module = PipelineModule.fromName(moduleName);
+            } catch (Exception e) {
+                LOG.errorf("Unknown module type: %s", moduleName);
+                return new ModuleDeploymentResult(false, "Unknown module type: " + moduleName);
+            }
+            
+            LOG.infof("Redeploying module %s - will clean up orphaned containers and deploy fresh", moduleName);
+            
+            // Clean up all containers for this module (module, sidecars, registrars)
+            cleanupOrphanedModuleContainers(moduleName);
+            
+            // Wait a bit for cleanup to complete
+            Thread.sleep(1000);
+            
+            // Now deploy fresh using the normal deployment process
+            return deployModule(module);
+            
+        } catch (Exception e) {
+            LOG.errorf("Failed to redeploy orphaned module: %s", e.getMessage(), e);
+            return new ModuleDeploymentResult(false, "Failed to redeploy: " + e.getMessage());
+        }
+    }
+    
+    /**
+     * Completely cleans up a module - removes all containers and Consul registrations
+     * This is useful for cleaning up orphaned modules or doing a full reset
+     */
+    public void cleanupModuleCompletely(String moduleName) {
+        LOG.infof("Performing complete cleanup for module: %s", moduleName);
+        
+        // First, deregister from Consul
+        deregisterModuleFromConsul(moduleName);
+        
+        // Then clean up all containers
+        cleanupOrphanedModuleContainers(moduleName);
+        
+        LOG.infof("Complete cleanup finished for module: %s", moduleName);
+    }
+    
+    /**
+     * Cleans up all containers related to an orphaned module
+     */
+    private void cleanupOrphanedModuleContainers(String moduleName) {
+        LOG.infof("Cleaning up all containers for orphaned module: %s", moduleName);
+        
+        // Find all containers with this module name
+        List<Container> containers = dockerClient.listContainersCmd()
+            .withShowAll(true)
+            .exec();
+            
+        for (Container container : containers) {
+            try {
+                // Check container name patterns
+                String containerName = container.getNames()[0].replaceFirst("^/", "");
+                boolean isModuleContainer = false;
+                
+                // Check various naming patterns
+                if (containerName.equals(moduleName + "-module-app") ||
+                    containerName.startsWith(moduleName + "-module-app-") ||
+                    containerName.equals("consul-agent-" + moduleName) ||
+                    containerName.startsWith("consul-agent-" + moduleName + "-") ||
+                    containerName.contains(moduleName + "-registrar") ||
+                    containerName.contains(moduleName + "-orphan-registrar")) {
+                    isModuleContainer = true;
+                }
+                
+                // Also check labels
+                if (!isModuleContainer && container.getLabels() != null) {
+                    String moduleLabel = container.getLabels().get("pipeline.module");
+                    if (moduleName.equals(moduleLabel)) {
+                        isModuleContainer = true;
+                    }
+                }
+                
+                if (isModuleContainer) {
+                    LOG.infof("Removing container: %s", containerName);
+                    try {
+                        dockerClient.stopContainerCmd(container.getId()).withTimeout(5).exec();
+                    } catch (Exception e) {
+                        // Container might already be stopped
+                    }
+                    dockerClient.removeContainerCmd(container.getId()).withForce(true).exec();
+                }
+            } catch (Exception e) {
+                LOG.warnf("Failed to remove container: %s", e.getMessage());
+            }
+        }
+    }
+    
+    /**
      * Attempts to register an orphaned module container
      */
     public boolean registerOrphanedModule(String containerId) {
+        LOG.infof("Attempting to register orphaned module with container ID: %s", containerId);
         try {
             // Inspect the container to get its details
             InspectContainerResponse containerInfo = dockerClient.inspectContainerCmd(containerId).exec();
@@ -1389,64 +1653,319 @@ public class ModuleDeploymentService {
             }
             
             Map<String, String> labels = containerInfo.getConfig().getLabels();
-            if (labels == null || !"module".equals(labels.get("pipeline.type"))) {
-                LOG.warnf("Container is not a module: %s", containerId);
+            if (labels == null) {
+                LOG.warnf("Container has no labels: %s", containerId);
+                return false;
+            }
+            
+            String containerType = labels.get("pipeline.type");
+            LOG.infof("Container type: %s, labels: %s", containerType, labels);
+            
+            if (!"module".equals(containerType)) {
+                LOG.warnf("Container is not a module (type=%s): %s", containerType, containerId);
                 return false;
             }
             
             String moduleName = labels.get("pipeline.module.name");
-            String modulePort = labels.get("pipeline.port");
+            if (moduleName == null) {
+                moduleName = labels.get("pipeline.module");
+            }
+            String instanceStr = labels.get("pipeline.instance");
+            int instanceNumber = instanceStr != null ? Integer.parseInt(instanceStr) : 1;
             
-            if (moduleName == null || modulePort == null) {
-                LOG.warnf("Container missing required labels: %s", containerId);
+            if (moduleName == null) {
+                LOG.warnf("Container missing module name label: %s", containerId);
                 return false;
             }
             
-            // Create a new registration container to register this module
-            String registrationScript = String.format("""
-                #!/bin/sh
-                echo 'Attempting to register orphaned module %s...'
+            // Get the internal port from PipelineModule
+            int internalPort = 0;
+            int actualHostPort = 0;
+            String registrationHost = "";
+            
+            try {
+                PipelineModule module = PipelineModule.fromName(moduleName);
+                internalPort = module.getUnifiedPort();
+                LOG.infof("Module %s has internal port %d", moduleName, internalPort);
+            } catch (Exception e) {
+                LOG.errorf("Could not determine internal port for module %s", moduleName);
+                return false;
+            }
+            
+            // Since the module shares network with consul sidecar, we need to find the mapped port
+            // from the consul sidecar container (which has the port mappings)
+            
+            // Find the consul sidecar for this module
+            String consulSidecarName = instanceNumber == 1 
+                ? "consul-agent-" + moduleName 
+                : "consul-agent-" + moduleName + "-" + instanceNumber;
+            
+            // Verify the consul sidecar exists
+            List<Container> consulSidecars = dockerClient.listContainersCmd()
+                .withNameFilter(List.of(consulSidecarName))
+                .exec();
+            
+            Container consulSidecar = null;
+            if (!consulSidecars.isEmpty()) {
+                consulSidecar = consulSidecars.get(0);
+            } else {
+                LOG.errorf("Consul sidecar not found for orphaned module: %s", consulSidecarName);
+                LOG.errorf("The orphaned module %s has lost its consul sidecar and cannot be re-registered. " +
+                          "Please clean up this container manually using 'docker rm -f %s' or the undeploy button.", 
+                          moduleName, containerInfo.getName());
                 
-                # Try to register the module with the engine
-                if java -jar /deployments/pipeline-cli.jar register \
-                    --module-host=%s \
-                    --module-port=%s \
-                    --engine-host=%s \
-                    --engine-port=39001; then
-                    echo 'Module registered successfully!'
-                else
-                    echo 'Registration failed'
-                    exit 1
-                fi
-                """,
-                moduleName,
-                containerInfo.getName().replaceFirst("^/", ""),
-                modulePort,
-                hostIPDetector.detectHostIP()
+                // For now, we'll return false. In the future, we could offer to clean up the orphaned container
+                return false;
+            }
+            
+            // For orphaned modules, we have a challenge: the module shares network with consul sidecar,
+            // and the consul sidecar has the port mappings. We can't easily change port mappings
+            // without recreating both containers. 
+            
+            // First, let's check what port mapping exists on the consul sidecar
+            int existingHostPort = 0;
+            if (consulSidecar != null) {
+                ContainerPort[] ports = consulSidecar.getPorts();
+                if (ports != null) {
+                    for (ContainerPort port : ports) {
+                        if (port.getPrivatePort() != null && port.getPrivatePort() == internalPort
+                            && port.getPublicPort() != null) {
+                            existingHostPort = port.getPublicPort();
+                            LOG.infof("Found existing port mapping %d->%d on consul sidecar", 
+                                     existingHostPort, internalPort);
+                            break;
+                        }
+                    }
+                }
+            }
+            
+            // Check if there's already a module registered at this port
+            if (existingHostPort > 0) {
+                // Check if this port conflicts with an already registered module
+                boolean portConflict = false;
+                String conflictingModule = null;
+                
+                try {
+                    // Check all registered modules to see if any are using this port
+                    var registeredModules = moduleRegistry.listRegisteredModules().await().indefinitely();
+                    for (var registration : registeredModules) {
+                        if (registration.port() == existingHostPort) {
+                            // Check if it's the same module (re-registering itself is OK)
+                            if (!registration.moduleName().equals(moduleName)) {
+                                portConflict = true;
+                                conflictingModule = registration.moduleName();
+                                break;
+                            }
+                        }
+                    }
+                } catch (Exception e) {
+                    LOG.errorf("Failed to check for port conflicts: %s", e.getMessage());
+                    return false;
+                }
+                
+                if (portConflict) {
+                    LOG.errorf("Cannot re-register orphaned module %s: port %d is already in use by module %s. " +
+                              "Please deregister the conflicting module first or clean up the orphaned containers.",
+                              moduleName, existingHostPort, conflictingModule);
+                    return false;
+                }
+                
+                actualHostPort = existingHostPort;
+                LOG.infof("No port conflicts found. Will use existing port mapping: %d", actualHostPort);
+            } else {
+                // No existing port mapping found - this shouldn't happen for orphaned modules
+                LOG.errorf("No port mapping found on consul sidecar for orphaned module %s", moduleName);
+                return false;
+            }
+            
+            
+            // Determine registration host based on network mode
+            String hostIP = hostIPDetector.detectHostIP();
+            registrationHost = hostIP;
+            
+            LOG.infof("Registering module %s with internal port %d mapped to host port %d", 
+                     moduleName, internalPort, actualHostPort);
+            
+            // Use the existing registration sidecar pattern
+            String registrarName = moduleName + "-orphan-registrar-" + System.currentTimeMillis();
+            
+            // Get the module's Docker image (prefer from container info)
+            String moduleImage = containerInfo.getConfig().getImage();
+            if (moduleImage == null || moduleImage.isEmpty()) {
+                moduleImage = "pipeline/" + moduleName + "-module:latest";
+            }
+            
+            // Create the registration sidecar using the same pattern as normal deployment
+            return createAndStartRegistrationSidecar(
+                moduleName, 
+                moduleImage,
+                registrarName,
+                consulSidecarName,
+                instanceNumber,
+                registrationHost,
+                actualHostPort  // Use the actual mapped host port, not internal port
             );
             
-            // Create a temporary registration container
-            CreateContainerResponse registrar = dockerClient.createContainerCmd("pipeline/" + moduleName + "-module:latest")
-                .withName(moduleName + "-orphan-registrar-" + System.currentTimeMillis())
+        } catch (Exception e) {
+            LOG.errorf("Failed to register orphaned module: %s", e.getMessage(), e);
+            return false;
+        }
+    }
+    
+    /**
+     * Creates a consul sidecar for an orphaned module with specific port mapping
+     */
+    private String createConsulSidecarForOrphanedModule(PipelineModule module, int hostPort, 
+            int instanceNumber, String moduleContainerId) {
+        String sidecarName = instanceNumber == 1 
+            ? "consul-agent-" + module.getModuleName() 
+            : "consul-agent-" + module.getModuleName() + "-" + instanceNumber;
+        
+        try {
+            // Remove existing container if it exists
+            removeContainerIfExists(sidecarName);
+            
+            // Create the consul sidecar that shares network with the module
+            // Note: We cannot publish ports when using container network mode
+            // The port mapping should already exist on the module container
+            HostConfig hostConfig = HostConfig.newHostConfig()
+                .withNetworkMode("container:" + moduleContainerId);  // Share network with module
+            
+            // Environment variables for Consul
+            List<String> env = List.of(
+                "CONSUL_BIND_INTERFACE=eth0",
+                "CONSUL_CLIENT_INTERFACE=eth0",
+                "CONSUL_HTTP_ADDR=http://127.0.0.1:8500"
+            );
+            
+            // Consul command
+            String[] cmd = new String[]{
+                "consul", "agent",
+                "-retry-join", "consul-server",
+                "-client", "0.0.0.0",
+                "-bind", "0.0.0.0",
+                "-ui=false",
+                "-node=" + sidecarName,
+                "-datacenter=rokkon-dev"
+            };
+            
+            CreateContainerResponse container = dockerClient.createContainerCmd("hashicorp/consul:" + consulVersion)
+                .withName(sidecarName)
+                .withHostConfig(hostConfig)
+                .withEnv(env)
+                .withCmd(cmd)
+                .withLabels(Map.of(
+                    "pipeline.module", module.getModuleName(),
+                    "pipeline.module.name", module.getModuleName(),
+                    "pipeline.type", "consul-sidecar",
+                    "pipeline.sidecar.for", module.getModuleName(),
+                    "pipeline.instance", String.valueOf(instanceNumber),
+                    "pipeline.port.mapping", hostPort + "->" + module.getUnifiedPort()
+                ))
+                .exec();
+                
+            // Start the container
+            dockerClient.startContainerCmd(container.getId()).exec();
+            LOG.infof("Started orphaned module consul sidecar: %s with port %d->%d", 
+                     sidecarName, hostPort, module.getUnifiedPort());
+            
+            return container.getId();
+            
+        } catch (Exception e) {
+            LOG.errorf("Failed to create consul sidecar for orphaned module: %s", e.getMessage(), e);
+            return null;
+        }
+    }
+    
+    /**
+     * Creates and starts a registration sidecar for orphaned modules
+     */
+    private boolean createAndStartRegistrationSidecar(String moduleName, String moduleImage, 
+            String registrarName, String consulSidecarName, int instanceNumber, 
+            String registrationHost, int allocatedPort) {
+        try {
+            String hostIP = hostIPDetector.detectHostIP();
+            
+            // Get the internal port for this module type
+            int internalPort = 0;
+            try {
+                PipelineModule module = PipelineModule.fromName(moduleName);
+                internalPort = module.getUnifiedPort();
+            } catch (Exception e) {
+                LOG.errorf("Could not determine internal port for module %s", moduleName);
+                return false;
+            }
+            
+            // Create registration script matching the normal deployment pattern
+            String moduleServiceName = moduleName + "-module" + (instanceNumber > 1 ? "-" + instanceNumber : "");
+            String registrationScript = String.format("""
+                #!/bin/sh
+                echo 'Waiting for module to be ready...'
+                sleep 15
+                
+                echo 'Attempting to register orphaned module %s (instance %d) with engine...'
+                echo 'Registration host: %s'
+                echo 'Registration port: %d (external/host port)'
+                echo 'Module port: %d (internal port)'
+                
+                # Try to register the module
+                # Note: module-port is the internal port since we share network with module
+                # registration-port is the external/host port for engine to connect back
+                if java -jar /deployments/pipeline-cli.jar register \
+                    --module-host=localhost \
+                    --module-port=%d \
+                    --engine-host=%s \
+                    --engine-port=39001 \
+                    --registration-host=%s \
+                    --registration-port=%d; then
+                    echo 'Module registered successfully!'
+                else
+                    echo 'Registration failed, but continuing...'
+                fi
+                
+                # Keep container alive for monitoring
+                echo 'Registration sidecar complete. Sleeping...'
+                sleep infinity
+                """,
+                moduleServiceName,
+                instanceNumber,
+                registrationHost,
+                allocatedPort,
+                internalPort,
+                internalPort,  // Module's internal port for communication
+                hostIP,
+                registrationHost,
+                allocatedPort   // External/host port for engine to connect back
+            );
+            
+            // Remove any existing registrar with same name
+            removeContainerIfExists(registrarName);
+            
+            // Create the registration sidecar sharing network with Consul sidecar
+            CreateContainerResponse registrar = dockerClient.createContainerCmd(moduleImage)
+                .withName(registrarName)
                 .withHostConfig(HostConfig.newHostConfig()
-                    .withNetworkMode("host")  // Use host network to reach the module
-                    .withAutoRemove(true)     // Remove after completion
+                    .withNetworkMode("container:" + consulSidecarName)  // Share network with Consul sidecar
                 )
                 .withEntrypoint("/bin/sh")
                 .withCmd("-c", registrationScript)
                 .withLabels(Map.of(
                     "pipeline.module", moduleName,
-                    "pipeline.type", "orphan-registrar"
+                    "pipeline.module.name", moduleName,
+                    "pipeline.type", "registration-sidecar",
+                    "pipeline.sidecar.for", moduleName,
+                    "pipeline.instance", String.valueOf(instanceNumber),
+                    "pipeline.orphan.registrar", "true"
                 ))
                 .exec();
                 
             // Start the registration container
             dockerClient.startContainerCmd(registrar.getId()).exec();
-            LOG.infof("Started orphan registration for module: %s", moduleName);
+            LOG.infof("Started registration sidecar for orphaned module: %s", registrarName);
             
             return true;
         } catch (Exception e) {
-            LOG.errorf("Failed to register orphaned module: %s", e.getMessage(), e);
+            LOG.errorf("Failed to create registration sidecar: %s", e.getMessage(), e);
             return false;
         }
     }
@@ -1458,6 +1977,7 @@ public class ModuleDeploymentService {
         String containerId,
         String containerName,
         String moduleName,
+        String containerType,
         int port,
         int instance,
         String state,

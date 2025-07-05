@@ -7,7 +7,7 @@ package com.rokkon.pipeline.engine.dev;
  */
 public enum PipelineModule {
     ECHO("echo", "pipeline/echo-module:latest", 39100, "Simple echo module for testing", "1G"),
-    TEST("test", "pipeline/test-module:latest", 39101, "Test module for pipeline validation", "1G"),
+    TEST("test-module", "pipeline/test-module:latest", 39101, "Test module for pipeline validation", "1G"),
     PARSER("parser", "pipeline/parser-module:latest", 39102, "Document parser module", "1G"),
     CHUNKER("chunker", "pipeline/chunker:latest", 39103, "Text chunking module with NLP", "4G"),
     EMBEDDER("embedder", "pipeline/embedder:latest", 39104, "ML embedding module", "8G");

@@ -16,7 +16,8 @@ class PipelineDashboard extends LitElement {
     autoRefresh: { type: Boolean },
     refreshInterval: { type: Number },
     menuOpen: { type: Boolean },
-    isDevMode: { type: Boolean }
+    isDevMode: { type: Boolean },
+    orphanedModules: { type: Array }
   };
 
   static styles = css`
@@ -391,6 +392,7 @@ class PipelineDashboard extends LitElement {
         if (this.isDevMode) {
           this.fetchAvailableModules();
           this.fetchDeployedModules();
+          this.fetchOrphanedModules();
         }
       }
     } catch (err) {
@@ -424,6 +426,19 @@ class PipelineDashboard extends LitElement {
     }
   }
 
+  async fetchOrphanedModules() {
+    try {
+      const response = await fetch('/api/v1/module-management/orphaned');
+      if (response.ok) {
+        this.orphanedModules = await response.json();
+        console.log('Orphaned modules:', this.orphanedModules);
+        this.requestUpdate();
+      }
+    } catch (err) {
+      console.error('Failed to fetch orphaned modules:', err);
+    }
+  }
+
   async fetchDashboardData() {
     try {
       console.log('Fetching dashboard data...');
@@ -439,6 +454,7 @@ class PipelineDashboard extends LitElement {
       // Also refresh module deployment status in dev mode
       if (this.isDevMode) {
         this.fetchDeployedModules();
+        this.fetchOrphanedModules();
       }
     } catch (err) {
       console.error('Error fetching dashboard data:', err);
@@ -514,6 +530,7 @@ class PipelineDashboard extends LitElement {
             .availableModules=${this.availableModules}
             .deployedModules=${this.deployedModules}
             .deployingModules=${this.deployingModules}
+            .orphanedModules=${this.orphanedModules}
             @register-module=${this.handleRegisterModule}
             @cleanup-zombies=${this.handleCleanupZombies}
             @module-action=${this.handleModuleAction}
@@ -524,6 +541,7 @@ class PipelineDashboard extends LitElement {
               if (this.isDevMode) {
                 this.fetchDeployedModules();
                 this.fetchAvailableModules();
+                this.fetchOrphanedModules();
               }
             }}>
           </dashboard-grid>
