@@ -14,6 +14,7 @@ import org.eclipse.microprofile.openapi.annotations.Operation;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
 import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 import java.util.*;
 import java.util.stream.Collectors;
@@ -127,6 +128,7 @@ public class ModuleDiscoveryResource {
     @GET
     @Path("/all-services")
     @Operation(summary = "Get all services registered in Consul")
+    @WithSpan("module-discovery-all-services")
     public Uni<Response> getAllServices() {
         LOG.info("Fetching all services from Consul");
 
@@ -336,6 +338,7 @@ public class ModuleDiscoveryResource {
     @GET
     @Path("/dashboard")
     @Operation(summary = "Get comprehensive service data for dashboard")
+    @WithSpan("module-discovery-dashboard")
     public Uni<Response> getDashboardData() {
         LOG.info("Fetching dashboard data");
 

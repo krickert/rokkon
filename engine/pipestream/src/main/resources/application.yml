@@ -103,6 +103,12 @@ pipeline:
         level: DEBUG
       "io.grpc":
         level: INFO
+      # Reduce OpenTelemetry context storage warnings
+      "io.quarkus.opentelemetry.runtime.QuarkusContextStorage":
+        level: WARN
+      # Reduce periodic metric reader noise
+      "io.opentelemetry.sdk.metrics.export.PeriodicMetricReader":
+        level: WARN
 
   # Container image configuration
   container-image:
@@ -137,6 +143,12 @@ pipeline:
       enabled: true
     logs:
       enabled: true
+    # Configure context propagation for reactive streams
+    propagators: tracecontext,baggage
+  
+  # Enable context propagation for reactive streams
+  context-propagation:
+    enabled: true
 
   # Micrometer metrics configuration
   micrometer:

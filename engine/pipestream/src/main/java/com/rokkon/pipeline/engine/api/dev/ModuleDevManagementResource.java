@@ -25,6 +25,7 @@ import java.util.Map;
 import java.util.Arrays;
 import java.util.stream.Collectors;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 /**
  * REST API for module management operations in development mode.
@@ -449,6 +450,7 @@ public class ModuleDevManagementResource {
             )
         )
     )
+    @WithSpan("dev-modules-find-orphaned")
     public Uni<List<OrphanedModule>> findOrphanedModules() {
         LOG.info("Request to find orphaned module containers");
         
