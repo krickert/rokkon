@@ -1,4 +1,5 @@
 import { LitElement, html, css } from 'lit';
+import '../pipeline-builder/pipeline-builder.js';
 
 export class PipelineView extends LitElement {
   static properties = {
@@ -287,6 +288,37 @@ export class PipelineView extends LitElement {
     this.editingPipeline = null;
   }
 
+  async savePipeline(pipeline) {
+    try {
+      const method = this.editingPipeline ? 'PUT' : 'POST';
+      const url = this.editingPipeline 
+        ? `/api/v1/pipelines/definitions/${this.editingPipeline.id}`
+        : '/api/v1/pipelines/definitions';
+      
+      const response = await fetch(url, {
+        method,
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify(pipeline)
+      });
+      
+      if (!response.ok) throw new Error('Failed to save pipeline');
+      
+      this.showToast('Pipeline saved successfully', 'success');
+      this.closeModal();
+      this.fetchPipelines();
+    } catch (err) {
+      this.showToast(err.message, 'error');
+    }
+  }
+
+  handleValidation(validationResult) {
+    // Update the pipeline validation status in the modal
+    // This could be used to enable/disable save button or show warnings
+    console.log('Pipeline validation:', validationResult);
+  }
+
   showToast(message, type) {
     const event = new CustomEvent('show-toast', {
       detail: { message, type },
@@ -397,17 +429,17 @@ export class PipelineView extends LitElement {
 
       ${this.showModal ? html`
         <div style="position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 1000;" @click=${(e) => e.target === e.currentTarget && this.closeModal()}>
-          <div style="background: white; border-radius: 8px; padding: 24px; min-width: 500px; max-width: 600px; box-shadow: 0 4px 20px rgba(0,0,0,0.15);">
-            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+          <div style="background: white; border-radius: 8px; width: 90%; height: 90%; max-width: 1400px; max-height: 900px; box-shadow: 0 4px 20px rgba(0,0,0,0.15); display: flex; flex-direction: column;">
+            <div style="display: flex; justify-content: space-between; align-items: center; padding: 20px; border-bottom: 1px solid #e0e0e0;">
               <h3 style="font-size: 20px; font-weight: 600; color: #333; margin: 0;">${this.editingPipeline ? 'Edit Pipeline' : 'Create Pipeline'}</h3>
-              <button style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999; padding: 0;" @click=${this.closeModal}>×</button>
+              <button style="background: none; border: none; font-size: 24px; cursor: pointer; color: #999; padding: 0; width: 32px; height: 32px;" @click=${this.closeModal}>×</button>
             </div>
-            <div style="margin-bottom: 24px;">
-              <p style="color: #666; text-align: center; padding: 40px;">Pipeline editor implementation coming soon</p>
-            </div>
-            <div style="display: flex; justify-content: flex-end; gap: 12px;">
-              <button style="padding: 8px 16px; border: 1px solid #ddd; background: white; border-radius: 4px; cursor: pointer;" @click=${this.closeModal}>Close</button>
-            </div>
+            <pipeline-builder 
+              style="flex: 1; display: block; overflow: hidden;"
+              .pipeline=${this.editingPipeline || { name: 'New Pipeline', nodes: [], connections: [] }}
+              @save-pipeline=${(e) => this.savePipeline(e.detail.pipeline)}
+              @pipeline-validated=${(e) => this.handleValidation(e.detail)}>
+            </pipeline-builder>
           </div>
         </div>
       ` : ''}
