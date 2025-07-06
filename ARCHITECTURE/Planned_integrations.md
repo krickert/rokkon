@@ -50,10 +50,10 @@ graph TD
     S3Connector -- PipeDocs --> PipelinePipeline
     FtpConnector -- PipeDocs --> PipelinePipeline
     NfsConnector -- PipeDocs --> PipelinePipeline
-    GitConnector -- PipeDocs --> PipelinePipeline
+    GitConnector -- PipeDocs --> Pipeline[A Pipeline]
     WikipediaConnector -- PipeDocs --> PipelinePipeline
-    GutenbergConnector -- PipeDocs --> PipelinePipeline
-    WeatherFeedConnector -- PipeDocs --> PipelinePipeline
+    GutenbergConnector -- PipeDocs --> Pipeline[A Pipeline]
+    WeatherFeedConnector -- PipeDocs --> Pipeline[A Pipeline]
 
     classDef source fill:#lightblue,stroke:#333,stroke-width:2px;
     classDef connector fill:#lightgreen,stroke:#333,stroke-width:2px;
@@ -175,8 +175,8 @@ Sinks are modules responsible for writing processed data from Pipeline to extern
 graph TD
     PipelinePipeline[Pipeline] -- PipeDocs --> OpenSearchSink[OpenSearch Sink]
     PipelinePipeline -- PipeDocs --> MongoSink["MongoDB/DocumentDB Sink"]
-    PipelinePipeline -- PipeDocs --> VectorStoreSink["Pinecone/Other Vector Stores Sink"]
-    PipelinePipeline -- PipeDocs --> PostgresSink["PostgreSQL Sink (Relational/JSONB)"]
+        Pipeline[A Pipeline] -- PipeDocs --> VectorStoreSink["Pinecone/Other Vector Stores Sink"]
+    Pipeline -- PipeDocs --> PostgresSink["PostgreSQL Sink (Relational/JSONB)"]
 
     OpenSearchSink -- "Writes Data" --> OpenSearchCluster[OpenSearch Cluster]
     MongoSink -- "Writes Data" --> MongoCluster["MongoDB / DocumentDB"]
@@ -214,7 +214,7 @@ graph TD
 
 ## Why This Can Happen Quickly
 
-The development and integration of these modules can be accelerated due to several factors inherent in Pipeline's design and the broader software ecosystem:
+The development and integration of these modules can be accelerated due to several factors inherent in the Pipeline Engine's design and the broader software ecosystem:
 
 *   **Microservice Architecture:** Each module is a small, focused service. Teams can develop them independently and in parallel.
 *   **gRPC & Protobuf:** Clear, language-agnostic contracts simplify integration. Code generation for client/server stubs saves significant time.

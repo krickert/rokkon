@@ -1,211 +1,216 @@
 # Pipeline Engine: Architecture Overview
 
-## High-Level Overview
+## Introduction
 
-The Pipeline Engine is a powerful and flexible data processing pipeline designed for building complex, scalable, and language-agnostic data workflows. It empowers developers to create pipeline steps, connectors (sources of data), and sinks (destinations for data) using any programming language that supports gRPC.
+The Pipeline Engine is a powerful and flexible data processing system designed for building complex, scalable, and language-agnostic data workflows. It excels at document extraction and manipulation, making it an ideal foundation for creating sophisticated search engine pipelines. Out of the box, the system allows you to define multiple data processing pipelines that can ingest data from various sources (like websites, file systems, or databases), process it through a series of transformation steps (like parsing, chunking, and embedding), and load it into search backends like OpenSearch.
 
-At its core, Pipeline is built around the concept of distributed, interconnected modules that communicate via gRPC and can leverage Kafka for asynchronous data transfer between steps. This architecture allows for:
+### The Core Principle: The Engine is the Orchestrator
 
-*   **Language Agnosticism:** Modules can be written in Python, Java, Go, Node.js, C++, Rust, or any other gRPC-supported language. This enables teams to use the best language for a specific task or leverage existing libraries and expertise.
-*   **Scalability:** Each pipeline step (module) can be independently scaled. The engine supports fan-in/fan-out patterns, allowing multiple instances of a module to process data in parallel or for data to be distributed across different subsequent steps.
-*   **Flexibility:** Pipelines are dynamically configurable and can be modified without recompiling the core engine.
-*   **Resilience:** The system is designed for fault tolerance, with features like health checks, service discovery, and configurable retry mechanisms.
+To understand how the system works, there is one critical rule: **Modules never talk to each other directly. They only talk to the Engine.**
 
-### Fan-in/Fan-out Capabilities
+The Engine is the central hub that manages the entire data flow. It receives data from one module, looks at the pipeline's configuration to decide what to do next, and then sends the data to the next module in the sequence. The modules themselves are simple, focused gRPC services that just do their one job and report the results back to the Engine.
 
-Each step in a Rokkon pipeline can exhibit fan-in or fan-out behavior:
+Let's explore this with two examples.
 
-*   **Fan-out:** A single pipeline step can send its output to multiple subsequent steps. This is useful for tasks like:
-    *   Processing the same data in different ways simultaneously (e.g., generating different types of embeddings).
-    *   Distributing data to different sinks for A/B testing or varied storage needs.
-    *   Triggering multiple independent downstream workflows.
-*   **Fan-in:** Multiple pipeline steps can send their output to a single subsequent step. This is useful for:
-    *   Aggregating results from parallel processing tasks.
-    *   Combining data from multiple sources before further processing.
+## Core Concepts and Technologies
 
-Communication between steps can occur synchronously via gRPC or asynchronously via Kafka:
+The Pipeline Engine is built on a set of modern, robust technologies designed for creating distributed systems. Its architecture provides significant flexibility, allowing developers to build and modify complex data pipelines dynamically.
 
-*   **gRPC:** For low-latency, direct communication between steps, especially suitable for request/response patterns or when immediate processing is required.
-*   **Kafka:** For decoupling steps, enabling durable messaging, and supporting high-throughput scenarios. Kafka acts as a buffer and allows steps to consume data at their own pace.
+### Architectural Flexibility
 
-```mermaid
-graph TD
-    subgraph "Pipeline Engine Core"
-        direction LR
-        Engine[pipeline-engine API/Orchestrator]
-        Consul[Consul Service Discovery & KV Store]
-        Kafka[Apache Kafka Messaging]
+A key design principle of the engine is its dynamic nature. Pipeline definitions—the sequence of steps and their configurations—are stored externally in Consul. The Engine reads this configuration at runtime. This means you can:
 
-        Engine -- Manages/Reads Config --> Consul
-        Engine -- Discovers Modules --> Consul
-        Engine -- Orchestrates --> StepA
-        Engine -- Orchestrates --> StepB
-        Engine -- Orchestrates --> StepC
-    end
+*   **Modify Pipelines without Redeployment:** Change the order of steps, add new steps, or alter a module's configuration on-the-fly. The Engine will detect the changes and adjust its behavior without needing to be restarted or redeployed.
+*   **Language-Agnostic Modules:** Modules are the workhorses of the pipeline, and they can be written in any programming language that supports gRPC (such as Python, Go, Node.js, or Rust). This allows teams to use the best tool for the job or leverage existing codebases.
+*   **Proxy for Enhanced Capabilities:** For modules not written in Java, the optional `proxy-module` can be used. This proxy sits in front of a non-Java module and automatically provides it with features from the Java ecosystem, such as advanced telemetry, metrics, security, and standardized testing endpoints, without the module developer needing to implement them.
 
-    subgraph "Pipeline Modules (gRPC Services)"
-        direction LR
-        Connector1["Connector Module 1<br>(e.g., Python)"]
-        Connector2["Connector Module 2<br>(e.g., Go)"]
-        StepA["Processing Step A<br>(e.g., Java)"]
-        StepB["Processing Step B<br>(e.g., Python)"]
-        StepC["Processing Step C<br>(e.g., Node.js)"]
-        Sink1["Sink Module 1<br>(e.g., Java)"]
-        Sink2["Sink Module 2<br>(e.g., Go)"]
-    end
+### Components at a Glance
 
-    User[User/API Client] -- Defines/Controls Pipeline --> Engine
+| Component | Role | Technology | Description |
+| :--- | :--- | :--- | :--- |
+| **Pipeline Engine** | **Orchestrator** | Java (Quarkus) | The central brain of the system. It reads pipeline configurations, discovers modules, and routes data between them using either gRPC for synchronous calls or Kafka for asynchronous messaging. |
+| **Modules** | **Workers** | Any (gRPC) | Standalone gRPC services that perform a single, specific task, such as parsing a document, chunking text, or generating embeddings. They are language-agnostic. |
+| **Consul** | **Service Registry & Config Store** | HashiCorp Consul | Used for service discovery (so the Pipeline Engine can find modules) and as a Key-Value store for all pipeline configurations. |
+| **MongoDB** | **Document Storage** | MongoDB | The initial implementation for storing document state and metadata. This will evolve into a generic document storage interface. |
+| **Kafka** | **Message Bus (Optional)** | Apache Kafka | An optional but recommended transport for asynchronous communication between steps. It provides buffering, durability, and decoupling for high-throughput workflows. |
+| **Prometheus** | **Metrics (Optional)** | Prometheus | An optional but recommended component for collecting metrics from the Engine and modules for monitoring. |
+| **Grafana** | **Visualization (Optional)** | Grafana | An optional but recommended tool for creating dashboards to visualize metrics collected by Prometheus. |
 
-%% Data Flow Example
-    Connector1 -- gRPC/Kafka --> StepA
-    Connector2 -- gRPC/Kafka --> StepA
-    StepA -- gRPC/Kafka --> StepB
-    StepB -- gRPC/Kafka --> StepC
-    StepC -- gRPC/Kafka --> Sink1
-    StepC -- gRPC/Kafka --> Sink2
+### Technology Stack
 
+*   **gRPC:** The primary communication protocol between the Engine and all modules.
+*   **Protocol Buffers:** Defines the data contracts and service interfaces.
+*   **Java (Quarkus):** The core Engine is built using the Quarkus framework for high performance and a rich feature set.
+*   **Docker:** All components, including the Engine and modules, are designed to be run as containers.
+*   **Consul:** For service discovery and distributed configuration.
+*   **MongoDB:** For document and state storage.
+*   **Apache Kafka (Optional):** For asynchronous messaging.
+*   **Prometheus (Optional):** For metrics collection.
+*   **Grafana (Optional):** For metrics visualization.
 
-    classDef module fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef coreComponent fill:#lightgrey,stroke:#333,stroke-width:2px;
+---
 
-    class Connector1,Connector2,StepA,StepB,StepC,Sink1,Sink2 module;
-    class Engine,Consul,Kafka coreComponent;
-```
+## Example 1: A Simple, Serial Document Processing Pipeline
 
-### Role of Consul
+In this scenario, we will trace a single document through a linear pipeline: a connector fetches the document, it gets parsed, chunked, embedded, and finally saved to a single destination.
 
-Consul plays a critical role in the Pipeline Engine ecosystem:
+### Step 1: Connector to Engine
 
-1.  **Service Discovery:** Each pipeline module (connector, step, sink) registers itself with Consul upon startup. The Pipeline Engine and other modules use Consul to discover the network location (IP address and port) of available services. This allows for dynamic scaling and resilience, as new instances are automatically discovered and failing instances are removed.
-2.  **Health Checking:** Consul performs health checks on registered modules. The engine uses this health information to route data only to healthy instances, improving the overall reliability of the pipelines.
-3.  **Distributed Key-Value (KV) Store:** Pipeline Engine stores pipeline definitions, module configurations, and other dynamic operational data in the Consul KV store. This provides a centralized and consistent way to manage configurations, which can be updated dynamically without restarting the engine or modules. The engine watches for changes in Consul and adapts pipeline behavior accordingly.
-
-```mermaid
-graph TD
-    subgraph "Service Discovery & Health Checking"
-        M1[Module Instance 1] -- Registers & Heartbeats --> Consul
-        M2[Module Instance 2] -- Registers & Heartbeats --> Consul
-        M3[Module Instance 3] -- Registers & Heartbeats --> Consul
-        Engine -- Queries for healthy M_X instances --> Consul
-    end
-
-    subgraph "Configuration Management"
-        AdminUI[Admin UI/CLI] -- Writes Pipeline Config --> EngineConsulWriter[engine/consul Writer Service]
-        EngineConsulWriter -- Stores Config --> ConsulKV[(Consul KV Store)]
-        pipeline-engine[pipeline-engine] -- Reads Pipeline Config --> ConsulKV
-        ModuleA[Module A] -- Reads Own Config --> ConsulKV
-    end
-
-    classDef service fill:#f9f,stroke:#333,stroke-width:2px;
-    classDef consulComponent fill:#ccf,stroke:#333,stroke-width:2px;
-    classDef admin fill:#cfc,stroke:#333,stroke-width:2px;
-
-    class M1,M2,M3,ModuleA service;
-    class Consul,ConsulKV consulComponent;
-    class AdminUI,EngineConsulWriter,PipelineEngine admin;
-```
-
-## Example Scenario: Building a Document Processing and Analysis Pipeline
-
-Let's consider a realistic scenario where we want to ingest documents from the Gutenberg Library and Wikipedia, process them, generate embeddings, and store them in multiple OpenSearch instances for A/B testing search relevance.
-
-**Pipeline Definition:**
-
-1.  **Initial Steps (Connectors - Fan-in to Parser):**
-    *   `Gutenberg Library Connector`: A module (e.g., written in Python using `requests` and `BeautifulSoup`) that fetches e-books from Project Gutenberg.
-    *   `Wikipedia Connector`: A module (e.g., written in Go using Wikipedia's API client) that fetches articles from Wikipedia.
-    *   Both connectors output raw document content (text, HTML, etc.).
-
-2.  **`Parser` Step:**
-    *   Receives raw content from both connectors.
-    *   Cleans HTML, extracts plain text, and normalizes the content.
-    *   Outputs structured document data (e.g., title, body, source URL).
-
-3.  **`Chunker` Step:**
-    *   Receives structured documents from the `Parser`.
-    *   Splits large documents into smaller, manageable chunks (e.g., paragraphs or fixed-size token blocks). This is crucial for effective embedding generation.
-    *   Outputs individual document chunks.
-
-4.  **`Chunker 2` Step (Illustrating Fan-out/Fan-in for specialized processing):**
-    *   This could be a specialized chunker that operates on the output of the first `Chunker`. For example, it might further subdivide chunks based on semantic boundaries or prepare chunks specifically for a different embedding model.
-    *   Alternatively, `Chunker` and `Chunker 2` could run in parallel, processing different aspects or using different strategies on the output of `Parser`. For this example, let's assume `Chunker 2` refines the output of `Chunker 1`.
-
-5.  **`Embedder` Step:**
-    *   Receives document chunks from `Chunker 2`.
-    *   Uses a sentence transformer model (e.g., Sentence-BERT, loaded in a Python module) to generate vector embeddings for each chunk.
-    *   Outputs chunks enriched with their vector embeddings.
-
-6.  **`Embedder 2` Step (Illustrating Fan-out for multiple embedding types):**
-    *   This step runs in parallel with the `Embedder` step, receiving the same chunks from `Chunker 2`.
-    *   It uses a *different* embedding model (e.g., a multilingual model or a domain-specific model) to generate a second set of vector embeddings for each chunk.
-    *   **Why this results in 4 vectors (conceptually):** If each embedder produces a primary vector and perhaps a title vector (or some other contextual vector), then having two embedders means each chunk is now associated with:
-        1.  Vector from Embedder 1 (e.g., general purpose)
-        2.  Contextual vector from Embedder 1 (if applicable)
-        3.  Vector from Embedder 2 (e.g., multilingual)
-        4.  Contextual vector from Embedder 2 (if applicable)
-    *   More simply, if each embedder generates one vector per chunk, the chunk now has two distinct vector representations. If "4 vectors" implies a dimensionality (e.g., two 2D vectors), that's also possible. For this example, we'll assume each embedder generates one vector, so a chunk has two vector representations. The "4 vectors" could refer to a scenario where a pipeline might split the data further, or if each embedder itself produced multiple distinct embedding types for a single input. For clarity, let's say each chunk now has *two different* vector embeddings.
-
-7.  **Final Steps (Sinks - Fan-out from Embedders):**
-    *   The outputs from `Embedder` (containing embedding set 1) and `Embedder 2` (containing embedding set 2) are fanned out.
-    *   `OpenSearch Sink`: A module (e.g., written in Java using the OpenSearch client) that takes the enriched chunks (with embedding set 1) and indexes them into an OpenSearch cluster.
-    *   `OpenSearch Sink 2`: Another instance of the OpenSearch Sink module (or a differently configured one) that takes the enriched chunks (with embedding set 2) and indexes them into a *separate* OpenSearch cluster or a different index within the same cluster.
-    *   **Usefulness for A/B Testing:** Having data indexed with different embedding models in separate OpenSearch instances (or indices) allows for A/B testing of search relevance. Queries can be run against both versions, and user engagement or relevance metrics can be compared to determine which embedding strategy yields better search results.
-
-**Mermaid Diagram of the Example Scenario:**
+The process starts when a Connector module fetches a document and sends it to the Engine.
 
 ```mermaid
 graph LR
-    subgraph "Data Sources (Connectors)"
-        Gutenberg["Gutenberg Library Connector"]
-        Wikipedia["Wikipedia Connector"]
-    end
-
-    subgraph "Processing Steps"
-        Parser["Parser"]
-        Chunker1["Chunker"]
-        Chunker2["Chunker 2 (Refiner/Specializer)"]
-        Embedder1["Embedder (Model A)"]
-        Embedder2["Embedder 2 (Model B)"]
-    end
-
-    subgraph "Data Destinations (Sinks)"
-        OpenSearch1["OpenSearch Sink (Index A)"]
-        OpenSearch2["OpenSearch Sink 2 (Index B for A/B Test)"]
-    end
-
-%% Data Flow
-    Gutenberg -- "Raw Docs" --> Parser
-    Wikipedia -- "Raw Docs" --> Parser
-    Parser -- "Structured Docs" --> Chunker1
-    Chunker1 -- "Chunks" --> Chunker2
-    Chunker2 -- "Refined Chunks" --> Embedder1
-%% Fan-out to parallel embedders
-    Chunker2 -- "Refined Chunks" --> Embedder2
-
-    Embedder1 -- "Chunks + Embedding A" --> OpenSearch1
-    Embedder2 -- "Chunks + Embedding B" --> OpenSearch2
-
-%% Illustrating potential direct path for A/B testing if Embedder2 output is also sent to OS1
-%% Embedder2 -- "Chunks + Embedding B" --> OpenSearch1 %% Option for combined index
-
-    classDef connector fill:#lightblue,stroke:#333,stroke-width:2px;
-    classDef processor fill:#lightgreen,stroke:#333,stroke-width:2px;
-    classDef sink fill:#lightcoral,stroke:#333,stroke-width:2px;
-
-    class Gutenberg,Wikipedia connector;
-    class Parser,Chunker1,Chunker2,Embedder1,Embedder2 processor;
-    class OpenSearch1,OpenSearch2 sink;
+    Connector["Connector Module"] -- "1. Raw Doc via gRPC" --> Engine["Pipeline Engine"]
 ```
 
-This example demonstrates how Pipeline's architecture supports complex data processing workflows, including fan-in from multiple sources, sequential processing, parallel processing with fan-out (to `Embedder` and `Embedder 2`), and fan-out to multiple sinks for purposes like A/B testing. Each component can be developed, deployed, and scaled independently.
+*   The `Gutenberg Connector` fetches an e-book.
+*   It makes a single gRPC call to the **Engine**, sending the raw document data.
 
-## Further Reading
+### Step 2: Engine to Parser and Back
 
-To understand how such pipelines are constructed and managed within the Pipeline Engine, refer to the following documentation:
+The Engine, knowing the first processing step is the `Parser`, orchestrates the next action.
 
-*   **Pipeline Design (`Pipeline_design.md`):** This document details the logical design of pipeline clusters, pipelines, pipeline steps, and modules. It also covers the dynamic configuration system.
-*   **Module Deployment (`Module_deployment.md`):** Explains the process of deploying and registering modules with the Pipeline Engine.
-*   **Pipeline Protobufs (`commons/protobuf/README.md`):** Describes the gRPC service definitions and message types that form the communication backbone of the engine and its modules.
-*   **Developer Notes (`DEVELOPER_NOTES/`):** Contains various notes relevant to the design and implementation details, including specific architectural decisions and plans. (Refer to `DEVELOPER_NOTES/pipeline-engine/ARCHITECTURE_AND_PLAN.md` for more engine-specific details).
+```mermaid
+graph LR
+    Engine["Pipeline Engine"] -- "2. Raw Doc via gRPC" --> Parser["Parser Module"]
+    Parser -- "3. Structured Doc via gRPC" --> Engine
+```
 
-By leveraging gRPC for inter-module communication and Consul for service discovery and configuration, the Pipeline Engine provides a robust platform for building sophisticated, distributed data processing applications.
+*   The Engine calls the `Parser` module with the raw document.
+*   The `Parser` cleans the HTML, extracts the plain text, and returns the structured result **back to the Engine**.
+
+### Step 3: Engine to Chunker and Back
+
+The pattern repeats. The Engine now sends the parsed text to the `Chunker`.
+
+```mermaid
+graph LR
+    Engine["Pipeline Engine"] -- "4. Structured Doc via gRPC" --> Chunker["Chunker Module"]
+    Chunker -- "5. Chunks via gRPC" --> Engine
+```
+
+*   The Engine calls the `Chunker` module with the structured document.
+*   The `Chunker` splits the text into smaller pieces and returns these chunks **back to the Engine**.
+
+### Step 4: Engine to Embedder and Back
+
+The chunks are now ready for vector embedding.
+
+```mermaid
+graph LR
+    Engine["Pipeline Engine"] -- "6. Chunks via gRPC" --> Embedder["Embedder Module"]
+    Embedder -- "7. Embedded Chunks via gRPC" --> Engine
+```
+
+*   The Engine calls the `Embedder` module with the document chunks.
+*   The `Embedder` uses a machine learning model to generate vector embeddings and returns the enriched chunks **back to the Engine**.
+
+### Step 5: Engine to Sink
+
+Finally, the Engine sends the fully processed data to its destination.
+
+```mermaid
+graph LR
+    Engine["Pipeline Engine"] -- "8. Embedded Chunks via gRPC" --> Sink["OpenSearch Sink Module"]
+```
+
+*   The Engine calls the `OpenSearch Sink` module with the embedded chunks.
+*   The Sink module indexes the data into an OpenSearch cluster. Since this is a final step, the Sink doesn't need to return any data to the Engine.
+
+This simple, step-by-step flow, orchestrated entirely by the Engine, forms the basis of all pipeline operations.
+
+---
+
+## Example 2: A Complex Pipeline with Fan-in and Fan-out
+
+Now, let's look at a more advanced scenario that demonstrates the full power of the Engine's orchestration, including A/B testing of different embedding models.
+
+### Step 1: Connectors to Engine (Fan-in)
+
+The pipeline starts by ingesting documents from multiple sources simultaneously.
+
+```mermaid
+graph LR
+    Connector1["Gutenberg Connector"] -- "gRPC" --> Engine
+    Connector2["Wikipedia Connector"] -- "gRPC" --> Engine
+    subgraph " "
+        direction LR
+        Engine["Pipeline Engine"] -- "gRPC" --> Parser["Parser Module"]
+    end
+```
+
+*   Both the `Gutenberg Connector` and `Wikipedia Connector` run in parallel, sending their documents to the **Engine**.
+*   The Engine receives documents from both sources and, as per the configuration, sends each one to the `Parser` module. This is "fan-in".
+
+### Step 2: Sequential Processing (Parser -> Chunker -> Chunker2)
+
+The initial processing steps are sequential, just like in our simple example. The data flows from `Parser` -> `Engine` -> `Chunker` -> `Engine` -> `Chunker2` -> `Engine`.
+
+### Step 3: Engine to Embedders (Fan-out for A/B Testing)
+
+This is where the pipeline branches. The Engine receives the refined chunks from `Chunker2` and sends them to two different Embedder modules in parallel.
+
+```mermaid
+graph LR
+    subgraph " "
+        direction LR
+        Chunker2["Chunker 2 Module"] -- "gRPC" --> Engine["Pipeline Engine"]
+    end
+    Engine -- "gRPC to Model A" --> Embedder1["Embedder (Model A)"]
+    Engine -- "gRPC to Model B" --> Embedder2["Embedder (Model B)"]
+```
+
+*   The Engine makes two separate gRPC calls with the *same chunked data*.
+*   `Embedder1` uses a general-purpose embedding model.
+*   `Embedder2` uses a different, experimental model. This is "fan-out".
+
+### Step 4: Embedders to Engine to Sinks (Fan-out to Destinations)
+
+Each embedder returns its results to the Engine, which then sends them to separate destinations for A/B testing.
+
+```mermaid
+graph LR
+    Embedder1["Embedder (Model A)"] -- "gRPC" --> Engine["Pipeline Engine"] -- "gRPC" --> Sink1["OpenSearch Sink (Index A)"]
+    Embedder2["Embedder (Model B)"] -- "gRPC" --> Engine -- "gRPC" --> Sink2["OpenSearch Sink (Index B)"]
+```
+
+*   `Embedder1` returns chunks with "Embedding A" to the Engine. The Engine forwards this data to `OpenSearch Sink 1`, which writes to `Index A`.
+*   `Embedder2` returns chunks with "Embedding B" to the Engine. The Engine forwards this data to `OpenSearch Sink 2`, which writes to `Index B`.
+*   Now you can run search queries against both OpenSearch indices to compare the performance of the two embedding models.
+
+---
+
+## How Kafka Fits In: An Engine-Managed Transport Option
+
+So where does Kafka come in? Kafka is an **optional transport mechanism that the Engine can use internally** to communicate with modules. The modules themselves remain simple gRPC services.
+
+The choice between a direct gRPC call and sending a message via Kafka is defined in the pipeline configuration for each step transition.
+
+### Standard Flow (gRPC)
+
+```mermaid
+sequenceDiagram
+    participant Engine
+    participant ModuleB as "Module B (gRPC Service)"
+    Engine->>+ModuleB: gRPC Call: Process this data
+    ModuleB-->>-Engine: gRPC Response: Here is the result
+```
+
+### Asynchronous Flow (Kafka)
+
+```mermaid
+sequenceDiagram
+    participant Engine
+    participant KafkaTopic as "Kafka Topic (e.g., step-b-input)"
+    participant Module as "Module (gRPC Service)"
+
+    Note over Engine, Module: Module is configured to listen on the Kafka topic.
+
+    Engine->>KafkaTopic: 1. Publishes data to topic
+    KafkaTopic->>Module: 2. Consumes data from topic
+    Note over Module: Processes the data...
+    Module->>+Engine: 3. Sends result back via gRPC call
+    Engine-->>-Module: gRPC Response
+```
+
+By managing the transport layer, the Engine provides flexibility and resilience. Developers creating modules don't need to worry about Kafka integration; they only need to implement the standard gRPC `PipeStepProcessor` service. This keeps modules simple and focused, while the Engine handles the complex orchestration and routing logic.

@@ -67,7 +67,7 @@ The Pipeline Engine aims to manage Kafka listeners and topics dynamically based 
     *   While convenient for development, in production, it's often preferred to manage topic creation explicitly (e.g., via administrative tools or scripts) to control partitioning, replication factor, and other settings. Pipeline might provide utilities or integrate with tools for this.
 
 4.  **Pushing to Any Allowed Kafka Topic:**
-    *   A producing pipeline step, based on its configuration or runtime logic, can be directed to publish messages to any Kafka topic it has permissions to write to. This flexibility is crucial for dynamic routing, A/B testing (sending data to different topics for different processing paths), or conditional data forwarding.
+    *   A producing pipeline step, based on its configuration or runtime logic, can be directed to publish messages to any Kafka topic it has permissions to write to. These permissions are typically managed through Kafka ACLs or by the Pipeline Engine's internal configuration, ensuring secure and controlled data flow. This flexibility is crucial for dynamic routing, A/B testing (sending data to different topics for different processing paths), or conditional data forwarding.
 
 ## Processing Control Capabilities
 

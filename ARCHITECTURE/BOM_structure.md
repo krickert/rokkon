@@ -2,7 +2,7 @@
 
 ## Overview
 
-The Rokkon project uses a hierarchical Bill of Materials (BOM) structure to manage dependencies across different types of projects. This approach ensures consistency, reduces duplication, and makes dependency management more maintainable.
+The Pipeline Engine project uses a hierarchical Bill of Materials (BOM) structure to manage dependencies across different types of projects. This approach ensures consistency, reduces duplication, and makes dependency management more maintainable.
 
 ## BOM Hierarchy
 
