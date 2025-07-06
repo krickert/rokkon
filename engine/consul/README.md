@@ -159,7 +159,7 @@ public class ModuleRegistrar {
             .id(module.getServiceId())
             .address(module.getHost())
             .port(module.getPort())
-            .tags(List.of("rokkon-module", module.getType()))
+            .tags(List.of("pipeline-module", module.getType()))
             .check(ConsulCheck.grpc(
                 module.getHost() + ":" + module.getPort(),
                 "10s"

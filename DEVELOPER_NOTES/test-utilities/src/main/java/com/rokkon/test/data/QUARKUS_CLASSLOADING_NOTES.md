@@ -1,7 +1,7 @@
 # Quarkus Classloading and Protobuf Classes
 
 ## The Problem
-Quarkus has a very strict classloading security model that prevents normal access to protobuf-generated classes from external modules (like rokkon-protobuf). This is especially problematic in:
+Quarkus has a very strict classloading security model that prevents normal access to protobuf-generated classes from external modules (like `commons/protobuf`). This is especially problematic in:
 - Test environments
 - Native compilation
 - Production JARs

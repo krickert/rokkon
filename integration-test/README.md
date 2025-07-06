@@ -67,7 +67,7 @@ The deployment consists of three main components:
 - `MODULE_HOST`: Module bind address (default: 0.0.0.0)
 - `MODULE_PORT`: Module gRPC port (default: 9090)
 - `ENGINE_HOST`: Engine host for registration
-- `ENGINE_PORT`: Engine gRPC port for registration
+- `ENGINE_PORT`: Engine gRPC port for registration (default: 39001)
 - `MAX_RETRIES`: Registration retry attempts (default: 5)
 
 ## Files

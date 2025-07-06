@@ -18,19 +18,14 @@
 7. [x] Documented ports and access points
 
 ### What We Need to Do:
-1. [ ] Test that Quarkus auto-detects and starts compose
-2. [x] Verify engine connects to consul sidecar (port 8501)
+1. [ ] Implement custom Dev Service to orchestrate Docker Compose startup (as per `ARCHITECTURE/Quarkus_Dev_UI_Extensions.md`)
+2. [ ] Verify engine connects to consul sidecar (port 8501)
 3. [ ] Verify modules register properly (waiting for engine to fully start)
 4. [ ] Document any remaining issues
 
 ### Current Issues:
-- Quarkus compose dev services doesn't seem to auto-start our compose file
-- Need to investigate if additional configuration is needed
-- Engine takes time to build and start (normal for first run)
-
-### Discovered Issues:
-- Quarkus compose dev services might not be included in our dependencies
-- Need to verify if we need additional extensions
+- The primary issue of Quarkus compose dev services not auto-starting our compose file is being addressed by the custom Dev Service implementation.
+- Need to verify if we need additional extensions (addressed by `ARCHITECTURE/Quarkus_Dev_UI_Extensions.md`)
 - Docker images still use "rokkon" prefix (working with existing images for now)
 
 ### Decision: Work with What We Have

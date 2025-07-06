@@ -136,7 +136,7 @@ your-module/
 ├── src/
 │   ├── main/
 │   │   ├── java/
-│   │   │   └── com/rokkon/pipeline/yourmodule/
+    │   │   │   └── com/rokkon/pipeline/yourmodule/
 │   │   │       ├── YourModuleServiceImpl.java    # gRPC service implementation
 │   │   │       ├── YourModuleResource.java       # REST API endpoint
 │   │   │       └── YourModuleHealthCheck.java    # Health check

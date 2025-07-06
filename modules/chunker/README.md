@@ -47,10 +47,10 @@ After building, you can run the module using Docker:
 docker run -i --rm -p 49095:49095 \
   -e ENGINE_HOST=engine \
   -e CONSUL_HOST=consul \
-  rokkon/chunker-module:latest
+  pipeline/chunker-module:latest
 
 # Development mode (uses host networking)
-docker run -i --rm --network=host rokkon/chunker-module:dev
+    docker run -i --rm --network=host pipeline/chunker-module:dev
 ```
 
 ### Testing the Module

@@ -1,6 +1,6 @@
 # Dev Mode Source Directory
 
-This directory contains code that is **only** loaded when running in Quarkus dev mode via `./gradlew dev`.
+This directory contains code that is **only** loaded when running the Pipeline Engine in Quarkus dev mode via `./gradlew dev`.
 
 ## Purpose
 

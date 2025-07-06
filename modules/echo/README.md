@@ -38,10 +38,10 @@ After building, you can run the module using Docker:
 
 ```bash
 # Production mode
-docker run -i --rm -p 49095:49095 \
-  -e ENGINE_HOST=engine \
-  -e CONSUL_HOST=consul \
-  rokkon/echo-module:latest
+docker run -i --rm -p 49095:49095 
+  -e ENGINE_HOST=engine 
+  -e CONSUL_HOST=consul 
+  pipeline/echo-module:latest
 
 # Development mode (uses host networking)
 docker run -i --rm --network=host rokkon/echo-module:dev

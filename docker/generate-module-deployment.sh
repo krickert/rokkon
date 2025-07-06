@@ -35,8 +35,8 @@ echo "Output: $OUTPUT_FILE"
 
 # Generate the deployment file
 sed -e "s/MODULE_NAME/${MODULE_NAME}/g" \
-    -e "s/\${MODULE_GRPC_PORT:-9090}/\${MODULE_GRPC_PORT:-${GRPC_PORT}}/g" \
-    -e "s/\${MODULE_HTTP_PORT:-8080}/\${MODULE_HTTP_PORT:-${HTTP_PORT}}/g" \
+    -e "s/\${MODULE_GRPC_PORT:-39100}/\${MODULE_GRPC_PORT:-${GRPC_PORT}}/g" \
+    -e "s/\${MODULE_HTTP_PORT:-39100}/\${MODULE_HTTP_PORT:-${HTTP_PORT}}/g" \
     "$TEMPLATE_FILE" > "$OUTPUT_FILE"
 
 # Add module-specific configuration based on module name

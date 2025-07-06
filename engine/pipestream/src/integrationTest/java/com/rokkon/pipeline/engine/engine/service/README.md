@@ -1,6 +1,6 @@
 # gRPC Routing Tests
 
-This directory contains tests for the gRPC routing mechanism within the Rokkon Engine. These tests verify that the engine can correctly route requests between modules using gRPC.
+This directory contains tests for the gRPC routing mechanism within the Pipeline Engine. These tests verify that the engine can correctly route requests between modules using gRPC.
 
 ## Test Classes
 
@@ -42,4 +42,4 @@ These tests complement the existing integration tests:
 - `ConsulGrpcHealthCheckNetworkTest`: Tests that Consul can perform gRPC health checks on containers sharing a Docker network.
 - `FullPipelineE2EIT`: Tests the complete pipeline setup and execution flow, including gRPC communication between modules.
 
-Together, these tests provide comprehensive coverage of the gRPC routing mechanism within the Rokkon Engine.
+Together, these tests provide comprehensive coverage of the gRPC routing mechanism within the Pipeline Engine.

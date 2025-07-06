@@ -2,7 +2,7 @@
 
 ## Summary
 
-We've added Playwright testing capability to test the module deployment UI and SSE real-time updates.
+We've added Playwright testing capability to test the Pipeline Engine's module deployment UI and SSE real-time updates.
 
 ## What Was Added
 
@@ -84,7 +84,7 @@ chmod +x test-deployment-ui.sh
 ## What the Tests Verify
 
 1. **Dashboard Loading**
-   - Dashboard component loads
+   - Pipeline Engine Dashboard component loads
    - Navigation header is visible
    - Dev mode badge appears
 

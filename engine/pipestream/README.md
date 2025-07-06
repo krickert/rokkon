@@ -36,10 +36,7 @@ The engine serves multiple roles:
 - `/ws/status` - WebSocket for real-time status updates (TODO)
 
 ### Web Dashboard
-The engine includes a web dashboard accessible at the root URL (`/`). The dashboard provides:
-- Engine status monitoring
-- Module registration interface
-- List of registered modules
+The main web dashboard is now a separate frontend application (see `ARCHITECTURE/Main_Frontend_Architecture.md`). The Pipeline Engine serves its static assets and provides the necessary APIs. Development-specific UI features are integrated into the Quarkus Dev UI (see `ARCHITECTURE/Quarkus_Dev_UI_Extensions.md`).
 
 ## Configuration
 
@@ -64,11 +61,12 @@ All module communication happens via gRPC:
 
 ### Docker
 ```bash
-docker run -p 8080:8080 \
+docker run -p 38090:38090 -p 49000:49000 \
   -e CONSUL_HOST=consul \
   -e CONSUL_PORT=8500 \
-  rokkon/rokkon-engine:latest
+  pipeline/pipestream:latest
 ```
+
 
 ### Environment Variables
 - `CONSUL_HOST` - Consul server hostname (default: localhost)

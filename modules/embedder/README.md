@@ -36,7 +36,7 @@ The Embedder Module:
 ### Prerequisites
 - JDK 21 or later
 - Docker (for containerized deployment)
-- Access to Rokkon Engine and Consul services
+  - Access to Pipeline Engine and Consul services
 - GPU with CUDA support (optional, for accelerated processing)
 
 ### Building the Module

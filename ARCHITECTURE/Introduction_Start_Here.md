@@ -14,6 +14,9 @@ Below is an index of all architectural documents, along with their current revie
 | `Future_search_capabilities.md` | Reviewed and Refined | Clarified terminology and analytics platform. |
 | `Initialization.md` | Reviewed and Refined | Clarified module discovery vs. acceptance and seeding dependencies. |
 | `Introduction_Start_Here.md` | In Progress | This document. |
+| `Quarkus_Dev_UI_Extensions.md` | Reviewed and Refined | Details extending Quarkus Dev UI for development operations. |
+| `Main_Frontend_Architecture.md` | Reviewed and Refined | Outlines the architecture for the main production frontend. |
+
 | `Kafka_integration.md` | Reviewed and Refined | Clarified Engine's role in dynamic listeners and permissions. |
 | `Module_deployment.md` | Reviewed and Refined | Clarified two registration paths and dashboard onboarding. |
 | `module_dev_mode.md` | Reviewed and Refined | Clarified role of entrypoint script and `pipeline-cli` in production. |
@@ -22,3 +25,4 @@ Below is an index of all architectural documents, along with their current revie
 | `Operations.md` | Reviewed and Refined | Comprehensive overview of operational aspects. |
 | `Pipeline_design.md` | Reviewed and Refined | Terminology and module examples updated. |
 | `Planned_integrations.md` | Reviewed and Refined | Clarified terminology and diagram labels. |
+| `engine/pipestream/README-DEV-MODE.md` | Reviewed and Refined | Details the Pipeline Engine's development mode setup and configuration. |

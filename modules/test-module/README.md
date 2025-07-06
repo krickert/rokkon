@@ -273,12 +273,12 @@ The test module supports automatic registration with the Rokkon engine using the
 
 ```bash
 # Manual registration
-java -jar rokkon-cli.jar register \
-  --host engine-host \
-  --port 48081 \
-  --module-name test-module \
-  --module-host localhost \
-  --module-port 48095
+java -jar pipeline-cli.jar register 
+  --host engine-host 
+  --port 39001 
+  --module-name test-module 
+  --module-host localhost 
+  --module-port 39100
 
 # Automatic registration on startup (Docker)
 # Set in docker-compose.yml or kubernetes deployment

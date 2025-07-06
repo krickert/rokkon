@@ -86,7 +86,7 @@ This phase is documented in detail in `mock-engine-project-plan.md`. The mock en
 3. Configure build files with minimal dependencies:
    - Java 21
    - Quarkus platform BOM
-   - rokkon-bom import (for protobuf definitions only)
+   - `rokkon-bom` import (for protobuf definitions only)
    
 4. Create basic application.yml configurations
 5. Update root settings.gradle.kts to include new modules

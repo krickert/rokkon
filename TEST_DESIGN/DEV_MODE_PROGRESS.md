@@ -28,28 +28,20 @@ The main issue is a chicken-and-egg problem:
 
 ## Next Steps for Future Sessions
 
-### Option 1: Custom Dev Service Implementation
-Create a custom Quarkus extension that:
-- Extends the compose dev services functionality
-- Ensures Consul is started and seeded BEFORE configuration loading
-- Manages the proper startup sequence
+Based on the analysis, the chosen path for automating the dev mode setup is to implement a custom Quarkus Dev Service. This approach, detailed in `ARCHITECTURE/Quarkus_Dev_UI_Extensions.md`, will address the timing issues by ensuring Consul is started and seeded before the main Pipeline Engine attempts to load its configuration.
 
-### Option 2: Lazy Consul Configuration
-Modify the Consul configuration approach to:
-- Skip Consul during build time
-- Load configuration lazily at runtime
-- Use default values during build
+### Chosen Approach: Custom Dev Service Implementation (as per `ARCHITECTURE/Quarkus_Dev_UI_Extensions.md`)
 
-### Option 3: Build-time vs Runtime Configuration Split
-- Move critical configuration to application.properties
-- Use Consul only for runtime-specific values
-- This would allow the build to complete without Consul
+This involves creating a custom Quarkus extension that:
+- Orchestrates the startup of essential services (Consul, seeder) before the main application's configuration loading phase.
+- Manages the proper startup sequence to resolve the "chicken-and-egg" problem.
+- Will eventually expose controls via the Quarkus Dev UI.
 
-### Option 4: Two-Phase Startup Script
-Create a wrapper script that:
-1. Starts compose services
-2. Waits for Consul to be ready
-3. Then runs quarkusDev
+### Other Options (Not Pursued for Automation):
+
+1.  **Lazy Consul Configuration:** Modify the Consul configuration approach to skip Consul during build time and load configuration lazily at runtime, using default values during build.
+2.  **Build-time vs Runtime Configuration Split:** Move critical configuration to `application.properties` and use Consul only for runtime-specific values.
+3.  **Two-Phase Startup Script:** Create a wrapper script that first starts compose services, waits for Consul, and then runs `quarkusDev` (this is the current workaround).
 
 ## Current Workaround
 

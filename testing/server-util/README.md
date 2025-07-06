@@ -1,6 +1,6 @@
 # Testing Server Utilities
 
-This module provides heavy Quarkus/Docker testing utilities for Rokkon server components.
+This module provides heavy Quarkus/Docker testing utilities for Pipeline Engine server components.
 
 ## Features
 

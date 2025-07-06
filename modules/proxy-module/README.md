@@ -45,7 +45,7 @@ chmod +x docker-build.sh
 
 ```bash
 # Run the proxy with the test module
-docker run -i --rm -p 9090:9090 -e MODULE_HOST=host.docker.internal rokkon/proxy-module:latest
+    docker run -i --rm -p 39100:39100 -e MODULE_HOST=host.docker.internal pipeline/proxy-module:latest
 ```
 
 ### Testing the Proxy

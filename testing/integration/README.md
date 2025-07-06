@@ -98,7 +98,7 @@ All containers log with prefixes to help identify the source:
 - `[CONSUL-SERVER]` - Main Consul server
 - `[CONSUL-AGENT-ENGINE]` - Consul sidecar for engine
 - `[CONSUL-AGENT-MODULE]` - Consul sidecar for test module
-- `[ENGINE]` - Rokkon engine
+- `[ENGINE]` - Pipeline Engine
 - `[TEST-MODULE]` - Test module
 
 ### Access Services During Tests

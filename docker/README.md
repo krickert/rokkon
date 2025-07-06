@@ -1,6 +1,6 @@
 # Docker Deployment Configurations
 
-This directory contains all Docker-related deployment configurations for the Rokkon project.
+This directory contains all Docker-related deployment configurations for the Pipeline Engine project.
 
 ## Directory Structure
 
@@ -44,12 +44,8 @@ docker compose down
 
 ## Port Conventions
 
-- **Engine**: HTTP 39000, gRPC 49000
-- **Echo Module**: HTTP 39090, gRPC 49090
-- **Test Module**: HTTP 39095, gRPC 49095
-- **Chunker Module**: HTTP 39092, gRPC 49092
-- **Parser Module**: HTTP 39093, gRPC 49093
-- **Embedder Module**: HTTP 39094, gRPC 49094
+- **Engine**: HTTP 39001, gRPC 49001
+- **All Modules**: HTTP 39100, gRPC 39100
 
 ## Sidecar Pattern
 
@@ -74,7 +70,7 @@ Before deploying, build the required Docker images:
 ## Accessing Services
 
 - **Consul UI**: http://localhost:8500
-- **Engine Health**: http://localhost:39000/q/health
-- **Engine Swagger**: http://localhost:39000/swagger-ui
-- **Echo Module**: http://localhost:39090/q/health
-- **Test Module**: http://localhost:39095/q/health
+- **Engine Health**: http://localhost:39001/q/health
+- **Engine Swagger**: http://localhost:39001/swagger-ui
+- **Echo Module**: http://localhost:39100/q/health
+- **Test Module**: http://localhost:39100/q/health

@@ -56,4 +56,4 @@ Most modules will need these core dependencies:
 The BOM uses the Quarkus version specified in `gradle.properties`:
 - `quarkusPlatformVersion=3.23.4`
 
-This ensures all modules use consistent versions throughout the project.
+This ensures all modules use consistent versions throughout the Pipeline Engine project.

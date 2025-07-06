@@ -67,13 +67,16 @@ Quarkus has built-in Docker Compose support that auto-detects `docker-compose-de
 
 ### Completed:
 - ✅ Research on Quarkus compose dev services
-- ✅ Created clean design document
+- ✅ Created clean design document (`TEST_DESIGN/QUARKUS_DEV_MODE_DESIGN.md`)
 - ✅ Docker client dependency added (build.gradle.kts)
 - ✅ Dev ports configured (application-dev.yml)
+- ✅ Architectural plan for Dev UI extensions (`ARCHITECTURE/Quarkus_Dev_UI_Extensions.md`)
+- ✅ Architectural plan for Main Frontend (`ARCHITECTURE/Main_Frontend_Architecture.md`)
 
 ### In Progress:
-- 🔄 Creating docker-compose-dev-service.yml
+- 🔄 Creating `docker-compose-dev-service.yml`
 - 🔄 Testing Quarkus auto-detection
+- 🔄 Implementing Dev UI extensions and backend endpoints for dev operations
 
 ### Blocked/Waiting:
 - None currently

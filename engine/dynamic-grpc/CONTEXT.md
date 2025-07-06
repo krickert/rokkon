@@ -1,7 +1,7 @@
 # Dynamic gRPC Module Context
 
 ## Overview
-The `engine:dynamic-grpc` module provides dynamic service discovery and gRPC client management for the Rokkon pipeline engine. It enables the engine to discover and connect to module services registered in Consul without requiring pre-configuration in Stork.
+The `engine:dynamic-grpc` module provides dynamic service discovery and gRPC client management for the Pipeline Engine. It enables the engine to discover and connect to module services registered in Consul without requiring pre-configuration in Stork.
 
 ## Architecture
 

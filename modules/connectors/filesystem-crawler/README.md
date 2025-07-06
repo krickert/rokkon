@@ -1,6 +1,6 @@
 # Filesystem Crawler Connector
 
-A connector for the Rokkon Engine that crawls a filesystem path and sends documents to the engine for processing.
+A connector for the Pipeline Engine that crawls a filesystem path and sends documents to the engine for processing.
 
 ## Features
 
@@ -27,7 +27,7 @@ The connector is configured through application properties or environment variab
 | `filesystem-crawler.batch-size` | `CRAWLER_BATCH_SIZE` | `100` | Batch size for processing files |
 | `filesystem-crawler.delete-orphans` | `CRAWLER_DELETE_ORPHANS` | `false` | Whether to delete orphaned files |
 | `filesystem-crawler.engine.host` | `ENGINE_HOST` | `localhost` | Rokkon Engine host |
-| `filesystem-crawler.engine.port` | `ENGINE_PORT` | `49000` | Rokkon Engine port |
+- `ENGINE_PORT`: Port for the Pipeline Engine (default: 39001)
 
 ## REST API
 
@@ -101,13 +101,15 @@ docker build -f modules/connectors/filesystem-crawler/src/main/docker/Dockerfile
 ### Running the Docker Container
 
 ```bash
-docker run -p 8080:8080 \
-  -e CRAWLER_ROOT_PATH=/data \
-  -e ENGINE_HOST=engine.example.com \
-  -e ENGINE_PORT=49000 \
-  -v /path/on/host:/data \
-  rokkon/filesystem-crawler
+docker run -p 8080:8080 
+  -e CRAWLER_ROOT_PATH=/data 
+  -e ENGINE_HOST=engine.example.com 
+  -e ENGINE_PORT=49000 
+  -v /path/on/host:/data 
+  pipeline/filesystem-crawler
 ```
+
+
 
 ## User Interface
 
@@ -139,7 +141,7 @@ There are several popular file crawling solutions available, each with different
 - Tika focuses on content extraction and analysis rather than crawling
 - Our crawler can be combined with Tika (in the pipeline) for content extraction
 - Tika supports a wider range of document formats
-- Our crawler is optimized for integration with the Rokkon Engine
+  - Our crawler is optimized for integration with the Pipeline Engine
 
 ### Elasticsearch File System Crawler
 

@@ -1,8 +1,8 @@
-# Using the Test Module for Integration Testing
+## Using the Test Module for Integration Testing
 
 ## Overview
 
-This document explains how to use the existing test-module for integration testing of the Rokkon Engine. The test-module is a comprehensive testing harness that addresses all the points highlighted in the FOLLOW_UP_TASKS.md document.
+This document explains how to use the existing test-module for integration testing of the Pipeline Engine. The test-module is a comprehensive testing harness that addresses all the points highlighted in the FOLLOW_UP_TASKS.md document.
 
 ## 1. Docker Setup for Integration Tests
 

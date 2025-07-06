@@ -1,8 +1,8 @@
 # docker/compose/docker-compose.parser-module.yml
 # Working configuration for parser module with sidecar pattern
 # Parser module will be accessible at:
-# - HTTP: http://localhost:39093
-# - gRPC: localhost:49093
+# - HTTP: http://localhost:39100
+# - gRPC: localhost:39100
 version: '3.8'
 
 services:
@@ -83,7 +83,7 @@ services:
   # 3a. ENGINE APPLICATION
   # ==========================================
   engine:
-    image: ${ENGINE_IMAGE:-rokkon/rokkon-engine:latest}
+    image: rokkon/pipestream:latest
     container_name: engine-app
     depends_on:
       seeder:
@@ -99,7 +99,7 @@ services:
       # Optional overrides for cluster configuration
       - CLUSTER_NAME=${CLUSTER_NAME:-docker-cluster}
       - PIPELINE_CLUSTER_NAME=${CLUSTER_NAME:-docker-cluster}
-      - PIPELINE_ENGINE_NAME=${ENGINE_NAME:-engine-docker}
+      - PIPELINE_ENGINE_NAME=${ENGINE_NAME:-pipeline-engine-docker}
     network_mode: "service:consul-agent-engine"  # Share network with sidecar
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:39000/q/health"]
@@ -117,8 +117,8 @@ services:
       consul-server:
         condition: service_healthy
     ports:
-      - "${PARSER_MODULE_REST_PORT:-39093}:39093"
-      - "${PARSER_MODULE_GRPC_PORT:-49093}:49093"
+      - "${PARSER_MODULE_REST_PORT:-39100}:39100"
+      - "${PARSER_MODULE_GRPC_PORT:-39100}:39100"
     command: >
       agent 
       -node="parser-sidecar"
@@ -135,7 +135,7 @@ services:
   # 4a. PARSER MODULE APPLICATION
   # ==========================================
   parser-module:
-    image: ${PARSER_MODULE_IMAGE:-rokkon/parser-module:latest}
+    image: rokkon/parser-module:latest
     container_name: parser-module-app
     depends_on:
       engine:
@@ -146,11 +146,11 @@ services:
       # Module Configuration
       - MODULE_NAME=parser
       - MODULE_HOST=consul-agent-parser
-      - MODULE_HTTP_PORT=39093
-      - MODULE_GRPC_PORT=49093
+      - MODULE_HTTP_PORT=39100
+      - MODULE_GRPC_PORT=39100
       # Override Quarkus ports
-      - QUARKUS_HTTP_PORT=39093
-      - QUARKUS_GRPC_SERVER_PORT=49093
+      - QUARKUS_HTTP_PORT=39100
+      - QUARKUS_GRPC_SERVER_PORT=39100
       # Engine connection for registration
       - ENGINE_HOST=consul-agent-engine
       - ENGINE_PORT=49000
