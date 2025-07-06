@@ -35,7 +35,7 @@ public class PipelineInstanceServiceImpl implements PipelineInstanceService {
     
     private static final Logger LOG = LoggerFactory.getLogger(PipelineInstanceServiceImpl.class);
     
-    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "rokkon")
+    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "pipeline")
     String kvPrefix;
     
     @Inject

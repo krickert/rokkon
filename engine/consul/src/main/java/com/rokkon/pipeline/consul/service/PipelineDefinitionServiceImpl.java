@@ -13,6 +13,10 @@ import com.rokkon.pipeline.validation.ConfigValidator;
 import com.rokkon.pipeline.validation.ValidationResult;
 import com.rokkon.pipeline.validation.ValidationResultFactory;
 import com.rokkon.pipeline.validation.ValidationMode;
+import io.quarkus.cache.CacheInvalidate;
+import io.quarkus.cache.CacheInvalidateAll;
+import io.quarkus.cache.CacheKey;
+import io.quarkus.cache.CacheResult;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.vertx.UniHelper;
 import io.vertx.ext.consul.ConsulClient;
@@ -38,7 +42,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     private static final Logger LOG = LoggerFactory.getLogger(PipelineDefinitionServiceImpl.class);
     private static final String PIPELINE_METADATA_SUFFIX = "/metadata";
     
-    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "rokkon")
+    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "pipeline")
     String kvPrefix;
     
     @Inject
@@ -60,6 +64,7 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     }
     
     @Override
+    @CacheResult(cacheName = "pipeline-definitions-list")
     public Uni<List<PipelineDefinitionSummary>> listDefinitions() {
         return UniHelper.toUni(getConsulClient().getKeys(kvPrefix + "/pipelines/definitions/"))
             .flatMap(keys -> {
@@ -141,7 +146,8 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     }
     
     @Override
-    public Uni<PipelineConfig> getDefinition(String pipelineId) {
+    @CacheResult(cacheName = "pipeline-definitions")
+    public Uni<PipelineConfig> getDefinition(@CacheKey String pipelineId) {
         String key = kvPrefix + "/pipelines/definitions/" + pipelineId;
         return UniHelper.toUni(getConsulClient().getValue(key))
             .map(keyValue -> {
@@ -165,7 +171,10 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     }
     
     @Override
-    public Uni<ValidationResult> createDefinition(String pipelineId, PipelineConfig definition, ValidationMode validationMode) {
+    @CacheInvalidate(cacheName = "pipeline-definitions-list")
+    @CacheInvalidate(cacheName = "pipeline-definitions")
+    @CacheInvalidate(cacheName = "pipeline-definitions-exists")
+    public Uni<ValidationResult> createDefinition(@CacheKey String pipelineId, PipelineConfig definition, ValidationMode validationMode) {
         // Check if already exists
         return definitionExists(pipelineId)
             .flatMap(exists -> {
@@ -239,7 +248,10 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     }
     
     @Override
-    public Uni<ValidationResult> updateDefinition(String pipelineId, PipelineConfig definition, ValidationMode validationMode) {
+    @CacheInvalidate(cacheName = "pipeline-definitions-list")
+    @CacheInvalidate(cacheName = "pipeline-definitions")
+    @CacheInvalidate(cacheName = "pipeline-metadata")
+    public Uni<ValidationResult> updateDefinition(@CacheKey String pipelineId, PipelineConfig definition, ValidationMode validationMode) {
         // Check if exists
         return definitionExists(pipelineId)
             .flatMap(exists -> {
@@ -307,7 +319,12 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     }
     
     @Override
-    public Uni<ValidationResult> deleteDefinition(String pipelineId) {
+    @CacheInvalidate(cacheName = "pipeline-definitions-list")
+    @CacheInvalidate(cacheName = "pipeline-definitions")
+    @CacheInvalidate(cacheName = "pipeline-definitions-exists")
+    @CacheInvalidate(cacheName = "pipeline-metadata")
+    @CacheInvalidate(cacheName = "pipeline-active-instances")
+    public Uni<ValidationResult> deleteDefinition(@CacheKey String pipelineId) {
         // Check if exists
         return definitionExists(pipelineId)
             .flatMap(exists -> {
@@ -337,14 +354,16 @@ public class PipelineDefinitionServiceImpl implements PipelineDefinitionService 
     }
     
     @Override
-    public Uni<Boolean> definitionExists(String pipelineId) {
+    @CacheResult(cacheName = "pipeline-definitions-exists")
+    public Uni<Boolean> definitionExists(@CacheKey String pipelineId) {
         String key = kvPrefix + "/pipelines/definitions/" + pipelineId;
         return UniHelper.toUni(getConsulClient().getValue(key))
             .map(keyValue -> keyValue != null && keyValue.getValue() != null);
     }
     
     @Override
-    public Uni<Integer> getActiveInstanceCount(String pipelineId) {
+    @CacheResult(cacheName = "pipeline-active-instances")
+    public Uni<Integer> getActiveInstanceCount(@CacheKey String pipelineId) {
         return pipelineInstanceService.listInstancesByDefinition(pipelineId)
             .map(instances -> (int) instances.stream()
                 .filter(instance -> instance.status() == PipelineInstance.PipelineInstanceStatus.RUNNING 

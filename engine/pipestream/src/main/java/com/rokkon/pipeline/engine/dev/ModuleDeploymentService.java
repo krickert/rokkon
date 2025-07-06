@@ -77,6 +77,9 @@ public class ModuleDeploymentService {
     @ConfigProperty(name = "quarkus.otel.exporter.otlp.endpoint", defaultValue = "")
     Optional<String> otelEndpoint;
     
+    @ConfigProperty(name = "quarkus.http.port", defaultValue = "38090")
+    int enginePort;
+    
     // Track instance numbers for each module
     private final Map<String, Integer> moduleInstanceCounts = new HashMap<>();
     
@@ -483,7 +486,7 @@ public class ModuleDeploymentService {
                         "MODULE_HOST=0.0.0.0",
                         "MODULE_PORT=" + MODULE_INTERNAL_PORT,
                         "ENGINE_HOST=" + hostIP,
-                        "ENGINE_PORT=39001",  // Engine unified port
+                        "ENGINE_PORT=" + enginePort,  // Engine unified port
                         "CONSUL_HOST=localhost",  // Via shared network namespace
                         "CONSUL_PORT=8500",  // Consul HTTP API port
                         // Registration is handled by the sidecar, not needed here
@@ -560,7 +563,7 @@ public class ModuleDeploymentService {
                 --module-host=localhost \
                 --module-port=%d \
                 --engine-host=%s \
-                --engine-port=39001 \
+                --engine-port=%d \
                 --registration-host=%s \
                 --registration-port=%d; then
                 echo 'Module registered successfully!'
@@ -578,6 +581,7 @@ public class ModuleDeploymentService {
             allocatedPort,
             MODULE_INTERNAL_PORT,
             hostIP,
+            enginePort,
             registrationHost,
             allocatedPort
         );

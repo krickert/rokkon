@@ -450,7 +450,6 @@ public class ModuleDevManagementResource {
             )
         )
     )
-    @WithSpan("dev-modules-find-orphaned")
     public Uni<List<OrphanedModule>> findOrphanedModules() {
         LOG.info("Request to find orphaned module containers");
         

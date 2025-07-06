@@ -338,7 +338,6 @@ public class ModuleDiscoveryResource {
     @GET
     @Path("/dashboard")
     @Operation(summary = "Get comprehensive service data for dashboard")
-    @WithSpan("module-discovery-dashboard")
     public Uni<Response> getDashboardData() {
         LOG.info("Fetching dashboard data");
 

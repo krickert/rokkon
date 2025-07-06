@@ -7,6 +7,9 @@ import com.rokkon.pipeline.config.service.PipelineConfigService;
 import com.rokkon.pipeline.validation.CompositeValidator;
 import com.rokkon.pipeline.validation.ValidationResult;
 import com.rokkon.pipeline.validation.ValidationResultFactory;
+import io.quarkus.cache.CacheInvalidate;
+import io.quarkus.cache.CacheKey;
+import io.quarkus.cache.CacheResult;
 import io.smallrye.mutiny.Uni;
 import io.smallrye.mutiny.infrastructure.Infrastructure;
 import jakarta.enterprise.context.ApplicationScoped;
@@ -31,7 +34,7 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
 
     private static final Logger LOG = LoggerFactory.getLogger(PipelineConfigServiceImpl.class);
     
-    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "rokkon")
+    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "pipeline")
     String kvPrefix;
 
     @Inject
@@ -56,7 +59,9 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
     /**
      * Creates a new pipeline configuration in Consul.
      */
-    public Uni<ValidationResult> createPipeline(String clusterName, String pipelineId,
+    @CacheInvalidate(cacheName = "cluster-pipelines-list")
+    @CacheInvalidate(cacheName = "cluster-pipelines")
+    public Uni<ValidationResult> createPipeline(@CacheKey String clusterName, @CacheKey String pipelineId,
                                                 PipelineConfig config) {
         LOG.info("Creating pipeline '{}' in cluster '{}'", pipelineId, clusterName);
 
@@ -82,7 +87,9 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
     /**
      * Updates an existing pipeline configuration.
      */
-    public Uni<ValidationResult> updatePipeline(String clusterName, String pipelineId,
+    @CacheInvalidate(cacheName = "cluster-pipelines-list")
+    @CacheInvalidate(cacheName = "cluster-pipelines")
+    public Uni<ValidationResult> updatePipeline(@CacheKey String clusterName, @CacheKey String pipelineId,
                                                 PipelineConfig config) {
         LOG.info("Updating pipeline '{}' in cluster '{}'", pipelineId, clusterName);
 
@@ -108,7 +115,9 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
     /**
      * Deletes a pipeline configuration.
      */
-    public Uni<ValidationResult> deletePipeline(String clusterName, String pipelineId) {
+    @CacheInvalidate(cacheName = "cluster-pipelines-list")
+    @CacheInvalidate(cacheName = "cluster-pipelines")
+    public Uni<ValidationResult> deletePipeline(@CacheKey String clusterName, @CacheKey String pipelineId) {
         LOG.info("Deleting pipeline '{}' from cluster '{}'", pipelineId, clusterName);
 
         return getPipeline(clusterName, pipelineId)
@@ -126,7 +135,8 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
     /**
      * Retrieves a pipeline configuration.
      */
-    public Uni<Optional<PipelineConfig>> getPipeline(String clusterName, String pipelineId) {
+    @CacheResult(cacheName = "cluster-pipelines")
+    public Uni<Optional<PipelineConfig>> getPipeline(@CacheKey String clusterName, @CacheKey String pipelineId) {
         return Uni.createFrom().<Optional<PipelineConfig>>item(() -> {
             try {
                 String key = buildPipelineKey(clusterName, pipelineId);
@@ -159,7 +169,8 @@ public class PipelineConfigServiceImpl implements PipelineConfigService {
     /**
      * Lists all pipelines in a cluster.
      */
-    public Uni<Map<String, PipelineConfig>> listPipelines(String clusterName) {
+    @CacheResult(cacheName = "cluster-pipelines-list")
+    public Uni<Map<String, PipelineConfig>> listPipelines(@CacheKey String clusterName) {
         return Uni.createFrom().item(() -> {
             try {
                 String prefix = buildClusterPrefix(clusterName) + "pipelines/";

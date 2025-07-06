@@ -103,7 +103,6 @@ public class ModuleManagementResource {
             )
         )
     )
-    @WithSpan("module-management-list-registered")
     public Uni<List<RegisteredModule>> listRegisteredModules() {
         LOG.info("Listing registered modules from registry");
         

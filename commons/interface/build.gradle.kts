@@ -20,6 +20,7 @@ dependencies {
     implementation("io.quarkus:quarkus-hibernate-validator")
     implementation("io.quarkus:quarkus-smallrye-openapi")
     implementation("io.swagger.core.v3:swagger-annotations") // version from BOM constraints
+    implementation("io.quarkus:quarkus-cache") // For cache invalidation handler
 
     // Testing
     testImplementation("io.quarkus:quarkus-junit5")

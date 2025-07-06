@@ -99,3 +99,5 @@ old_*
 old_rokkon-to-migrate/**
 /consul-data/node-id
 /consul-data
+
+java_tree.txt
