@@ -10,12 +10,18 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.networknt.schema.JsonSchema;
 import com.networknt.schema.JsonSchemaFactory;
 import com.networknt.schema.SpecVersion;
+import io.quarkus.cache.CacheInvalidate;
+import io.quarkus.cache.CacheKey;
+import io.quarkus.cache.CacheResult;
 import io.smallrye.mutiny.Uni;
 import io.vertx.ext.consul.ConsulClient;
 import io.vertx.ext.consul.Service;
 import io.vertx.ext.consul.ServiceOptions;
 import io.vertx.ext.consul.CheckOptions;
 import io.vertx.ext.consul.CheckStatus;
+import io.vertx.ext.consul.ServiceEntry;
+import io.vertx.ext.consul.ServiceEntryList;
+import io.vertx.ext.consul.ServiceList;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.enterprise.event.Event;
 import jakarta.enterprise.event.Observes;
@@ -47,7 +53,7 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
     
     private static final Logger LOG = Logger.getLogger(GlobalModuleRegistryServiceImpl.class);
     
-    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "rokkon")
+    @ConfigProperty(name = "pipeline.consul.kv-prefix", defaultValue = "pipeline")
     String kvPrefix;
     
     @Inject
@@ -73,6 +79,8 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
      * This creates both a service entry and stores metadata in KV.
      */
     @Override
+    @CacheInvalidate(cacheName = "global-modules-list")
+    @CacheInvalidate(cacheName = "global-modules-enabled")
     public Uni<ModuleRegistration> registerModule(
             String moduleName,
             String implementationId,
@@ -264,20 +272,81 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
      * This includes both enabled and disabled modules
      */
     @Override
+    @CacheResult(cacheName = "global-modules-list")
+    @SuppressWarnings("unchecked")
     public Uni<Set<ModuleRegistration>> listRegisteredModules() {
         ConsulClient client = getConsulClient();
         
-        return Uni.createFrom().completionStage(
-            client.localServices().toCompletionStage()
-        )
+        // Try to get all services with module tag directly using health endpoint
+        return ((Uni<Set<ModuleRegistration>>) (Uni<?>) Uni.createFrom().<List<Service>>emitter(emitter -> {
+            // First, we need to get the list of all services from catalog
+            client.catalogServices()
+                .onComplete(catalogResult -> {
+                    if (catalogResult.failed()) {
+                        LOG.warnf("Failed to get catalog services: %s", catalogResult.cause());
+                        emitter.complete(new ArrayList<>());
+                        return;
+                    }
+                    
+                    ServiceList serviceList = catalogResult.result();
+                    if (serviceList == null || serviceList.getList() == null) {
+                        LOG.debugf("No services found in catalog");
+                        emitter.complete(new ArrayList<>());
+                        return;
+                    }
+                    
+                    // Filter for services with "module" tag
+                    List<String> moduleServiceNames = serviceList.getList().stream()
+                        .filter(service -> service != null && 
+                                service.getTags() != null && 
+                                service.getTags().contains("module"))
+                        .map(service -> service.getName())
+                        .distinct()
+                        .toList();
+                    
+                    if (moduleServiceNames.isEmpty()) {
+                        LOG.debugf("No services with 'module' tag found");
+                        emitter.complete(new ArrayList<>());
+                        return;
+                    }
+                    
+                    // Collect all services from health checks
+                    List<Service> allServices = new ArrayList<>();
+                    java.util.concurrent.atomic.AtomicInteger remaining = 
+                        new java.util.concurrent.atomic.AtomicInteger(moduleServiceNames.size());
+                    
+                    for (String serviceName : moduleServiceNames) {
+                        client.healthServiceNodes(serviceName, false)
+                            .onComplete(healthResult -> {
+                                if (healthResult.succeeded()) {
+                                    ServiceEntryList entryList = healthResult.result();
+                                    if (entryList != null && entryList.getList() != null) {
+                                        entryList.getList().stream()
+                                            .map(ServiceEntry::getService)
+                                            .filter(service -> service != null)
+                                            .forEach(allServices::add);
+                                    }
+                                } else {
+                                    LOG.debugf("Failed to get health for service %s: %s", 
+                                        serviceName, healthResult.cause());
+                                }
+                                
+                                if (remaining.decrementAndGet() == 0) {
+                                    // All requests completed
+                                    emitter.complete(allServices);
+                                }
+                            });
+                    }
+                });
+        })
         .onItem().transformToUni(services -> {
-            // Filter for module services using tags instead of name prefix
-            List<Service> moduleServices = services.stream()
-                .filter(service -> service.getTags() != null && service.getTags().contains("module"))
-                .toList();
+            if (services.isEmpty()) {
+                return Uni.createFrom().item(new LinkedHashSet<>());
+            }
             
             // Convert to ModuleRegistration objects
-            List<Uni<ModuleRegistration>> registrationUnis = moduleServices.stream()
+            List<Uni<ModuleRegistration>> registrationUnis = services.stream()
+                .filter(service -> service.getTags() != null && service.getTags().contains("module"))
                 .map(this::serviceToModuleRegistration)
                 .toList();
             
@@ -289,16 +358,26 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
                 .with(list -> {
                     // Use LinkedHashSet to maintain order and prevent duplicates
                     Set<ModuleRegistration> registrations = new LinkedHashSet<>();
-                    list.forEach(obj -> registrations.add((ModuleRegistration) obj));
+                    list.forEach(obj -> {
+                        if (obj instanceof ModuleRegistration) {
+                            registrations.add((ModuleRegistration) obj);
+                        }
+                    });
                     return registrations;
                 });
-        });
+        })
+        .onFailure().recoverWithUni(throwable -> {
+            LOG.errorf(throwable, "Failed to list registered modules");
+            Set<ModuleRegistration> empty = new LinkedHashSet<>();
+            return (Uni<Set<ModuleRegistration>>) (Uni<?>) Uni.createFrom().item(empty);
+        }));
     }
     
     /**
      * List only enabled modules
      */
     @Override
+    @CacheResult(cacheName = "global-modules-enabled")
     public Uni<Set<ModuleRegistration>> listEnabledModules() {
         return listRegisteredModules()
             .onItem().transform(modules -> {
@@ -316,31 +395,29 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
      * Get a specific module by ID
      */
     @Override
-    public Uni<ModuleRegistration> getModule(String moduleId) {
+    @CacheResult(cacheName = "global-modules")
+    public Uni<ModuleRegistration> getModule(@CacheKey String moduleId) {
         ConsulClient client = getConsulClient();
         
-        return Uni.createFrom().completionStage(
-            client.localServices().toCompletionStage()
-        )
-        .onItem().transform(services -> {
-            return services.stream()
-                .filter(service -> service.getId().equals(moduleId))
-                .findFirst()
-                .orElse(null);
-        })
-        .onItem().transformToUni(service -> {
-            if (service == null) {
-                return Uni.createFrom().nullItem();
-            }
-            return serviceToModuleRegistration(service);
-        });
+        // First try to find the service by listing all modules
+        return listRegisteredModules()
+            .onItem().transform(modules -> {
+                return modules.stream()
+                    .filter(module -> module.moduleId().equals(moduleId))
+                    .findFirst()
+                    .orElse(null);
+            });
     }
     
     /**
      * Disable a module (sets enabled=false)
      */
     @Override
-    public Uni<Boolean> disableModule(String moduleId) {
+    @CacheInvalidate(cacheName = "global-modules-list")
+    @CacheInvalidate(cacheName = "global-modules-enabled")
+    @CacheInvalidate(cacheName = "global-modules")
+    @CacheInvalidate(cacheName = "cluster-modules-enabled")
+    public Uni<Boolean> disableModule(@CacheKey String moduleId) {
         LOG.infof("Disabling module: %s", moduleId);
         
         // First get the current module registration
@@ -388,7 +465,11 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
      * Enable a module (sets enabled=true)
      */
     @Override
-    public Uni<Boolean> enableModule(String moduleId) {
+    @CacheInvalidate(cacheName = "global-modules-list")
+    @CacheInvalidate(cacheName = "global-modules-enabled")
+    @CacheInvalidate(cacheName = "global-modules")
+    @CacheInvalidate(cacheName = "cluster-modules-enabled")
+    public Uni<Boolean> enableModule(@CacheKey String moduleId) {
         LOG.infof("Enabling module: %s", moduleId);
         
         // First get the current module registration
@@ -436,7 +517,12 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
      * Deregister a module (hard delete - removes from registry completely)
      */
     @Override
-    public Uni<Boolean> deregisterModule(String moduleId) {
+    @CacheInvalidate(cacheName = "global-modules-list")
+    @CacheInvalidate(cacheName = "global-modules-enabled")
+    @CacheInvalidate(cacheName = "global-modules")
+    @CacheInvalidate(cacheName = "module-health-status")
+    @CacheInvalidate(cacheName = "cluster-modules-enabled")
+    public Uni<Boolean> deregisterModule(@CacheKey String moduleId) {
         ConsulClient client = getConsulClient();
         
         LOG.infof("Deregistering module (hard delete): %s", moduleId);
@@ -466,7 +552,8 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
      * Enable a module for a specific cluster
      */
     @Override
-    public Uni<Void> enableModuleForCluster(String moduleId, String clusterName) {
+    @CacheInvalidate(cacheName = "cluster-modules-enabled")
+    public Uni<Void> enableModuleForCluster(@CacheKey String moduleId, @CacheKey String clusterName) {
         ConsulClient client = getConsulClient();
         String kvKey = String.format("%s/clusters/%s/enabled-modules/%s", 
                                     kvPrefix, clusterName, moduleId);
@@ -491,7 +578,8 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
      * Disable a module for a specific cluster
      */
     @Override
-    public Uni<Void> disableModuleForCluster(String moduleId, String clusterName) {
+    @CacheInvalidate(cacheName = "cluster-modules-enabled")
+    public Uni<Void> disableModuleForCluster(@CacheKey String moduleId, @CacheKey String clusterName) {
         ConsulClient client = getConsulClient();
         String kvKey = String.format("%s/clusters/%s/enabled-modules/%s", 
                                     kvPrefix, clusterName, moduleId);
@@ -509,7 +597,8 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
      * List modules enabled for a specific cluster as an ordered set
      */
     @Override
-    public Uni<Set<String>> listEnabledModulesForCluster(String clusterName) {
+    @CacheResult(cacheName = "cluster-modules-enabled")
+    public Uni<Set<String>> listEnabledModulesForCluster(@CacheKey String clusterName) {
         ConsulClient client = getConsulClient();
         String prefix = String.format("%s/clusters/%s/enabled-modules/", kvPrefix, clusterName);
         
@@ -685,6 +774,10 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
      * Archive a service by moving it from active to archive namespace in Consul
      */
     @Override
+    @CacheInvalidate(cacheName = "global-modules-list")
+    @CacheInvalidate(cacheName = "global-modules-enabled")
+    @CacheInvalidate(cacheName = "global-modules")
+    @CacheInvalidate(cacheName = "module-health-status")
     public Uni<Boolean> archiveService(String serviceName, String reason) {
         ConsulClient client = getConsulClient();
         String timestamp = java.time.Instant.now().toString();
@@ -924,7 +1017,8 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
      * @return Health status of the module
      */
     @Override
-    public Uni<ServiceHealthStatus> getModuleHealthStatus(String moduleId) {
+    @CacheResult(cacheName = "module-health-status")
+    public Uni<ServiceHealthStatus> getModuleHealthStatus(@CacheKey String moduleId) {
         return getModule(moduleId)
             .onItem().transformToUni(module -> {
                 if (module == null) {

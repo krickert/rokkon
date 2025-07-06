@@ -15,6 +15,7 @@ import org.eclipse.microprofile.openapi.annotations.responses.APIResponses;
 import org.eclipse.microprofile.openapi.annotations.tags.Tag;
 import org.jboss.logging.Logger;
 import com.rokkon.pipeline.commons.model.GlobalModuleRegistryService;
+import io.opentelemetry.instrumentation.annotations.WithSpan;
 
 import java.util.List;
 import java.util.Map;

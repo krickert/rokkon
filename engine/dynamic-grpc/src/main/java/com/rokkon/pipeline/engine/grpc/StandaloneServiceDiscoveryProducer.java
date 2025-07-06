@@ -22,6 +22,7 @@ public class StandaloneServiceDiscoveryProducer {
     private static final Logger LOG = LoggerFactory.getLogger(StandaloneServiceDiscoveryProducer.class);
     
     @Inject
+    @ServiceDiscoveryImpl(ServiceDiscoveryImpl.Type.CONSUL_DIRECT)
     DynamicConsulServiceDiscovery dynamicConsulServiceDiscovery;
     
     /**

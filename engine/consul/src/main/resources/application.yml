@@ -77,12 +77,30 @@ quarkus:
     com-rokkon-pipeline-engine-models:
       group-id: com.rokkon.pipeline
       artifact-id: engine-models
+    commons-interface:
+      group-id: com.rokkon.pipeline
+      artifact-id: interface
 
 
 # Consul configuration
 consul:
   host: ${CONSUL_HOST:localhost}
   port: ${CONSUL_PORT:8500}
+  kv:
+    prefix: ${CONSUL_KV_PREFIX:rokkon}
+
+# Pipeline configuration
+pipeline:
+  cluster:
+    name: ${PIPELINE_CLUSTER_NAME:default}
+  consul:
+    init:
+      enabled: ${PIPELINE_CONSUL_INIT_ENABLED:true}
+    watch:
+      enabled: ${PIPELINE_CONSUL_WATCH_ENABLED:true}
+      interval: ${PIPELINE_CONSUL_WATCH_INTERVAL:10s}
+      services:
+        interval: ${PIPELINE_CONSUL_WATCH_SERVICES_INTERVAL:5s}
 
 # Rokkon configuration defaults
 # These can be overridden by values in Consul KV store
@@ -120,6 +138,12 @@ rokkon:
   quarkus:
     live-reload:
       instrumentation: true
+
+# Dev profile
+"%dev":
+  consul:
+    host: ${CONSUL_HOST:localhost}
+    port: ${CONSUL_PORT:8501}  # Dev mode uses 8501
 
 # Test profile
 "%test":

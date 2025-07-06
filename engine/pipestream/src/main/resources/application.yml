@@ -22,6 +22,9 @@ quarkus:
       max-inbound-message-size: 419430400
       health:
         enabled: true
+      # Enable gRPC-Web via WebSockets
+      websockets:
+        enabled: true
 
 
     # gRPC client defaults
@@ -50,6 +53,11 @@ quarkus:
   # Jackson configuration for consistent JSON formatting
   jackson:
     property-naming-strategy: SNAKE_CASE
+  
+  # Web bundler configuration
+  web-bundler:
+    dependencies:
+      compile-only: false
 
 # Pipeline configuration - using 'pipeline' prefix instead of 'rokkon'
 pipeline:
@@ -62,6 +70,50 @@ pipeline:
       "grpc-channels":
         expire-after-write: 10m
         maximum-size: 100
+      
+      # Consul data caches with appropriate TTLs
+      
+      # Pipeline definition caches
+      "pipeline-definitions-list":
+        expire-after-write: 5m
+        maximum-size: 1000
+      "pipeline-definitions":
+        expire-after-write: 5m
+        maximum-size: 1000
+      "pipeline-definitions-exists":
+        expire-after-write: 5m
+        maximum-size: 1000
+      "pipeline-metadata":
+        expire-after-write: 5m
+        maximum-size: 1000
+      "pipeline-active-instances":
+        expire-after-write: 30s
+        maximum-size: 1000
+      
+      # Cluster pipeline caches
+      "cluster-pipelines-list":
+        expire-after-write: 5m
+        maximum-size: 1000
+      "cluster-pipelines":
+        expire-after-write: 5m
+        maximum-size: 5000
+      
+      # Global module registry caches
+      "global-modules-list":
+        expire-after-write: 2m
+        maximum-size: 1000
+      "global-modules-enabled":
+        expire-after-write: 2m
+        maximum-size: 1000
+      "global-modules":
+        expire-after-write: 2m
+        maximum-size: 5000
+      "module-health-status":
+        expire-after-write: 30s
+        maximum-size: 1000
+      "cluster-modules-enabled":
+        expire-after-write: 2m
+        maximum-size: 1000
 
   # Index external dependencies for CDI discovery
   index-dependency:
@@ -103,6 +155,15 @@ pipeline:
         level: DEBUG
       "io.grpc":
         level: INFO
+      # Reduce OpenTelemetry context storage warnings
+      "io.quarkus.opentelemetry.runtime.QuarkusContextStorage":
+        level: WARN
+      # Reduce periodic metric reader noise
+      "io.opentelemetry.sdk.metrics.export.PeriodicMetricReader":
+        level: WARN
+      # Disable FINE-level OpenTelemetry logs
+      "io.opentelemetry":
+        level: INFO
 
   # Container image configuration
   container-image:
@@ -130,13 +191,19 @@ pipeline:
         enabled: true
 
   otel:
-    enabled: true
+    enabled: ${OTEL_ENABLED:true}
     traces:
       enabled: true
     metrics:
       enabled: true
     logs:
       enabled: true
+    # Configure context propagation for reactive streams
+    propagators: tracecontext,baggage
+  
+  # Enable context propagation for reactive streams
+  context-propagation:
+    enabled: true
 
   # Micrometer metrics configuration
   micrometer:
@@ -328,7 +395,7 @@ smallrye:
       # Read timeout  
       read-timeout: 30s
 
-    # In dev mode, enable Consul features if consul.host is configured
+    # In dev mode, disable Consul config to avoid startup failures
     consul-config:
       enabled: false
 
@@ -336,6 +403,8 @@ smallrye:
     web-bundler:
       bundling:
         watch: true  # Enable hot reload in dev mode
+      dependencies:
+        compile-only: false  # Allow runtime web dependencies
 
   # Consul configuration for dev mode
   consul:
@@ -343,9 +412,37 @@ smallrye:
     port: ${CONSUL_PORT:8501}
     enabled: true
 
-  # Enable auto-start of Consul container in dev mode
-  rokkon:
+  # Dev mode specific pipeline configuration
+  pipeline:
     dev:
+      # Auto-deployment configuration for modules
+      modules:
+        auto-deploy:
+          enabled: true
+          # List of modules to automatically deploy in dev mode
+          modules:
+            - name: echo
+              instances: 1
+              enabled: true
+            - name: chunker
+              instances: 1
+              enabled: true
+            - name: parser
+              instances: 1
+              enabled: true
+            - name: embedder
+              instances: 1
+              enabled: false  # Disabled by default due to resource usage
+          # Restart policy for failed modules
+          restart:
+            enabled: true
+            max-attempts: 3
+            backoff-seconds: 30
+      # Health check configuration
+      health:
+        check-interval: 30s
+        timeout: 10s
+      # Consul configuration for dev mode
       consul:
         auto-start: true
 

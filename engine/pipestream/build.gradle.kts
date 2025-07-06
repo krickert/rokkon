@@ -70,6 +70,9 @@ dependencies {
 
     // --- Observability & Resilience ---
     implementation("io.quarkus:quarkus-smallrye-fault-tolerance")
+    
+    // --- Scheduler for periodic tasks ---
+    implementation("io.quarkus:quarkus-scheduler")
 
     // --- Observability DevServices ---
     // Automatically starts Grafana LGTM stack (Loki, Grafana, Tempo, Mimir/Prometheus) in dev mode
@@ -77,6 +80,9 @@ dependencies {
 
     // OpenTelemetry for traces, metrics, and logs
     implementation("io.quarkus:quarkus-opentelemetry")
+    
+    // Context propagation for reactive operations (required for OpenTelemetry with reactive)
+    implementation("io.quarkus:quarkus-smallrye-context-propagation")
 
     // Micrometer for metrics export to OTLP
     implementation("io.quarkus:quarkus-micrometer")
