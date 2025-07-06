@@ -7,7 +7,7 @@ package com.rokkon.pipeline.engine.dev;
  * External ports are dynamically allocated during deployment.
  */
 public enum PipelineModule {
-    ECHO("echo", "pipeline/echo-module:latest", "Simple echo module for testing", "1G"),
+    ECHO("echo", "pipeline/echo:latest", "Simple echo module for testing", "1G"),
     TEST("test-module", "pipeline/test-module:latest", "Test module for pipeline validation", "1G"),
     PARSER("parser", "pipeline/parser-module:latest", "Document parser module", "1G"),
     CHUNKER("chunker", "pipeline/chunker:latest", "Text chunking module with NLP", "4G"),

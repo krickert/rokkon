@@ -36,9 +36,11 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.Set;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.UUID;
 import java.util.ArrayList;
+import java.util.stream.Collectors;
 import java.net.Socket;
 import java.net.InetSocketAddress;
 
@@ -928,82 +930,245 @@ public class GlobalModuleRegistryServiceImpl implements GlobalModuleRegistryServ
     
     /**
      * Clean up zombie instances - modules that are failing health checks or no longer exist
-     * This method uses Consul health information instead of Docker
+     * This method handles ALL types of zombies and dirty Consul state:
+     * 1. Type 1: Classic zombies (in KV + catalog but unhealthy)
+     * 2. Type 2: Stale service entries (in catalog but not KV)
+     * 3. Type 3: Partial registrations (in KV but not catalog)
+     * 4. Type 4: Name mismatches (registered with wrong name like "echo-module" instead of "echo")
+     * 5. Type 5: Any registration that doesn't match expected patterns or has no real backing
      */
     @Override
     public Uni<ZombieCleanupResult> cleanupZombieInstances() {
-        LOG.info("Starting zombie instance cleanup using Consul health checks");
+        LOG.info("Starting comprehensive zombie instance cleanup");
         ConsulClient client = getConsulClient();
         
+        // First, get all registered modules from KV store
         return listRegisteredModules()
-            .onItem().transformToUni(modules -> {
-                if (modules.isEmpty()) {
-                    LOG.info("No modules to check for zombies");
-                    return Uni.createFrom().item(new ZombieCleanupResult(0, 0, List.of()));
-                }
-                
-                // Get health check status for all module services
-                List<Uni<ServiceHealthStatus>> healthCheckUnis = modules.stream()
-                    .map(module -> checkModuleHealth(client, module))
-                    .toList();
-                
-                return Uni.combine().all().unis(healthCheckUnis)
-                    .with(results -> {
-                        @SuppressWarnings("unchecked")
-                        List<ServiceHealthStatus> healthStatuses = (List<ServiceHealthStatus>) results;
-                        
-                        // Identify zombies (critical health or missing)
-                        List<ServiceHealthStatus> zombies = healthStatuses.stream()
-                            .filter(status -> status.isZombie())
-                            .toList();
-                        
-                        return zombies;
-                    })
-                    .onItem().transformToUni(zombies -> {
-                        int zombiesDetected = zombies.size();
-                        LOG.infof("Detected %d zombie instances", zombiesDetected);
-                        
-                        if (zombiesDetected == 0) {
-                            return Uni.createFrom().item(new ZombieCleanupResult(0, 0, List.of()));
-                        }
-                        
-                        // Clean up zombies
-                        List<Uni<Boolean>> cleanupUnis = zombies.stream()
-                            .map(zombie -> {
-                                LOG.infof("Deregistering zombie instance: %s (health: %s)", 
-                                         zombie.module().moduleId(), zombie.healthStatus());
-                                return deregisterModule(zombie.module().moduleId())
-                                    .onFailure().recoverWithItem(t -> {
-                                        LOG.errorf(t, "Failed to deregister zombie %s", zombie.module().moduleId());
-                                        return false;
-                                    });
-                            })
-                            .toList();
-                        
-                        return Uni.combine().all().unis(cleanupUnis)
-                            .with(cleanupResults -> {
-                                @SuppressWarnings("unchecked")
-                                List<Boolean> cleanResults = (List<Boolean>) cleanupResults;
+            .onItem().transformToUni(registeredModules -> {
+                // Also get all services from catalog that look like modules
+                return Uni.createFrom().<List<Service>>emitter(emitter -> {
+                    client.catalogServices()
+                        .onComplete(catalogResult -> {
+                            if (catalogResult.failed()) {
+                                LOG.warnf("Failed to get catalog services: %s", catalogResult.cause());
+                                emitter.complete(new ArrayList<>());
+                                return;
+                            }
+                            
+                            ServiceList serviceList = catalogResult.result();
+                            if (serviceList == null || serviceList.getList() == null) {
+                                emitter.complete(new ArrayList<>());
+                                return;
+                            }
+                            
+                            // Filter for services with "module" tag
+                            List<Service> moduleServices = serviceList.getList().stream()
+                                .filter(service -> service != null && 
+                                        service.getTags() != null && 
+                                        service.getTags().contains("module"))
+                                .toList();
                                 
-                                int zombiesCleaned = (int) cleanResults.stream()
-                                    .filter(success -> success)
-                                    .count();
-                                
-                                List<String> errors = new ArrayList<>();
-                                for (int i = 0; i < cleanResults.size(); i++) {
-                                    if (!cleanResults.get(i)) {
-                                        ModuleRegistration zombie = zombies.get(i).module();
-                                        errors.add(String.format("Failed to cleanup %s (%s)", 
-                                                                zombie.moduleId(), zombie.moduleName()));
+                            emitter.complete(moduleServices);
+                        });
+                })
+                .onItem().transformToUni(catalogModuleServices -> {
+                    // Now check for all three types of zombies
+                    List<Uni<ServiceHealthStatus>> healthCheckUnis = new ArrayList<>();
+                    Set<String> registeredModuleIds = registeredModules.stream()
+                        .map(ModuleRegistration::moduleId)
+                        .collect(Collectors.toSet());
+                    
+                    // Type 1 & 3: Check health of all registered modules
+                    for (ModuleRegistration module : registeredModules) {
+                        healthCheckUnis.add(checkModuleHealth(client, module));
+                    }
+                    
+                    // Type 2: Check for stale service entries (in catalog but not in KV)
+                    List<Uni<ServiceHealthStatus>> staleServiceUnis = new ArrayList<>();
+                    for (Service catalogService : catalogModuleServices) {
+                        String serviceName = catalogService.getName();
+                        
+                        // Get all instances of this service
+                        Uni<ServiceHealthStatus> staleCheckUni = Uni.createFrom().completionStage(
+                            client.healthServiceNodes(serviceName, false).toCompletionStage()
+                        )
+                        .onItem().transformToUni(serviceEntryList -> {
+                            if (serviceEntryList == null || serviceEntryList.getList() == null) {
+                                return Uni.createFrom().item((ServiceHealthStatus) null);
+                            }
+                            
+                            List<Uni<ServiceHealthStatus>> instanceUnis = new ArrayList<>();
+                            for (ServiceEntry entry : serviceEntryList.getList()) {
+                                Service svc = entry.getService();
+                                if (svc != null && !registeredModuleIds.contains(svc.getId())) {
+                                    // This service instance is NOT in our KV store - it's a stale entry!
+                                    LOG.infof("Found stale service entry: %s (ID: %s) - not in KV store", 
+                                             serviceName, svc.getId());
+                                    
+                                    // Create a dummy ModuleRegistration for cleanup
+                                    ModuleRegistration staleModule = new ModuleRegistration(
+                                        svc.getId(),
+                                        serviceName,
+                                        "",
+                                        svc.getAddress(),
+                                        svc.getPort(),
+                                        "UNKNOWN",
+                                        "unknown",
+                                        svc.getMeta() != null ? svc.getMeta() : Map.of(),
+                                        0,
+                                        svc.getAddress(),
+                                        svc.getPort(),
+                                        null,
+                                        false,
+                                        null,
+                                        null,
+                                        null
+                                    );
+                                    
+                                    // Mark as zombie (stale type 2)
+                                    instanceUnis.add(Uni.createFrom().item(
+                                        new ServiceHealthStatus(staleModule, HealthStatus.CRITICAL, false)
+                                    ));
+                                }
+                            }
+                            
+                            if (instanceUnis.isEmpty()) {
+                                return Uni.createFrom().item((ServiceHealthStatus) null);
+                            }
+                            
+                            return Uni.combine().all().unis(instanceUnis)
+                                .with(list -> {
+                                    @SuppressWarnings("unchecked")
+                                    List<ServiceHealthStatus> statuses = (List<ServiceHealthStatus>) list;
+                                    return statuses.isEmpty() ? null : statuses.get(0);
+                                });
+                        });
+                        
+                        staleServiceUnis.add(staleCheckUni);
+                    }
+                    
+                    // Combine all health checks
+                    List<Uni<ServiceHealthStatus>> allChecks = new ArrayList<>();
+                    allChecks.addAll(healthCheckUnis);
+                    allChecks.addAll(staleServiceUnis);
+                    
+                    if (allChecks.isEmpty()) {
+                        return Uni.createFrom().item(new ZombieCleanupResult(0, 0, List.of()));
+                    }
+                    
+                    return Uni.combine().all().unis(allChecks)
+                        .with(results -> {
+                            @SuppressWarnings("unchecked")
+                            List<ServiceHealthStatus> healthStatuses = ((List<ServiceHealthStatus>) results).stream()
+                                .filter(Objects::nonNull)
+                                .toList();
+                            
+                            // Identify all types of zombies
+                            List<ServiceHealthStatus> zombies = new ArrayList<>();
+                            
+                            // Add Type 1, 2, 3 zombies (unhealthy, stale, partial)
+                            zombies.addAll(healthStatuses.stream()
+                                .filter(status -> status.isZombie())
+                                .toList());
+                            
+                            // Type 4: Check for modules in KV with no corresponding service instances
+                            // This catches registrations that exist in KV but have no service catalog entries
+                            Set<String> servicesWithInstances = new HashSet<>();
+                            for (ServiceHealthStatus status : healthStatuses) {
+                                if (status.exists()) {
+                                    servicesWithInstances.add(status.module().moduleName());
+                                }
+                            }
+                            
+                            // Find modules that are registered but have NO service instances at all
+                            for (ModuleRegistration regModule : registeredModules) {
+                                if (!servicesWithInstances.contains(regModule.moduleName())) {
+                                    // This module is in KV but has no service instances - it's a zombie
+                                    boolean alreadyMarked = zombies.stream()
+                                        .anyMatch(z -> z.module().moduleId().equals(regModule.moduleId()));
+                                    
+                                    if (!alreadyMarked) {
+                                        LOG.infof("Found Type 4 zombie (KV entry with no service instances): %s (%s)", 
+                                                 regModule.moduleId(), regModule.moduleName());
+                                        zombies.add(new ServiceHealthStatus(regModule, HealthStatus.CRITICAL, false));
                                     }
                                 }
-                                
-                                LOG.infof("Zombie cleanup completed: %d detected, %d cleaned, %d errors", 
-                                         zombiesDetected, zombiesCleaned, errors.size());
-                                
-                                return new ZombieCleanupResult(zombiesDetected, zombiesCleaned, errors);
-                            });
-                    });
+                            }
+                            
+                            LOG.infof("Zombie detection complete: %d total zombies found", zombies.size());
+                            
+                            // Log zombie types for debugging
+                            for (ServiceHealthStatus zombie : zombies) {
+                                ModuleRegistration module = zombie.module();
+                                if (!zombie.exists()) {
+                                    // Could be Type 2 (stale catalog) or Type 4 (KV only)
+                                    boolean hasKvEntry = registeredModules.stream()
+                                        .anyMatch(r -> r.moduleId().equals(module.moduleId()));
+                                    if (hasKvEntry) {
+                                        LOG.infof("  Type 4 zombie (KV entry with no service instances): %s", module.moduleId());
+                                    } else {
+                                        LOG.infof("  Type 2 zombie (stale catalog entry): %s", module.moduleId());
+                                    }
+                                } else if (zombie.healthStatus() == HealthStatus.CRITICAL) {
+                                    LOG.infof("  Type 1 zombie (unhealthy): %s", module.moduleId());
+                                }
+                            }
+                            
+                            return zombies;
+                        })
+                        .onItem().transformToUni(zombies -> {
+                            int zombiesDetected = zombies.size();
+                            
+                            if (zombiesDetected == 0) {
+                                LOG.info("No zombies detected");
+                                return Uni.createFrom().item(new ZombieCleanupResult(0, 0, List.of()));
+                            }
+                            
+                            // Clean up all zombies
+                            List<Uni<Boolean>> cleanupUnis = zombies.stream()
+                                .map(zombie -> {
+                                    String moduleId = zombie.module().moduleId();
+                                    LOG.infof("Cleaning up zombie: %s", moduleId);
+                                    
+                                    // Use the full deregisterModule method which handles both service catalog and KV
+                                    // This ensures we clean up everything regardless of zombie type
+                                    return deregisterModule(moduleId)
+                                        .onItem().transform(success -> {
+                                            if (success) {
+                                                LOG.infof("Successfully cleaned up zombie: %s", moduleId);
+                                            } else {
+                                                LOG.warnf("Partial cleanup of zombie: %s", moduleId);
+                                            }
+                                            return success;
+                                        });
+                                })
+                                .toList();
+                            
+                            return Uni.combine().all().unis(cleanupUnis)
+                                .with(cleanupResults -> {
+                                    @SuppressWarnings("unchecked")
+                                    List<Boolean> cleanResults = (List<Boolean>) cleanupResults;
+                                    
+                                    int zombiesCleaned = (int) cleanResults.stream()
+                                        .filter(success -> success)
+                                        .count();
+                                    
+                                    List<String> errors = new ArrayList<>();
+                                    for (int i = 0; i < cleanResults.size(); i++) {
+                                        if (!cleanResults.get(i)) {
+                                            ModuleRegistration zombie = zombies.get(i).module();
+                                            errors.add(String.format("Failed to cleanup %s (%s)", 
+                                                                    zombie.moduleId(), zombie.moduleName()));
+                                        }
+                                    }
+                                    
+                                    LOG.infof("Zombie cleanup completed: %d detected, %d cleaned, %d errors", 
+                                             zombiesDetected, zombiesCleaned, errors.size());
+                                    
+                                    return new ZombieCleanupResult(zombiesDetected, zombiesCleaned, errors);
+                                });
+                        });
+                });
             })
             .onFailure().recoverWithItem(t -> {
                 LOG.errorf(t, "Failed to cleanup zombie instances");

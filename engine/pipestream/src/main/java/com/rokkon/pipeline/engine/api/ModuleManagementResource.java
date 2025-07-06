@@ -339,11 +339,15 @@ public class ModuleManagementResource {
             });
     }
 
-    @DELETE
-    @Path("/zombies/cleanup")
+    @POST
+    @Path("/cleanup-zombies")
     @Operation(
         summary = "Clean up zombie modules",
-        description = "Removes modules from registry that are no longer responding"
+        description = "Removes modules from registry that are no longer responding. " +
+                     "Handles three types of zombies: " +
+                     "1) Classic zombies (in KV + catalog but unhealthy), " +
+                     "2) Stale service entries (in catalog but not KV), " +
+                     "3) Partial registrations (in KV but not catalog)"
     )
     @APIResponse(
         responseCode = "200",
@@ -354,7 +358,7 @@ public class ModuleManagementResource {
         )
     )
     public Uni<GlobalModuleRegistryService.ZombieCleanupResult> cleanupZombies() {
-        LOG.info("Cleaning up zombie modules from registry");
+        LOG.info("Manual trigger: Cleaning up zombie modules from registry");
         
         return moduleRegistry.cleanupZombieInstances();
     }

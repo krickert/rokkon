@@ -36,7 +36,7 @@ quarkus:
     build: false  # Override with -Dquarkus.container-image.build=true
     push: false   # Override with -Dquarkus.container-image.push=true
     group: pipeline
-    name: echo-module
+    name: echo
     tag: latest
     # Additional labels for service mesh integration
     labels:
@@ -59,7 +59,7 @@ quarkus:
         protocol: ${OTEL_EXPORTER_OTLP_PROTOCOL:grpc}
     resource:
       attributes:
-        service.name: echo-module
+        service.name: echo
         service.namespace: pipeline
         deployment.environment: ${quarkus.profile:prod}
   

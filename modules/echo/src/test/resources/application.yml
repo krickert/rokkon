@@ -1,0 +1,9 @@
+# Test profile configuration
+module:
+  name: echo
+
+quarkus:
+  grpc:
+    server:
+      use-separate-server: false  # Use unified server mode
+      test-port: 0  # Use random port for tests

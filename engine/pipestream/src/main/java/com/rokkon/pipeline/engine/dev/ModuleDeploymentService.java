@@ -482,7 +482,7 @@ public class ModuleDeploymentService {
                         .withMemoryReservation(memoryReservation)
                     )
                     .withEnv(List.of(
-                        "MODULE_NAME=" + module.getModuleName() + "-module" + (instanceNumber > 1 ? "-" + instanceNumber : ""),
+                        "MODULE_NAME=" + module.getModuleName() + (instanceNumber > 1 ? "-" + instanceNumber : ""),
                         "MODULE_HOST=0.0.0.0",
                         "MODULE_PORT=" + MODULE_INTERNAL_PORT,
                         "ENGINE_HOST=" + hostIP,
@@ -493,7 +493,7 @@ public class ModuleDeploymentService {
                         "QUARKUS_HTTP_PORT=" + MODULE_INTERNAL_PORT,
                         "QUARKUS_PROFILE=dev",
                         "OTEL_EXPORTER_OTLP_ENDPOINT=" + otelEndpoint.orElse("http://" + hostIP + ":4317"),
-                        "OTEL_SERVICE_NAME=" + module.getModuleName() + "-module",
+                        "OTEL_SERVICE_NAME=" + module.getModuleName(),
                         "JAVA_OPTS=-Xmx" + memory + " -Xms" + (parseMemoryString(memory) / 4 / 1024 / 1024) + "m",
                         "AUTO_REGISTER=false",  // Disable auto registration - use sidecar instead
                         "SHUTDOWN_ON_REGISTRATION_FAILURE=false"  // Keep module running even if registration fails
@@ -548,7 +548,7 @@ public class ModuleDeploymentService {
         removeContainerIfExists(containerName);
         
         // Create a registration script using the provided registration host and allocated port
-        String moduleName = module.getModuleName() + "-module" + (instanceNumber > 1 ? "-" + instanceNumber : "");
+        String moduleName = module.getModuleName() + (instanceNumber > 1 ? "-" + instanceNumber : "");
         String registrationScript = String.format("""
             #!/bin/sh
             echo 'Waiting for module to be ready...'
@@ -1903,7 +1903,7 @@ public class ModuleDeploymentService {
             int internalPort = MODULE_INTERNAL_PORT;
             
             // Create registration script matching the normal deployment pattern
-            String moduleServiceName = moduleName + "-module" + (instanceNumber > 1 ? "-" + instanceNumber : "");
+            String moduleServiceName = moduleName + (instanceNumber > 1 ? "-" + instanceNumber : "");
             String registrationScript = String.format("""
                 #!/bin/sh
                 echo 'Waiting for module to be ready...'

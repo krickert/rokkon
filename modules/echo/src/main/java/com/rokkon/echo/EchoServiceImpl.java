@@ -15,6 +15,9 @@ import java.time.Instant;
 public class EchoServiceImpl implements PipeStepProcessor {
 
     private static final Logger LOG = Logger.getLogger(EchoServiceImpl.class);
+    
+    // TODO: Make this configurable when we fix the test environment
+    private static final String MODULE_NAME = "echo";
 
     @Override
     public Uni<ProcessResponse> processData(ProcessRequest request) {
@@ -37,7 +40,7 @@ public class EchoServiceImpl implements PipeStepProcessor {
                     : Struct.newBuilder();
 
             // Add echo module metadata
-            customDataBuilder.putFields("processed_by_echo", Value.newBuilder().setStringValue("echo-module").build());
+            customDataBuilder.putFields("processed_by_echo", Value.newBuilder().setStringValue(MODULE_NAME).build());
             customDataBuilder.putFields("echo_timestamp", Value.newBuilder().setStringValue(Instant.now().toString()).build());
             customDataBuilder.putFields("echo_module_version", Value.newBuilder().setStringValue("1.0.0").build());
 
@@ -72,7 +75,7 @@ public class EchoServiceImpl implements PipeStepProcessor {
 
         // Build a more comprehensive registration response with metadata
         ServiceRegistrationResponse.Builder responseBuilder = ServiceRegistrationResponse.newBuilder()
-                .setModuleName("echo-module")
+                .setModuleName(MODULE_NAME)
                 .setVersion("1.0.0")
                 .setDisplayName("Echo Service")
                 .setDescription("A simple echo module that returns documents with added metadata")

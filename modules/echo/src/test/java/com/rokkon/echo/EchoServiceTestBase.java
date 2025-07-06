@@ -95,7 +95,7 @@ public abstract class EchoServiceTestBase {
                 .awaitItem()
                 .getItem();
         
-        assertThat(registration.getModuleName()).isEqualTo("echo-module");
+        assertThat(registration.getModuleName()).isEqualTo("echo");
         // Echo service has no JSON schema - it accepts any input
         assertThat(registration.hasJsonConfigSchema()).isFalse();
         // Should be healthy without test
@@ -130,7 +130,7 @@ public abstract class EchoServiceTestBase {
                 .awaitItem()
                 .getItem();
         
-        assertThat(registration.getModuleName()).isEqualTo("echo-module");
+        assertThat(registration.getModuleName()).isEqualTo("echo");
         assertThat(registration.hasJsonConfigSchema()).isFalse();
         // Health check should pass
         assertThat(registration.getHealthCheckPassed()).isTrue();
